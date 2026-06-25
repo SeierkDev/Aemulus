@@ -24,6 +24,9 @@ export const SOLANA = {
   whaleMin: num("MIMIC_WHALE_BALANCE", 10_000_000),
   /** Public pump.fun link shown on the gated screen (set after launch). */
   pumpUrl: process.env.MIMIC_PUMP_URL ?? "https://pump.fun",
+  /** Social links for the footer (set when live). */
+  xUrl: process.env.MIMIC_X_URL ?? "https://x.com",
+  githubUrl: process.env.MIMIC_GITHUB_URL ?? "https://github.com",
   /** Daily run quotas per tier. A negative value means unlimited. */
   quotaHolder: num("MIMIC_QUOTA_HOLDER", 5),
   quotaPro: num("MIMIC_QUOTA_PRO", 50),
