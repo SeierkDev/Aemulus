@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Badge, Button, Card } from "@/components/ui";
+import { Badge, Card } from "@/components/ui";
+import { Nav } from "@/components/Nav";
 import { StatusBadge } from "@/components/StatusBadge";
 import { listRuns } from "@/lib/runs";
 import type { Run } from "@/lib/types";
@@ -15,14 +16,7 @@ export default async function RunsPage() {
   const review = runs.filter((r) => r.status === "needs_review");
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6">
-      <header className="flex items-center justify-between py-6">
-        <Link href="/" className="mono text-sm font-semibold tracking-tight">
-          ← mimic
-        </Link>
-        <Link href="/skills">
-          <Button variant="ghost">Skills</Button>
-        </Link>
-      </header>
+      <Nav />
 
       {review.length > 0 && (
         <div className="border-t border-border pt-8">

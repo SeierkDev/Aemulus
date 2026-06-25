@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Badge, Button, Card, Label } from "@/components/ui";
+import { Badge, Card, Label } from "@/components/ui";
+import { Nav } from "@/components/Nav";
 import { GenerateButton } from "@/components/GenerateButton";
 import { listDemonstrations } from "@/lib/demonstrations";
 import { listSkills } from "@/lib/skills";
@@ -22,14 +23,7 @@ export default async function SkillsPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6">
-      <header className="flex items-center justify-between py-6">
-        <Link href="/" className="mono text-sm font-semibold tracking-tight">
-          ← mimic
-        </Link>
-        <Link href="/record">
-          <Button variant="primary">Record a task</Button>
-        </Link>
-      </header>
+      <Nav />
 
       {/* Skills */}
       <div className="border-t border-border pt-8">
