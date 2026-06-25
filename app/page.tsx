@@ -4,6 +4,7 @@ import { Nav } from "@/components/Nav";
 import { StatusBadge } from "@/components/StatusBadge";
 import { listSkills } from "@/lib/skills";
 import { listRuns } from "@/lib/runs";
+import { getSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,10 @@ function when(ts: number): string {
 }
 
 export default async function Home() {
-  const [skills, runs] = await Promise.all([listSkills(), listRuns()]);
+  const session = await getSession();
+  const [skills, runs] = session
+    ? await Promise.all([listSkills(session.pubkey), listRuns(session.pubkey)])
+    : [[], []];
   const hasData = skills.length > 0 || runs.length > 0;
   const needsReview = runs.filter((r) => r.status === "needs_review");
   const skillName = new Map(skills.map((s) => [s.id, s.name]));

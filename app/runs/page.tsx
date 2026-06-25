@@ -3,6 +3,7 @@ import { Badge, Card } from "@/components/ui";
 import { Nav } from "@/components/Nav";
 import { StatusBadge } from "@/components/StatusBadge";
 import { listRuns } from "@/lib/runs";
+import { getSession } from "@/lib/auth";
 import type { Run } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,8 @@ function when(ts: number): string {
 }
 
 export default async function RunsPage() {
-  const runs = await listRuns();
+  const owner = (await getSession())?.pubkey ?? "";
+  const runs = await listRuns(owner);
   const review = runs.filter((r) => r.status === "needs_review");
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6">

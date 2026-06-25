@@ -4,6 +4,7 @@ import { Nav } from "@/components/Nav";
 import { GenerateButton } from "@/components/GenerateButton";
 import { listDemonstrations } from "@/lib/demonstrations";
 import { listSkills } from "@/lib/skills";
+import { getSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -12,9 +13,10 @@ function when(ts: number): string {
 }
 
 export default async function SkillsPage() {
+  const owner = (await getSession())?.pubkey ?? "";
   const [skills, demos] = await Promise.all([
-    listSkills(),
-    listDemonstrations(),
+    listSkills(owner),
+    listDemonstrations(owner),
   ]);
   const generalizedDemoIds = new Set(
     skills.map((s) => s.sourceDemoId).filter(Boolean),

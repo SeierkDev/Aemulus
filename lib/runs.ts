@@ -3,6 +3,7 @@ import { id } from "./ids";
 import type { Run, RunOverrides, RunStatus, RunStepRecord } from "./types";
 
 export async function createRun(input: {
+  owner: string;
   skillId: string;
   input: Record<string, string>;
   overrides?: RunOverrides;
@@ -11,6 +12,7 @@ export async function createRun(input: {
   const now = Date.now();
   const run: Run = {
     id: id("run"),
+    owner: input.owner,
     skillId: input.skillId,
     status: "running",
     input: input.input,
@@ -22,10 +24,11 @@ export async function createRun(input: {
     updatedAt: now,
   };
   await db.execute({
-    sql: `INSERT INTO runs (id, skill_id, status, input, overrides, result, error, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO runs (id, owner, skill_id, status, input, overrides, result, error, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       run.id,
+      run.owner,
       run.skillId,
       run.status,
       JSON.stringify(run.input),
@@ -85,15 +88,19 @@ export async function getRun(runId: string): Promise<Run | null> {
   return rowToRun(r.rows[0], steps.rows.map(rowToStep));
 }
 
-export async function listRuns(): Promise<Run[]> {
+export async function listRuns(owner: string): Promise<Run[]> {
   await ready();
-  const r = await db.execute(`SELECT * FROM runs ORDER BY created_at DESC LIMIT 50`);
+  const r = await db.execute({
+    sql: `SELECT * FROM runs WHERE owner = ? ORDER BY created_at DESC LIMIT 50`,
+    args: [owner],
+  });
   return r.rows.map((row) => rowToRun(row, []));
 }
 
 function rowToRun(row: Record<string, unknown>, steps: RunStepRecord[]): Run {
   return {
     id: String(row.id),
+    owner: row.owner == null ? "" : String(row.owner),
     skillId: String(row.skill_id),
     status: String(row.status) as RunStatus,
     input: JSON.parse(String(row.input || "{}")),

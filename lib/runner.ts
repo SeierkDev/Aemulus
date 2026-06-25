@@ -24,8 +24,9 @@ export async function executeRun(
   skill: Skill,
   input: Record<string, string>,
   overrides: RunOverrides = {},
+  owner = "",
 ): Promise<Run> {
-  const run = await createRun({ skillId: skill.id, input, overrides });
+  const run = await createRun({ owner, skillId: skill.id, input, overrides });
   await mkdir(path.join(RUNS_DIR, run.id), { recursive: true });
 
   let browser: Browser | null = null;

@@ -10,7 +10,8 @@ export const maxDuration = 120;
 
 export async function POST(req: Request) {
   try {
-    if (!(await requireAccess())) {
+    const session = await requireAccess();
+    if (!session) {
       return NextResponse.json({ error: "Not authorized" }, { status: 401 });
     }
     const { demonstrationId } = (await req.json().catch(() => ({}))) as {
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
       );
     }
     const demo = await getDemonstration(demonstrationId);
-    if (!demo) {
+    if (!demo || demo.owner !== session.pubkey) {
       return NextResponse.json(
         { error: "Demonstration not found" },
         { status: 404 },
@@ -31,6 +32,7 @@ export async function POST(req: Request) {
     }
     const generalized = await generalizeDemonstration(demo);
     const skill = await createSkill({
+      owner: session.pubkey,
       generalized,
       sourceDemoId: demo.id,
     });

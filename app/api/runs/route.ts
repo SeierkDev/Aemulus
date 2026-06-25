@@ -9,7 +9,8 @@ export const maxDuration = 120;
 
 export async function POST(req: Request) {
   try {
-    if (!(await requireAccess())) {
+    const session = await requireAccess();
+    if (!session) {
       return NextResponse.json({ error: "Not authorized" }, { status: 401 });
     }
     const { skillId, input } = (await req.json().catch(() => ({}))) as {
@@ -20,10 +21,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "skillId is required" }, { status: 400 });
     }
     const skill = await getSkill(skillId);
-    if (!skill) {
+    if (!skill || skill.owner !== session.pubkey) {
       return NextResponse.json({ error: "Skill not found" }, { status: 404 });
     }
-    const run = await executeRun(skill, input ?? {});
+    const run = await executeRun(skill, input ?? {}, {}, session.pubkey);
     return NextResponse.json({ run });
   } catch (err) {
     return NextResponse.json(

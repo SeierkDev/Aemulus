@@ -5,6 +5,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { ResolveForm } from "@/components/ResolveForm";
 import { getRun } from "@/lib/runs";
 import { getSkill } from "@/lib/skills";
+import { getSession } from "@/lib/auth";
 import type { RunStepRecord } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -20,8 +21,8 @@ export default async function RunPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const run = await getRun(id);
-  if (!run) notFound();
+  const [run, session] = await Promise.all([getRun(id), getSession()]);
+  if (!run || run.owner !== session?.pubkey) notFound();
   const skill = await getSkill(run.skillId);
   const inputs = Object.entries(run.input);
 

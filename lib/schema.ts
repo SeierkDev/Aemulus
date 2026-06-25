@@ -14,6 +14,8 @@
 export const SCHEMA = /* sql */ `
 CREATE TABLE IF NOT EXISTS demonstrations (
   id          TEXT PRIMARY KEY,
+  -- owner wallet pubkey (base58); '' for legacy/global rows
+  owner       TEXT NOT NULL DEFAULT '',
   title       TEXT NOT NULL,
   start_url   TEXT,
   -- ordered JSON array of captured actions + screenshot refs
@@ -23,6 +25,7 @@ CREATE TABLE IF NOT EXISTS demonstrations (
 
 CREATE TABLE IF NOT EXISTS skills (
   id             TEXT PRIMARY KEY,
+  owner          TEXT NOT NULL DEFAULT '',
   name           TEXT NOT NULL,
   description    TEXT,
   -- JSON: generalized step plan (intent per step, selectors, fallbacks)
@@ -36,6 +39,7 @@ CREATE TABLE IF NOT EXISTS skills (
 
 CREATE TABLE IF NOT EXISTS runs (
   id          TEXT PRIMARY KEY,
+  owner       TEXT NOT NULL DEFAULT '',
   skill_id    TEXT NOT NULL REFERENCES skills(id),
   -- queued | running | needs_review | completed | failed
   status      TEXT NOT NULL DEFAULT 'queued',
@@ -67,4 +71,7 @@ CREATE TABLE IF NOT EXISTS run_steps (
 CREATE INDEX IF NOT EXISTS idx_runs_skill   ON runs(skill_id);
 CREATE INDEX IF NOT EXISTS idx_steps_run    ON run_steps(run_id);
 CREATE INDEX IF NOT EXISTS idx_skills_demo  ON skills(source_demo_id);
+CREATE INDEX IF NOT EXISTS idx_demos_owner  ON demonstrations(owner);
+CREATE INDEX IF NOT EXISTS idx_skills_owner ON skills(owner);
+CREATE INDEX IF NOT EXISTS idx_runs_owner   ON runs(owner);
 `;

@@ -52,6 +52,7 @@ export interface RecorderState {
 
 export interface Demonstration {
   id: string;
+  owner: string;
   title: string;
   startUrl: string | null;
   trace: RecordedAction[];
@@ -87,6 +88,7 @@ export interface SkillStep {
 
 export interface Skill {
   id: string;
+  owner: string;
   name: string;
   description: string;
   plan: SkillStep[];
@@ -138,6 +140,7 @@ export type RunOverrides = Record<number, StepOverride>;
 
 export interface Run {
   id: string;
+  owner: string;
   skillId: string;
   status: RunStatus;
   input: Record<string, string>;

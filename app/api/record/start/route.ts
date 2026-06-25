@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireAccess } from "@/lib/auth";
 import { recorder } from "@/lib/recorder";
 
 export const runtime = "nodejs";
@@ -13,6 +14,9 @@ function normalizeUrl(raw: string): string {
 
 export async function POST(req: Request) {
   try {
+    if (!(await requireAccess())) {
+      return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+    }
     const body = (await req.json().catch(() => ({}))) as {
       title?: string;
       startUrl?: string;

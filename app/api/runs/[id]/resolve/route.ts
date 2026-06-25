@@ -19,12 +19,13 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    if (!(await requireAccess())) {
+    const session = await requireAccess();
+    if (!session) {
       return NextResponse.json({ error: "Not authorized" }, { status: 401 });
     }
     const { id } = await params;
     const original = await getRun(id);
-    if (!original) {
+    if (!original || original.owner !== session.pubkey) {
       return NextResponse.json({ error: "Run not found" }, { status: 404 });
     }
     const skill = await getSkill(original.skillId);
@@ -49,7 +50,7 @@ export async function POST(
       },
     };
 
-    const run = await executeRun(skill, original.input, overrides);
+    const run = await executeRun(skill, original.input, overrides, session.pubkey);
     return NextResponse.json({ run });
   } catch (err) {
     return NextResponse.json(
