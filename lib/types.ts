@@ -103,3 +103,39 @@ export interface GeneralizedSkill {
   inputFields: SkillInputField[];
   steps: Omit<SkillStep, "idx">[];
 }
+
+/* ─── Runs (Phase 3) ───────────────────────────────────────────────────── */
+
+export type RunStatus =
+  | "running"
+  | "needs_review"
+  | "completed"
+  | "failed";
+
+/** One executed step of a run — the unit of proof and calibration. */
+export interface RunStepRecord {
+  id: string;
+  runId: string;
+  idx: number;
+  intent: string;
+  action: ActionType;
+  selectorUsed: string; // "" if none / navigate
+  value: string; // resolved value applied
+  screenshot: string; // relative path under .data/recordings
+  confidence: number; // 0..1
+  flagged: boolean;
+  note: string;
+  createdAt: number;
+}
+
+export interface Run {
+  id: string;
+  skillId: string;
+  status: RunStatus;
+  input: Record<string, string>;
+  result: string | null;
+  error: string | null;
+  steps: RunStepRecord[];
+  createdAt: number;
+  updatedAt: number;
+}
