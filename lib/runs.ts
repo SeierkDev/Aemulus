@@ -1,10 +1,11 @@
 import { db, ready } from "./db";
 import { id } from "./ids";
-import type { Run, RunStatus, RunStepRecord } from "./types";
+import type { Run, RunOverrides, RunStatus, RunStepRecord } from "./types";
 
 export async function createRun(input: {
   skillId: string;
   input: Record<string, string>;
+  overrides?: RunOverrides;
 }): Promise<Run> {
   await ready();
   const now = Date.now();
@@ -13,6 +14,7 @@ export async function createRun(input: {
     skillId: input.skillId,
     status: "running",
     input: input.input,
+    overrides: input.overrides ?? {},
     result: null,
     error: null,
     steps: [],
@@ -20,9 +22,19 @@ export async function createRun(input: {
     updatedAt: now,
   };
   await db.execute({
-    sql: `INSERT INTO runs (id, skill_id, status, input, result, error, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [run.id, run.skillId, run.status, JSON.stringify(run.input), null, null, now, now],
+    sql: `INSERT INTO runs (id, skill_id, status, input, overrides, result, error, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [
+      run.id,
+      run.skillId,
+      run.status,
+      JSON.stringify(run.input),
+      JSON.stringify(run.overrides),
+      null,
+      null,
+      now,
+      now,
+    ],
   });
   return run;
 }
@@ -85,6 +97,7 @@ function rowToRun(row: Record<string, unknown>, steps: RunStepRecord[]): Run {
     skillId: String(row.skill_id),
     status: String(row.status) as RunStatus,
     input: JSON.parse(String(row.input || "{}")),
+    overrides: JSON.parse(String(row.overrides || "{}")),
     result: row.result == null ? null : String(row.result),
     error: row.error == null ? null : String(row.error),
     steps,

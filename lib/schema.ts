@@ -41,6 +41,8 @@ CREATE TABLE IF NOT EXISTS runs (
   status      TEXT NOT NULL DEFAULT 'queued',
   -- JSON: the input this run is executing against
   input       TEXT NOT NULL DEFAULT '{}',
+  -- JSON: human resolutions keyed by step idx ({ "3": { selector?, skip? } })
+  overrides   TEXT NOT NULL DEFAULT '{}',
   -- JSON: structured result / extracted output
   result      TEXT,
   error       TEXT,

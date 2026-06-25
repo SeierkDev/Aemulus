@@ -128,11 +128,20 @@ export interface RunStepRecord {
   createdAt: number;
 }
 
+/** A human resolution for a flagged step, applied on retry. */
+export interface StepOverride {
+  selector?: string; // a corrected selector to try first
+  skip?: boolean; // skip the step entirely
+}
+
+export type RunOverrides = Record<number, StepOverride>;
+
 export interface Run {
   id: string;
   skillId: string;
   status: RunStatus;
   input: Record<string, string>;
+  overrides: RunOverrides;
   result: string | null;
   error: string | null;
   steps: RunStepRecord[];

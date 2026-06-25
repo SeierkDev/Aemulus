@@ -4,7 +4,7 @@ import path from "node:path";
 import { id } from "./ids";
 import { createRun, addRunStep, finishRun, getRun } from "./runs";
 import { operatorChooseSelector, type Candidate } from "./operate";
-import type { Run, RunStatus, Skill, SkillStep } from "./types";
+import type { Run, RunOverrides, RunStatus, Skill, SkillStep } from "./types";
 
 /**
  * Execute a skill against a set of inputs.
@@ -23,8 +23,9 @@ const DETERMINISTIC_CONFIDENCE = 0.99;
 export async function executeRun(
   skill: Skill,
   input: Record<string, string>,
+  overrides: RunOverrides = {},
 ): Promise<Run> {
-  const run = await createRun({ skillId: skill.id, input });
+  const run = await createRun({ skillId: skill.id, input, overrides });
   await mkdir(path.join(RUNS_DIR, run.id), { recursive: true });
 
   let browser: Browser | null = null;
@@ -42,11 +43,19 @@ export async function executeRun(
 
     for (const step of skill.plan) {
       const value = resolveValue(step, input);
+      const override = overrides[step.idx];
       const shotFile = `step-${String(step.idx).padStart(4, "0")}.png`;
       const shotRel = path.posix.join("recordings", run.id, shotFile);
       const shotPath = path.join(RUNS_DIR, run.id, shotFile);
 
       try {
+        // Reviewer chose to skip this step.
+        if (override?.skip) {
+          await page.screenshot({ path: shotPath }).catch(() => {});
+          await recordStep(run.id, step, "", value, shotRel, 1, false, "Skipped by reviewer.");
+          continue;
+        }
+
         if (step.action === "navigate") {
           await page.goto(step.target, { waitUntil: "domcontentloaded" });
           await page.screenshot({ path: shotPath });
@@ -54,8 +63,12 @@ export async function executeRun(
           continue;
         }
 
-        // Resolve a locator: recorded selectors first, operator fallback next.
-        let loc = await locate(page, step.selectors);
+        // Resolve a locator: reviewer's corrected selector first (if any),
+        // then recorded selectors, then operator fallback.
+        const selectors = override?.selector
+          ? [override.selector, ...step.selectors]
+          : step.selectors;
+        let loc = await locate(page, selectors);
         let selectorUsed = loc?.selector ?? "";
         let confidence = DETERMINISTIC_CONFIDENCE;
         let note = "";

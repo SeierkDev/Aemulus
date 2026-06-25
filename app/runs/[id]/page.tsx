@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card, Label } from "@/components/ui";
 import { StatusBadge } from "@/components/StatusBadge";
+import { ResolveForm } from "@/components/ResolveForm";
 import { getRun } from "@/lib/runs";
 import { getSkill } from "@/lib/skills";
 import type { RunStepRecord } from "@/lib/types";
@@ -101,6 +102,9 @@ export default async function RunPage({
                 <div className="border-t border-border px-4 py-2 text-xs text-ink-3">
                   {s.note}
                 </div>
+              )}
+              {s.flagged && run.status === "needs_review" && (
+                <ResolveForm runId={run.id} stepIdx={s.idx} />
               )}
               {s.screenshot && (
                 <div className="border-t border-border bg-bg">
