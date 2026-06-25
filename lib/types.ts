@@ -94,6 +94,9 @@ export interface Skill {
   plan: SkillStep[];
   inputSchema: { fields: SkillInputField[] };
   sourceDemoId: string | null;
+  published: boolean;
+  publishedAt: number | null;
+  runCount: number;
   createdAt: number;
   updatedAt: number;
 }

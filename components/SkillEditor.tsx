@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Button, Card, Label, cx } from "@/components/ui";
 import { RunPanel } from "@/components/RunPanel";
+import { PublishToggle } from "@/components/PublishToggle";
 import type { Skill, SkillInputField, SkillStep } from "@/lib/types";
 
 const input =
@@ -96,6 +97,15 @@ export function SkillEditor({ initial }: { initial: Skill }) {
           </div>
           <div className="mono text-xs text-ink-3">{initial.id}</div>
         </Card>
+
+        {/* Publish */}
+        <div className="mt-6">
+          <PublishToggle
+            skillId={initial.id}
+            initialPublished={initial.published}
+            runCount={initial.runCount}
+          />
+        </div>
 
         {/* Run */}
         <div className="mt-6">

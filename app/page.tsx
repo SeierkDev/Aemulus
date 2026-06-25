@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Badge, Button, Card, Label } from "@/components/ui";
 import { Nav } from "@/components/Nav";
 import { StatusBadge } from "@/components/StatusBadge";
-import { listSkills } from "@/lib/skills";
+import { listSkills, listPublishedSkills } from "@/lib/skills";
 import { listRuns } from "@/lib/runs";
 import { getSession } from "@/lib/auth";
 import { SOLANA, gatingEnabled, limitForLevel } from "@/lib/solana";
@@ -64,9 +64,11 @@ function when(ts: number): string {
 
 export default async function Home() {
   const session = await getSession();
-  const [skills, runs] = session
-    ? await Promise.all([listSkills(session.pubkey), listRuns(session.pubkey)])
-    : [[], []];
+  const [skills, runs, popular] = await Promise.all([
+    session ? listSkills(session.pubkey) : Promise.resolve([]),
+    session ? listRuns(session.pubkey) : Promise.resolve([]),
+    listPublishedSkills(6),
+  ]);
   const hasData = skills.length > 0 || runs.length > 0;
   const needsReview = runs.filter((r) => r.status === "needs_review");
   const skillName = new Map(skills.map((s) => [s.id, s.name]));
@@ -168,6 +170,45 @@ export default async function Home() {
               </div>
             </div>
           )}
+        </section>
+      )}
+
+      {/* Popular skills — real content, browsable by anyone */}
+      {popular.length > 0 && (
+        <section className="border-t border-border py-16">
+          <div className="flex items-end justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight">
+                Popular skills
+              </h2>
+              <p className="mt-1.5 text-sm text-ink-2">
+                Published by the community — run any of them on your own inputs.
+              </p>
+            </div>
+            <Link href="/market" className="text-sm text-ink-3 hover:text-ink">
+              Explore all →
+            </Link>
+          </div>
+          <div className="mt-6 grid gap-3 md:grid-cols-3">
+            {popular.map((s) => (
+              <Link key={s.id} href={`/market/${s.id}`}>
+                <Card className="flex h-full flex-col p-5 transition-colors hover:bg-surface-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="text-sm font-semibold">{s.name}</h3>
+                    <span className="mono shrink-0 text-xs text-ink-3">
+                      {s.runCount}↻
+                    </span>
+                  </div>
+                  <p className="mt-1.5 flex-1 text-sm leading-relaxed text-ink-3">
+                    {s.description}
+                  </p>
+                  <div className="mono mt-3 text-xs text-ink-3">
+                    by {s.owner ? `${s.owner.slice(0, 4)}…${s.owner.slice(-4)}` : "anon"}
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
         </section>
       )}
 

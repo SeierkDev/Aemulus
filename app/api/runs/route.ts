@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
 import { getQuota } from "@/lib/quota";
-import { getSkill } from "@/lib/skills";
+import { getSkill, incrementRunCount } from "@/lib/skills";
 import { executeRun } from "@/lib/runner";
 
 export const runtime = "nodejs";
@@ -22,7 +22,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "skillId is required" }, { status: 400 });
     }
     const skill = await getSkill(skillId);
-    if (!skill || skill.owner !== session.pubkey) {
+    // Runnable if you own it, or it's published to the marketplace.
+    if (!skill || (skill.owner !== session.pubkey && !skill.published)) {
       return NextResponse.json({ error: "Skill not found" }, { status: 404 });
     }
     const quota = await getQuota(session);
@@ -35,6 +36,7 @@ export async function POST(req: Request) {
       );
     }
     const run = await executeRun(skill, input ?? {}, {}, session.pubkey);
+    await incrementRunCount(skill.id);
     return NextResponse.json({ run });
   } catch (err) {
     return NextResponse.json(

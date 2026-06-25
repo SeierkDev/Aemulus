@@ -33,6 +33,10 @@ CREATE TABLE IF NOT EXISTS skills (
   -- JSON schema describing the per-run input (e.g. fields to fill)
   input_schema   TEXT NOT NULL DEFAULT '{}',
   source_demo_id TEXT REFERENCES demonstrations(id),
+  -- marketplace: published skills are publicly browsable + runnable
+  published      INTEGER NOT NULL DEFAULT 0,
+  published_at   INTEGER,
+  run_count      INTEGER NOT NULL DEFAULT 0,
   created_at     INTEGER NOT NULL,
   updated_at     INTEGER NOT NULL
 );
@@ -74,4 +78,5 @@ CREATE INDEX IF NOT EXISTS idx_skills_demo  ON skills(source_demo_id);
 CREATE INDEX IF NOT EXISTS idx_demos_owner  ON demonstrations(owner);
 CREATE INDEX IF NOT EXISTS idx_skills_owner ON skills(owner);
 CREATE INDEX IF NOT EXISTS idx_runs_owner   ON runs(owner);
+CREATE INDEX IF NOT EXISTS idx_skills_pub   ON skills(published);
 `;

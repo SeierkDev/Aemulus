@@ -25,6 +25,9 @@ export function Nav() {
         <Brand />
       </Link>
       <nav className="flex items-center gap-1">
+        <Link href="/market">
+          <Button variant="ghost">Explore</Button>
+        </Link>
         <Link href="/skills">
           <Button variant="ghost">Skills</Button>
         </Link>
