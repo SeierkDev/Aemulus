@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+/*
+ * Mimic — monochrome design system
+ * Grayscale only. No hue. The product watches, learns, and imitates;
+ * the UI reads like a lab instrument: high contrast, sharp, quiet.
+ */
+
+:root {
+  /* Canvas → elevated surfaces (dark-first) */
+  --bg: #0a0a0b;
+  --surface: #101012;
+  --surface-2: #161618;
+  --elevated: #1c1c1f;
+
+  /* Lines */
+  --border: #232327;
+  --border-strong: #34343a;
+
+  /* Ink */
+  --ink: #f4f4f5; /* primary text */
+  --ink-2: #a1a1aa; /* secondary */
+  --ink-3: #6b6b73; /* muted / captions */
+
+  /* Signal (still monochrome — pure white as the only "accent") */
+  --signal: #ffffff;
+
+  --radius: 10px;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-elevated: var(--elevated);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-signal: var(--signal);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  --radius-base: var(--radius);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  background: var(--bg);
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  /* faint dotted grid — instrument backdrop */
+  background-image: radial-gradient(var(--border) 1px, transparent 1px);
+  background-size: 28px 28px;
+  background-position: -1px -1px;
+}
+
+/* Selection stays monochrome */
+::selection {
+  background: var(--signal);
+  color: var(--bg);
+}
+
+/* Thin scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+  border: 2px solid var(--bg);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Utilities */
+.mono {
+  font-family: var(--font-mono);
+}
+.kbd {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  color: var(--ink-2);
+  background: var(--surface-2);
+}
