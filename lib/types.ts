@@ -57,3 +57,49 @@ export interface Demonstration {
   trace: RecordedAction[];
   createdAt: number;
 }
+
+/* ─── Generalized skills (Phase 2) ─────────────────────────────────────── */
+
+/** A field that varies between runs — the parameterized input of a skill. */
+export interface SkillInputField {
+  key: string; // machine key, e.g. "full_name"
+  label: string; // human label
+  example: string; // example value drawn from the demonstration
+}
+
+/**
+ * One generalized step. `valueSource` decides where the value comes from:
+ *  - "input"    → bound to inputKey (varies per run)
+ *  - "constant" → fixed `value` baked into the skill
+ *  - "none"     → no value (clicks, navigation, key presses)
+ */
+export interface SkillStep {
+  idx: number;
+  intent: string;
+  action: ActionType;
+  selectors: string[];
+  target: string;
+  valueSource: "input" | "constant" | "none";
+  value: string;
+  inputKey: string;
+  key: string;
+}
+
+export interface Skill {
+  id: string;
+  name: string;
+  description: string;
+  plan: SkillStep[];
+  inputSchema: { fields: SkillInputField[] };
+  sourceDemoId: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** Raw shape the generalizer model emits (before we attach idx / persist). */
+export interface GeneralizedSkill {
+  name: string;
+  description: string;
+  inputFields: SkillInputField[];
+  steps: Omit<SkillStep, "idx">[];
+}

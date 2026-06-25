@@ -25,9 +25,16 @@ declare global {
   var __mimicAnthropic: Anthropic | undefined;
 }
 
-export const claude: Anthropic =
-  globalThis.__mimicAnthropic ??
-  (globalThis.__mimicAnthropic = new Anthropic({ apiKey: env.anthropicApiKey }));
+/**
+ * Lazily construct the client. Done on first use (not at import) so that
+ * importing a route doesn't require ANTHROPIC_API_KEY — only actually calling
+ * Claude does. Cached on globalThis to survive HMR.
+ */
+export function getClaude(): Anthropic {
+  return (globalThis.__mimicAnthropic ??= new Anthropic({
+    apiKey: env.anthropicApiKey,
+  }));
+}
 
 /** A screenshot turned into an Anthropic image content block. */
 export function imageBlock(
