@@ -35,6 +35,11 @@ export const env = {
     return optional("TURSO_AUTH_TOKEN");
   },
 
+  /** Secret for signing session JWTs. Falls back to a dev-only constant. */
+  get authSecret(): string {
+    return optional("AUTH_SECRET") ?? "mimic-dev-secret-change-me";
+  },
+
   get isProd(): boolean {
     return process.env.NODE_ENV === "production";
   },

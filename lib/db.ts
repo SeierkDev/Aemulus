@@ -1,6 +1,21 @@
+import { mkdirSync } from "node:fs";
+import path from "node:path";
 import { createClient, type Client } from "@libsql/client";
 import { env } from "./env";
 import { SCHEMA } from "./schema";
+
+// For the local file fallback, libsql won't create the parent directory — do it.
+function ensureLocalDir(url: string) {
+  if (url.startsWith("file:")) {
+    const file = url.slice("file:".length);
+    const dir = path.dirname(path.resolve(file));
+    try {
+      mkdirSync(dir, { recursive: true });
+    } catch {
+      /* already exists */
+    }
+  }
+}
 
 /**
  * Single shared libsql client. In dev this points at a local SQLite file;
@@ -18,10 +33,10 @@ declare global {
 
 export const db: Client =
   globalThis.__mimicDb ??
-  (globalThis.__mimicDb = createClient({
-    url: env.dbUrl,
-    authToken: env.dbAuthToken,
-  }));
+  (globalThis.__mimicDb = (() => {
+    ensureLocalDir(env.dbUrl);
+    return createClient({ url: env.dbUrl, authToken: env.dbAuthToken });
+  })());
 
 /** Idempotently create tables. Awaited by data-access code before queries. */
 export function ready(): Promise<void> {

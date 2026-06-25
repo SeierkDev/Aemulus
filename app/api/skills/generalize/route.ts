@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireAccess } from "@/lib/auth";
 import { getDemonstration } from "@/lib/demonstrations";
 import { generalizeDemonstration } from "@/lib/generalize";
 import { createSkill } from "@/lib/skills";
@@ -9,6 +10,9 @@ export const maxDuration = 120;
 
 export async function POST(req: Request) {
   try {
+    if (!(await requireAccess())) {
+      return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+    }
     const { demonstrationId } = (await req.json().catch(() => ({}))) as {
       demonstrationId?: string;
     };

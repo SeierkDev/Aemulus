@@ -1,0 +1,88 @@
+"use client";
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import { useWallet } from "@solana/wallet-adapter-react";
+import bs58 from "bs58";
+import type { Session } from "@/lib/auth";
+
+interface AuthValue {
+  session: Session | null;
+  loading: boolean;
+  signingIn: boolean;
+  error: string | null;
+  signIn: () => Promise<void>;
+  signOut: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthValue | null>(null);
+
+export function useAuth(): AuthValue {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  return ctx;
+}
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const { publicKey, signMessage, disconnect } = useWallet();
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [signingIn, setSigningIn] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load any existing session on mount.
+  useEffect(() => {
+    fetch("/api/auth/session")
+      .then((r) => r.json())
+      .then((d) => setSession(d.session ?? null))
+      .catch(() => setSession(null))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const signIn = useCallback(async () => {
+    setError(null);
+    if (!publicKey || !signMessage) {
+      setError("Connect a wallet first.");
+      return;
+    }
+    setSigningIn(true);
+    try {
+      const { message } = await (await fetch("/api/auth/nonce")).json();
+      const signature = await signMessage(new TextEncoder().encode(message));
+      const r = await fetch("/api/auth/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pubkey: publicKey.toBase58(),
+          signature: bs58.encode(signature),
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Sign-in failed");
+      setSession(data.session);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Sign-in failed");
+    } finally {
+      setSigningIn(false);
+    }
+  }, [publicKey, signMessage]);
+
+  const signOut = useCallback(async () => {
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    setSession(null);
+    await disconnect().catch(() => {});
+  }, [disconnect]);
+
+  return (
+    <AuthContext.Provider
+      value={{ session, loading, signingIn, error, signIn, signOut }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+}

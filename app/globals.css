@@ -100,3 +100,30 @@ body {
   color: var(--ink-2);
   background: var(--surface-2);
 }
+
+/* Force the Solana wallet-adapter modal into Mimic's monochrome palette. */
+.wallet-adapter-modal-wrapper {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  font-family: var(--font-sans) !important;
+}
+.wallet-adapter-modal-title {
+  color: var(--ink) !important;
+}
+.wallet-adapter-modal-list .wallet-adapter-button {
+  background: var(--surface-2) !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--border-strong) !important;
+  font-family: var(--font-sans) !important;
+}
+.wallet-adapter-modal-list .wallet-adapter-button:hover {
+  background: var(--elevated) !important;
+}
+.wallet-adapter-button-trigger {
+  background: var(--signal) !important;
+  color: var(--bg) !important;
+}
+.wallet-adapter-modal-button-close {
+  background: var(--surface-2) !important;
+}

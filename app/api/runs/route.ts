@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireAccess } from "@/lib/auth";
 import { getSkill } from "@/lib/skills";
 import { executeRun } from "@/lib/runner";
 
@@ -8,6 +9,9 @@ export const maxDuration = 120;
 
 export async function POST(req: Request) {
   try {
+    if (!(await requireAccess())) {
+      return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+    }
     const { skillId, input } = (await req.json().catch(() => ({}))) as {
       skillId?: string;
       input?: Record<string, string>;

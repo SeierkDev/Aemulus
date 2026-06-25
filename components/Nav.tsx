@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Button } from "./ui";
+import { WalletStatus } from "./WalletStatus";
 
 /** The Mimic mark — two nested squares (the original and its copy). */
 export function Brand() {
@@ -33,6 +34,7 @@ export function Nav() {
         <Link href="/record">
           <Button variant="primary">Record a task</Button>
         </Link>
+        <WalletStatus />
       </nav>
     </header>
   );

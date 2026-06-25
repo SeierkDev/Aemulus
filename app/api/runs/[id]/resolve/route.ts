@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireAccess } from "@/lib/auth";
 import { getRun } from "@/lib/runs";
 import { getSkill } from "@/lib/skills";
 import { executeRun } from "@/lib/runner";
@@ -18,6 +19,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
+    if (!(await requireAccess())) {
+      return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+    }
     const { id } = await params;
     const original = await getRun(id);
     if (!original) {
