@@ -88,6 +88,19 @@ export async function getRun(runId: string): Promise<Run | null> {
   return rowToRun(r.rows[0], steps.rows.map(rowToStep));
 }
 
+/** How many runs this wallet has started since `sinceMs` (for quotas). */
+export async function countRecentRuns(
+  owner: string,
+  sinceMs: number,
+): Promise<number> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT COUNT(*) AS n FROM runs WHERE owner = ? AND created_at >= ?`,
+    args: [owner, sinceMs],
+  });
+  return Number(r.rows[0]?.n ?? 0);
+}
+
 export async function listRuns(owner: string): Promise<Run[]> {
   await ready();
   const r = await db.execute({

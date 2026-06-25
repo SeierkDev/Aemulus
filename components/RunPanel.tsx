@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, Label } from "@/components/ui";
+import type { QuotaStatus } from "@/lib/quota";
 import type { SkillInputField } from "@/lib/types";
 
 const input =
@@ -22,6 +23,16 @@ export function RunPanel({
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [quota, setQuota] = useState<QuotaStatus | null>(null);
+
+  useEffect(() => {
+    fetch("/api/quota")
+      .then((r) => r.json())
+      .then((d) => setQuota(d.quota ?? null))
+      .catch(() => {});
+  }, []);
+
+  const out = quota ? !quota.unlimited && (quota.remaining ?? 0) <= 0 : false;
 
   async function run() {
     setBusy(true);
@@ -68,12 +79,25 @@ export function RunPanel({
           ))}
         </div>
       )}
-      <div className="flex items-center gap-3">
-        <Button variant="primary" onClick={run} disabled={busy}>
-          {busy ? "Running…" : "▶ Run now"}
+      <div className="flex flex-wrap items-center gap-3">
+        <Button variant="primary" onClick={run} disabled={busy || out}>
+          {busy ? "Running…" : out ? "Daily limit reached" : "▶ Run now"}
         </Button>
+        {quota && (
+          <span className="text-xs text-ink-3">
+            {quota.unlimited
+              ? `Unlimited runs · ${quota.tier}`
+              : `${quota.remaining} of ${quota.limit} runs left today · ${quota.tier}`}
+          </span>
+        )}
         {error && <span className="text-sm text-ink-2">{error}</span>}
       </div>
+      {out && (
+        <p className="text-xs text-ink-3">
+          You&apos;ve used your daily runs for the {quota?.tier} tier. Hold more
+          $MIMIC to raise your limit, or come back in 24h.
+        </p>
+      )}
     </Card>
   );
 }

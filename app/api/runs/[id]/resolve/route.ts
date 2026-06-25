@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
+import { getQuota } from "@/lib/quota";
 import { getRun } from "@/lib/runs";
 import { getSkill } from "@/lib/skills";
 import { executeRun } from "@/lib/runner";
@@ -40,6 +41,16 @@ export async function POST(
     };
     if (typeof body.stepIdx !== "number") {
       return NextResponse.json({ error: "stepIdx is required" }, { status: 400 });
+    }
+
+    const quota = await getQuota(session);
+    if (!quota.ok) {
+      return NextResponse.json(
+        {
+          error: `Daily run limit reached (${quota.limit}/24h on the ${quota.tier} tier). Hold more $MIMIC to raise it.`,
+        },
+        { status: 429 },
+      );
     }
 
     const overrides: RunOverrides = {

@@ -24,7 +24,19 @@ export const SOLANA = {
   whaleMin: num("MIMIC_WHALE_BALANCE", 10_000_000),
   /** Public pump.fun link shown on the gated screen (set after launch). */
   pumpUrl: process.env.MIMIC_PUMP_URL ?? "https://pump.fun",
+  /** Daily run quotas per tier. A negative value means unlimited. */
+  quotaHolder: num("MIMIC_QUOTA_HOLDER", 5),
+  quotaPro: num("MIMIC_QUOTA_PRO", 50),
+  quotaWhale: num("MIMIC_QUOTA_WHALE", -1),
 };
+
+/** Daily run limit for an access level (Whale/Open = level 3). <0 = unlimited. */
+export function limitForLevel(level: number): number {
+  if (level >= 3) return SOLANA.quotaWhale;
+  if (level === 2) return SOLANA.quotaPro;
+  if (level === 1) return SOLANA.quotaHolder;
+  return 0; // locked — no runs (locked wallets never reach a run anyway)
+}
 
 export function gatingEnabled(): boolean {
   return SOLANA.mint.length > 0;
