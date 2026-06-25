@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, Label } from "@/components/ui";
+import { useUsageGate } from "@/components/use-usage-gate";
 import type { QuotaStatus } from "@/lib/quota";
 import type { SkillInputField } from "@/lib/types";
 
@@ -24,13 +25,15 @@ export function RunPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [quota, setQuota] = useState<QuotaStatus | null>(null);
+  const { ready, gate, label } = useUsageGate();
 
   useEffect(() => {
+    if (!ready) return;
     fetch("/api/quota")
       .then((r) => r.json())
       .then((d) => setQuota(d.quota ?? null))
       .catch(() => {});
-  }, []);
+  }, [ready]);
 
   const out = quota ? !quota.unlimited && (quota.remaining ?? 0) <= 0 : false;
 
@@ -80,10 +83,16 @@ export function RunPanel({
         </div>
       )}
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="primary" onClick={run} disabled={busy || out}>
-          {busy ? "Running…" : out ? "Daily limit reached" : "▶ Run now"}
-        </Button>
-        {quota && (
+        {!ready ? (
+          <Button variant="primary" onClick={gate}>
+            {label}
+          </Button>
+        ) : (
+          <Button variant="primary" onClick={run} disabled={busy || out}>
+            {busy ? "Running…" : out ? "Daily limit reached" : "▶ Run now"}
+          </Button>
+        )}
+        {ready && quota && (
           <span className="text-xs text-ink-3">
             {quota.unlimited
               ? `Unlimited runs · ${quota.tier}`

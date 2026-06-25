@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Badge, Button, Card, Label, cx } from "@/components/ui";
+import { useUsageGate } from "@/components/use-usage-gate";
 import type { RecordedAction, RecorderState } from "@/lib/types";
 
 function actionLabel(a: RecordedAction): string {
@@ -34,6 +35,7 @@ export default function RecordPage() {
 
   const recording = state?.status === "recording";
   const saved = state?.status === "saved" || state?.status === "stopped";
+  const { ready, gate, label } = useUsageGate();
 
   const poll = useCallback(async () => {
     const r = await fetch("/api/record/status", { cache: "no-store" });
@@ -144,9 +146,21 @@ export default function RecordPage() {
                   className="rounded-[var(--radius-base)] border border-border-strong bg-surface-2 px-3 py-2 text-sm outline-none placeholder:text-ink-3 focus:border-ink-3"
                 />
               </div>
-              <Button variant="primary" onClick={start} disabled={busy}>
-                {busy ? "Opening browser…" : "Start recording"}
-              </Button>
+              {!ready ? (
+                <Button variant="primary" onClick={gate}>
+                  {label}
+                </Button>
+              ) : (
+                <Button variant="primary" onClick={start} disabled={busy}>
+                  {busy ? "Opening browser…" : "Start recording"}
+                </Button>
+              )}
+              {!ready && (
+                <p className="text-xs text-ink-3">
+                  Connect your wallet to record — browsing is free, running
+                  costs a slot.
+                </p>
+              )}
               {error && <p className="text-sm text-ink-2">{error}</p>}
             </Card>
           )}

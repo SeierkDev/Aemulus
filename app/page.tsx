@@ -5,8 +5,20 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { listSkills } from "@/lib/skills";
 import { listRuns } from "@/lib/runs";
 import { getSession } from "@/lib/auth";
+import { SOLANA, gatingEnabled, limitForLevel } from "@/lib/solana";
 
 export const dynamic = "force-dynamic";
+
+function quotaLabel(level: number): string {
+  const n = limitForLevel(level);
+  return n < 0 ? "Unlimited runs" : `${n} runs / day`;
+}
+
+const TIERS = [
+  { name: "Holder", level: 1, min: SOLANA.holderMin },
+  { name: "Pro", level: 2, min: SOLANA.proMin },
+  { name: "Whale", level: 3, min: SOLANA.whaleMin },
+];
 
 const STAGES = [
   ["Record", "Do the task once in a controlled browser — Mimic captures every action with a screenshot."],
@@ -138,6 +150,49 @@ export default async function Home() {
             <p className="mt-2 text-sm leading-relaxed text-ink-2">{body}</p>
           </Card>
         ))}
+      </section>
+
+      {/* Tiers — token utility */}
+      <section className="border-t border-border py-16">
+        <div className="flex items-end justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-tight">
+              Access tiers
+            </h2>
+            <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-ink-2">
+              Browsing Mimic is free. Running skills is powered by $MIMIC — the
+              more you hold, the more autonomous runs you get each day.
+            </p>
+          </div>
+          <a href={SOLANA.pumpUrl} target="_blank" rel="noopener noreferrer">
+            <Button variant="primary">Get $MIMIC →</Button>
+          </a>
+        </div>
+
+        <div className="mt-6 grid gap-4 md:grid-cols-3">
+          {TIERS.map((t) => (
+            <Card key={t.name} className="flex flex-col gap-3 p-5">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold tracking-tight">{t.name}</span>
+                <Badge>Tier {t.level}</Badge>
+              </div>
+              <div className="mono text-2xl font-semibold tracking-tight">
+                {quotaLabel(t.level)}
+              </div>
+              <div className="text-sm text-ink-2">
+                Hold{" "}
+                <span className="text-ink">
+                  ≥ {t.min.toLocaleString()} $MIMIC
+                </span>
+              </div>
+            </Card>
+          ))}
+        </div>
+        <p className="mt-4 text-xs text-ink-3">
+          {gatingEnabled()
+            ? "Gating is live — hold $MIMIC to run."
+            : "Token not launched yet — sign in with any wallet to use Mimic free during pre-launch."}
+        </p>
       </section>
 
       <footer className="mt-auto flex items-center justify-between border-t border-border py-6 text-sm text-ink-3">
