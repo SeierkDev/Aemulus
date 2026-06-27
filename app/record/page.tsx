@@ -6,6 +6,12 @@ import { Badge, Button, Card, Label, cx } from "@/components/ui";
 import { useUsageGate } from "@/components/use-usage-gate";
 import type { RecordedAction, RecorderState } from "@/lib/types";
 
+const VIEW_W = 1280;
+const VIEW_H = 800;
+
+const input =
+  "w-full rounded-[var(--radius-base)] border border-border-strong bg-surface-2 px-3 py-2 text-sm outline-none placeholder:text-ink-3 focus:border-ink-3";
+
 function actionLabel(a: RecordedAction): string {
   switch (a.type) {
     case "navigate":
@@ -25,31 +31,100 @@ function actionLabel(a: RecordedAction): string {
   }
 }
 
+const SPECIAL_KEYS = new Set([
+  "Enter",
+  "Tab",
+  "Backspace",
+  "Delete",
+  "Escape",
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "Home",
+  "End",
+]);
+
 export default function RecordPage() {
   const [title, setTitle] = useState("");
   const [startUrl, setStartUrl] = useState("");
   const [state, setState] = useState<RecorderState | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [frame, setFrame] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const { ready, gate, label } = useUsageGate();
 
   const recording = state?.status === "recording";
   const saved = state?.status === "saved" || state?.status === "stopped";
-  const { ready, gate, label } = useUsageGate();
 
   const poll = useCallback(async () => {
     const r = await fetch("/api/record/status", { cache: "no-store" });
     if (r.ok) setState(await r.json());
   }, []);
 
+  // Poll status (trace) while recording.
   useEffect(() => {
-    if (recording) {
-      pollRef.current = setInterval(poll, 1200);
-      return () => {
-        if (pollRef.current) clearInterval(pollRef.current);
-      };
-    }
+    if (!recording) return;
+    pollRef.current = setInterval(poll, 1200);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
   }, [recording, poll]);
+
+  // Stream screencast frames while recording.
+  useEffect(() => {
+    if (!recording) return;
+    const es = new EventSource("/api/record/stream");
+    es.onmessage = (e) => {
+      try {
+        const d = JSON.parse(e.data);
+        if (d.data) setFrame(d.data as string);
+      } catch {
+        /* ignore */
+      }
+    };
+    es.addEventListener("end", () => es.close());
+    es.onerror = () => es.close();
+    return () => es.close();
+  }, [recording]);
+
+  async function sendInput(event: unknown) {
+    await fetch("/api/record/input", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event }),
+    }).catch(() => {});
+  }
+
+  function toViewCoords(e: React.MouseEvent) {
+    const el = imgRef.current;
+    if (!el) return { x: 0, y: 0 };
+    const r = el.getBoundingClientRect();
+    return {
+      x: ((e.clientX - r.left) / r.width) * VIEW_W,
+      y: ((e.clientY - r.top) / r.height) * VIEW_H,
+    };
+  }
+
+  function onViewClick(e: React.MouseEvent) {
+    const { x, y } = toViewCoords(e);
+    void sendInput({ type: "click", x, y });
+  }
+  function onViewWheel(e: React.WheelEvent) {
+    void sendInput({ type: "scroll", dy: e.deltaY });
+  }
+  function onViewKey(e: React.KeyboardEvent) {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key.length === 1) {
+      e.preventDefault();
+      void sendInput({ type: "text", text: e.key });
+    } else if (SPECIAL_KEYS.has(e.key)) {
+      e.preventDefault();
+      void sendInput({ type: "key", key: e.key });
+    }
+  }
 
   async function start() {
     setError(null);
@@ -80,6 +155,7 @@ export default function RecordPage() {
       const r = await fetch("/api/record/stop", { method: "POST" });
       const data = await r.json();
       setState(data.state);
+      setFrame(null);
     } finally {
       setBusy(false);
     }
@@ -90,13 +166,13 @@ export default function RecordPage() {
     setTitle("");
     setStartUrl("");
     setError(null);
+    setFrame(null);
   }
 
   const actions = state?.actions ?? [];
-  const latest = actions[actions.length - 1];
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6">
+    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6">
       <header className="flex items-center justify-between py-6">
         <Link href="/" className="mono text-sm font-semibold tracking-tight">
           ← mimic
@@ -112,17 +188,17 @@ export default function RecordPage() {
         </Badge>
       </header>
 
-      <div className="grid flex-1 gap-6 border-t border-border pt-8 md:grid-cols-[360px_1fr]">
-        {/* Left: controls */}
+      <div className="grid flex-1 gap-6 border-t border-border pt-8 md:grid-cols-[340px_1fr]">
+        {/* Left: controls + trace */}
         <div className="flex flex-col gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">
               Record a task
             </h1>
             <p className="mt-1.5 text-sm leading-relaxed text-ink-2">
-              A Chromium window will open. Do the task once — Mimic captures
-              every step with a screenshot. Then stop, and we&apos;ll turn it
-              into a reusable skill.
+              A live browser opens here in your screen. Do the task once — click
+              and type in the view — then stop, and we&apos;ll turn it into a
+              reusable skill.
             </p>
           </div>
 
@@ -134,7 +210,7 @@ export default function RecordPage() {
                   value={startUrl}
                   onChange={(e) => setStartUrl(e.target.value)}
                   placeholder="example.com/form"
-                  className="rounded-[var(--radius-base)] border border-border-strong bg-surface-2 px-3 py-2 text-sm outline-none placeholder:text-ink-3 focus:border-ink-3"
+                  className={input}
                 />
               </div>
               <div className="flex flex-col gap-1.5">
@@ -143,7 +219,7 @@ export default function RecordPage() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Enter invoice into CRM"
-                  className="rounded-[var(--radius-base)] border border-border-strong bg-surface-2 px-3 py-2 text-sm outline-none placeholder:text-ink-3 focus:border-ink-3"
+                  className={input}
                 />
               </div>
               {!ready ? (
@@ -152,21 +228,15 @@ export default function RecordPage() {
                 </Button>
               ) : (
                 <Button variant="primary" onClick={start} disabled={busy}>
-                  {busy ? "Opening browser…" : "Start recording"}
+                  {busy ? "Starting…" : "Start recording"}
                 </Button>
-              )}
-              {!ready && (
-                <p className="text-xs text-ink-3">
-                  Connect your wallet to record — browsing is free, running
-                  costs a slot.
-                </p>
               )}
               {error && <p className="text-sm text-ink-2">{error}</p>}
             </Card>
           )}
 
           {recording && (
-            <Card className="flex flex-col gap-4 p-5">
+            <Card className="flex flex-col gap-3 p-5">
               <div className="flex items-center justify-between">
                 <Label>Capturing</Label>
                 <span className="mono text-2xl font-semibold">
@@ -174,8 +244,8 @@ export default function RecordPage() {
                 </span>
               </div>
               <p className="text-sm text-ink-2">
-                Steps recorded so far. Keep going in the Chromium window, then
-                stop when the task is done.
+                Steps recorded. Click and type directly in the live view, then
+                stop when done.
               </p>
               <Button variant="primary" onClick={stop} disabled={busy}>
                 {busy ? "Saving…" : "Stop & save"}
@@ -189,17 +259,7 @@ export default function RecordPage() {
                 <Label>Demonstration saved</Label>
                 <p className="mt-2 text-sm text-ink-2">
                   Captured{" "}
-                  <span className="text-ink">{actions.length} steps</span>
-                  {state?.demonstrationId && (
-                    <>
-                      {" "}
-                      ·{" "}
-                      <span className="mono text-ink-3">
-                        {state.demonstrationId}
-                      </span>
-                    </>
-                  )}
-                  .
+                  <span className="text-ink">{actions.length} steps</span>.
                 </p>
               </div>
               <div className="flex gap-2">
@@ -210,50 +270,17 @@ export default function RecordPage() {
                   <Button variant="default">Go to skills →</Button>
                 </Link>
               </div>
-              <p className="text-xs text-ink-3">
-                Next phase turns this trace into a generalized skill.
-              </p>
             </Card>
           )}
-        </div>
 
-        {/* Right: live trace + latest screenshot */}
-        <div className="flex flex-col gap-4">
-          <Card className="overflow-hidden">
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <Label>Live view</Label>
-              {latest && (
-                <span className="mono text-xs text-ink-3">
-                  step {latest.idx}
-                </span>
-              )}
-            </div>
-            <div className="grid aspect-[16/10] place-items-center bg-bg">
-              {latest?.screenshot ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={`/api/${latest.screenshot}`}
-                  alt="latest captured step"
-                  className="h-full w-full object-contain"
-                />
-              ) : (
-                <span className="text-sm text-ink-3">
-                  {recording
-                    ? "Waiting for the first action…"
-                    : "No recording yet"}
-                </span>
-              )}
-            </div>
-          </Card>
-
-          <Card className="flex min-h-[180px] flex-col">
+          <Card className="flex min-h-[160px] flex-col">
             <div className="border-b border-border px-4 py-3">
               <Label>Trace</Label>
             </div>
             <ol className="flex-1 divide-y divide-border overflow-auto">
               {actions.length === 0 && (
                 <li className="px-4 py-6 text-sm text-ink-3">
-                  Steps will appear here as you interact with the page.
+                  Steps appear here as you interact with the view.
                 </li>
               )}
               {[...actions].reverse().map((a) => (
@@ -273,6 +300,45 @@ export default function RecordPage() {
             </ol>
           </Card>
         </div>
+
+        {/* Right: live interactive view */}
+        <Card className="overflow-hidden">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <Label>Live browser</Label>
+            <span className="mono truncate text-xs text-ink-3">
+              {state?.startUrl}
+            </span>
+          </div>
+          <div
+            className="grid aspect-[16/10] place-items-center bg-bg outline-none"
+            tabIndex={0}
+            onKeyDown={onViewKey}
+          >
+            {recording && frame ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                ref={imgRef}
+                src={`data:image/jpeg;base64,${frame}`}
+                alt="live browser"
+                className="h-full w-full cursor-crosshair object-contain"
+                onClick={onViewClick}
+                onWheel={onViewWheel}
+                draggable={false}
+              />
+            ) : (
+              <span className="text-sm text-ink-3">
+                {recording
+                  ? "Connecting to the live browser…"
+                  : "The live browser will appear here once you start."}
+              </span>
+            )}
+          </div>
+          {recording && (
+            <div className="border-t border-border px-4 py-2 text-xs text-ink-3">
+              Click in the view to interact. Click a field first, then type.
+            </div>
+          )}
+        </Card>
       </div>
 
       <div className="py-6" />

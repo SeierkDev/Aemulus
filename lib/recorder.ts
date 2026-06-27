@@ -1,4 +1,10 @@
-import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import {
+  chromium,
+  type Browser,
+  type BrowserContext,
+  type CDPSession,
+  type Page,
+} from "playwright";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { id } from "./ids";
@@ -6,24 +12,38 @@ import { recorderInitScript } from "./recorder-inject";
 import type { RecordedAction, RecorderState } from "./types";
 
 /**
- * Server-side recorder. Launches a real (headed) Chromium window the user
- * drives directly; an injected script reports every meaningful interaction
- * back to Node, where we attach a proof screenshot and append to the trace.
+ * Server-side recorder. Launches a HEADLESS Chromium, streams its screen to the
+ * browser via CDP screencast, and forwards the user's mouse/keyboard back via
+ * Playwright (which dispatches trusted DOM events) — so it works for a remote
+ * user on a hosted deploy, not just on localhost. The injected script still
+ * reports each interaction, building the trace exactly as before.
  *
  * Exactly one session is active at a time. The instance is cached on
  * globalThis so Next.js hot-reload doesn't orphan a live browser.
  */
 
 const RECORDINGS_DIR = path.join(process.cwd(), ".data", "recordings");
+const VIEWPORT = { width: 1280, height: 800 };
 
 /** Payload the in-page script sends; Node enriches it into a RecordedAction. */
 type RawAction = Omit<RecordedAction, "idx" | "ts" | "url" | "screenshot">;
+
+/** An input event forwarded from the streamed view (coords in viewport px). */
+export type InputEvent =
+  | { type: "click"; x: number; y: number }
+  | { type: "move"; x: number; y: number }
+  | { type: "scroll"; dy: number }
+  | { type: "text"; text: string }
+  | { type: "key"; key: string };
 
 class RecorderSession {
   state: RecorderState | null = null;
   private browser: Browser | null = null;
   private context: BrowserContext | null = null;
   private page: Page | null = null;
+  private cdp: CDPSession | null = null;
+  private lastFrame: string | null = null;
+  private frameSeq = 0;
   /** Serializes screenshot+trace writes so indexes never race. */
   private tail: Promise<void> = Promise.resolve();
 
@@ -52,13 +72,12 @@ class RecorderSession {
 
     await mkdir(path.join(RECORDINGS_DIR, owner, sid), { recursive: true });
 
-    // Headed by default (the user drives it). MIMIC_HEADLESS=1 for tests/CI.
+    // Headless — the user drives it remotely via the streamed view.
+    // MIMIC_RECORD_HEADED=1 opens a real window for local debugging.
     this.browser = await chromium.launch({
-      headless: process.env.MIMIC_HEADLESS === "1",
+      headless: process.env.MIMIC_RECORD_HEADED !== "1",
     });
-    this.context = await this.browser.newContext({
-      viewport: { width: 1280, height: 800 },
-    });
+    this.context = await this.browser.newContext({ viewport: VIEWPORT });
 
     // Bridge: in-page script calls window.__mimicRecord(action).
     await this.context.exposeBinding(
@@ -70,15 +89,70 @@ class RecorderSession {
     await this.context.addInitScript(recorderInitScript);
 
     this.page = await this.context.newPage();
-
-    // If the user closes the window, end the session cleanly.
     this.context.on("close", () => this.markStopped());
+
+    // Stream the page to the client via CDP screencast.
+    this.cdp = await this.context.newCDPSession(this.page);
+    this.cdp.on("Page.screencastFrame", async (frame) => {
+      this.lastFrame = frame.data;
+      this.frameSeq++;
+      try {
+        await this.cdp?.send("Page.screencastFrameAck", {
+          sessionId: frame.sessionId,
+        });
+      } catch {
+        /* session may be tearing down */
+      }
+    });
+    await this.cdp.send("Page.startScreencast", {
+      format: "jpeg",
+      quality: 60,
+      maxWidth: VIEWPORT.width,
+      maxHeight: VIEWPORT.height,
+      everyNthFrame: 1,
+    });
 
     await this.page.goto(startUrl, { waitUntil: "domcontentloaded" });
     // Seed the trace with the opening navigation + its screenshot.
     this.enqueue(this.page, { type: "navigate", value: startUrl });
 
     return this.snapshot();
+  }
+
+  /** Latest screencast frame for the live view (base64 jpeg). */
+  getFrame(): { seq: number; data: string | null; url: string } {
+    return {
+      seq: this.frameSeq,
+      data: this.lastFrame,
+      url: this.page ? safeUrl(this.page) : "",
+    };
+  }
+
+  /** Forward a user input event from the streamed view to the page. */
+  async dispatchInput(ev: InputEvent): Promise<void> {
+    const page = this.page;
+    if (!page || this.state?.status !== "recording") return;
+    try {
+      switch (ev.type) {
+        case "click":
+          await page.mouse.click(clamp(ev.x, VIEWPORT.width), clamp(ev.y, VIEWPORT.height));
+          break;
+        case "move":
+          await page.mouse.move(clamp(ev.x, VIEWPORT.width), clamp(ev.y, VIEWPORT.height));
+          break;
+        case "scroll":
+          await page.mouse.wheel(0, ev.dy);
+          break;
+        case "text":
+          await page.keyboard.type(ev.text);
+          break;
+        case "key":
+          await page.keyboard.press(ev.key);
+          break;
+      }
+    } catch {
+      /* page may be navigating; drop the event */
+    }
   }
 
   /** Append an action, capturing a screenshot, serialized via `tail`. */
@@ -128,6 +202,8 @@ class RecorderSession {
     this.browser = null;
     this.context = null;
     this.page = null;
+    this.cdp = null;
+    this.lastFrame = null;
   }
 
   /** Serializable snapshot for API responses. */
@@ -152,6 +228,10 @@ class RecorderSession {
       this.state.demonstrationId = demonstrationId;
     }
   }
+}
+
+function clamp(v: number, max: number): number {
+  return Math.max(0, Math.min(Math.round(v), max));
 }
 
 function safeUrl(page: Page): string {

@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 /** Normalize a user-typed URL into something Playwright can navigate to. */
 function normalizeUrl(raw: string): string {
   const t = raw.trim();
-  if (/^https?:\/\//i.test(t)) return t;
+  if (/^https?:\/\//i.test(t) || t.startsWith("data:")) return t;
   return `https://${t}`;
 }
 
