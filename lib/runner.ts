@@ -5,6 +5,7 @@ import { id } from "./ids";
 import { createRun, addRunStep, finishRun, getRun } from "./runs";
 import { operatorChooseSelector, type Candidate } from "./operate";
 import { assertSafeUrl } from "./safe-url";
+import { runSlots } from "./semaphore";
 import type { Run, RunOverrides, RunStatus, Skill, SkillStep } from "./types";
 
 /**
@@ -28,12 +29,14 @@ export async function executeRun(
   owner = "",
 ): Promise<Run> {
   const run = await createRun({ owner, skillId: skill.id, input, overrides });
-  await mkdir(path.join(RUNS_DIR, run.id), { recursive: true });
+  await mkdir(path.join(RUNS_DIR, owner, run.id), { recursive: true });
 
   let browser: Browser | null = null;
   let finalStatus: RunStatus = "completed";
   let error: string | null = null;
 
+  // Bound concurrent Chromium launches; excess runs queue here.
+  await runSlots.acquire();
   try {
     browser = await chromium.launch({
       headless: process.env.MIMIC_RUN_HEADED !== "1",
@@ -47,8 +50,8 @@ export async function executeRun(
       const value = resolveValue(step, input);
       const override = overrides[step.idx];
       const shotFile = `step-${String(step.idx).padStart(4, "0")}.png`;
-      const shotRel = path.posix.join("recordings", run.id, shotFile);
-      const shotPath = path.join(RUNS_DIR, run.id, shotFile);
+      const shotRel = path.posix.join("recordings", owner, run.id, shotFile);
+      const shotPath = path.join(RUNS_DIR, owner, run.id, shotFile);
 
       try {
         // Reviewer chose to skip this step.
@@ -128,6 +131,7 @@ export async function executeRun(
     error = err instanceof Error ? err.message : "Run failed to start.";
   } finally {
     await browser?.close().catch(() => {});
+    runSlots.release();
   }
 
   const result =

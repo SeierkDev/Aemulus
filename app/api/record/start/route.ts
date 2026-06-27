@@ -15,7 +15,8 @@ function normalizeUrl(raw: string): string {
 
 export async function POST(req: Request) {
   try {
-    if (!(await requireAccess())) {
+    const session = await requireAccess();
+    if (!session) {
       return NextResponse.json({ error: "Not authorized" }, { status: 401 });
     }
     const body = (await req.json().catch(() => ({}))) as {
@@ -37,7 +38,7 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    const state = await recorder.start(body.title ?? "", url);
+    const state = await recorder.start(body.title ?? "", url, session.pubkey);
     return NextResponse.json(state);
   } catch (err) {
     return NextResponse.json(

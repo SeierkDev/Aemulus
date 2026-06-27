@@ -40,6 +40,7 @@ export type RecorderStatus =
 /** Live, in-memory state of the single active recorder session. */
 export interface RecorderState {
   id: string;
+  owner: string;
   status: RecorderStatus;
   title: string;
   startUrl: string;

@@ -31,13 +31,18 @@ class RecorderSession {
     return this.state?.status === "recording";
   }
 
-  async start(title: string, startUrl: string): Promise<RecorderState> {
+  async start(
+    title: string,
+    startUrl: string,
+    owner: string,
+  ): Promise<RecorderState> {
     if (this.isBusy()) {
       throw new Error("A recording is already in progress.");
     }
     const sid = id("rec");
     this.state = {
       id: sid,
+      owner,
       status: "recording",
       title: title.trim() || "Untitled task",
       startUrl,
@@ -45,7 +50,7 @@ class RecorderSession {
       startedAt: Date.now(),
     };
 
-    await mkdir(path.join(RECORDINGS_DIR, sid), { recursive: true });
+    await mkdir(path.join(RECORDINGS_DIR, owner, sid), { recursive: true });
 
     // Headed by default (the user drives it). MIMIC_HEADLESS=1 for tests/CI.
     this.browser = await chromium.launch({
@@ -82,10 +87,10 @@ class RecorderSession {
       if (!this.state || this.state.status !== "recording") return;
       const idx = this.state.actions.length;
       const file = `step-${String(idx).padStart(4, "0")}.png`;
-      const rel = path.posix.join("recordings", this.state.id, file);
+      const rel = path.posix.join("recordings", this.state.owner, this.state.id, file);
       try {
         await page.screenshot({
-          path: path.join(RECORDINGS_DIR, this.state.id, file),
+          path: path.join(RECORDINGS_DIR, this.state.owner, this.state.id, file),
         });
       } catch {
         // Page may be mid-navigation; keep the action without a screenshot.
@@ -130,6 +135,7 @@ class RecorderSession {
     if (!this.state) {
       return {
         id: "",
+        owner: "",
         status: "idle",
         title: "",
         startUrl: "",

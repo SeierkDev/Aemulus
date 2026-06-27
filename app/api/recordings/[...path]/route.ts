@@ -1,19 +1,32 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { getSession } from "@/lib/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const ROOT = path.join(process.cwd(), ".data", "recordings");
 
-/** Serve recording screenshots from .data/recordings (proof images). */
+/**
+ * Serve proof screenshots — but only your own. Screenshots are stored under
+ * .data/recordings/<owner-pubkey>/<session-or-run-id>/..., so we require a
+ * session and verify the first path segment is the caller's wallet. Prevents
+ * cross-wallet access to another user's captured screens (IDOR).
+ */
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ path: string[] }> },
 ) {
+  const session = await getSession();
+  if (!session) {
+    return new Response("Unauthorized", { status: 401 });
+  }
   const { path: parts } = await params;
+  if (parts[0] !== session.pubkey) {
+    return new Response("Forbidden", { status: 403 });
+  }
+
   const target = path.join(ROOT, ...parts);
-  // Prevent path traversal outside the recordings root.
   if (!target.startsWith(ROOT + path.sep)) {
     return new Response("Forbidden", { status: 403 });
   }
