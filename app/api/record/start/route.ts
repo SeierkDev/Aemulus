@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
+import { assertSafeUrl } from "@/lib/safe-url";
 import { recorder } from "@/lib/recorder";
 
 export const runtime = "nodejs";
@@ -27,10 +28,16 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    const state = await recorder.start(
-      body.title ?? "",
-      normalizeUrl(body.startUrl),
-    );
+    const url = normalizeUrl(body.startUrl);
+    try {
+      await assertSafeUrl(url);
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "Unsafe URL" },
+        { status: 400 },
+      );
+    }
+    const state = await recorder.start(body.title ?? "", url);
     return NextResponse.json(state);
   } catch (err) {
     return NextResponse.json(

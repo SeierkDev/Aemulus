@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { Badge, Card, Label } from "@/components/ui";
 import { Nav } from "@/components/Nav";
 import { RunPanel } from "@/components/RunPanel";
-import { getSkill } from "@/lib/skills";
+import { getSkill, skillTargets } from "@/lib/skills";
+import { getSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +18,11 @@ export default async function MarketSkillPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const skill = await getSkill(id);
+  const [skill, session] = await Promise.all([getSkill(id), getSession()]);
   if (!skill || !skill.published) notFound();
+  // Owners running their own skill don't need the trust ack.
+  const isOwner = session?.pubkey === skill.owner;
+  const domains = skillTargets(skill.plan);
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-6">
@@ -48,7 +52,12 @@ export default async function MarketSkillPage({
 
         {/* Run it */}
         <div className="mt-6">
-          <RunPanel skillId={skill.id} fields={skill.inputSchema.fields} />
+          <RunPanel
+            skillId={skill.id}
+            fields={skill.inputSchema.fields}
+            domains={domains}
+            requireTrust={!isOwner}
+          />
         </div>
 
         {/* What it does (read-only) */}

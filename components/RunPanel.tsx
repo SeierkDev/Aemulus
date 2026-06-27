@@ -14,9 +14,15 @@ const input =
 export function RunPanel({
   skillId,
   fields,
+  domains = [],
+  requireTrust = false,
 }: {
   skillId: string;
   fields: SkillInputField[];
+  /** Sites this skill will operate on (shown as a trust warning). */
+  domains?: string[];
+  /** When true (e.g. a marketplace skill you don't own), require a trust ack. */
+  requireTrust?: boolean;
 }) {
   const router = useRouter();
   const [values, setValues] = useState<Record<string, string>>(
@@ -25,6 +31,7 @@ export function RunPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [quota, setQuota] = useState<QuotaStatus | null>(null);
+  const [trusted, setTrusted] = useState(!requireTrust);
   const { ready, gate, label } = useUsageGate();
 
   useEffect(() => {
@@ -82,13 +89,39 @@ export function RunPanel({
           ))}
         </div>
       )}
+      {requireTrust && (
+        <div className="rounded-[var(--radius-base)] border border-border-strong bg-surface-2 p-3.5">
+          <Label>Before you run</Label>
+          <p className="mt-1.5 text-sm text-ink-2">
+            This skill operates on{" "}
+            <span className="text-ink">
+              {domains.length ? domains.join(", ") : "an inline page"}
+            </span>{" "}
+            and will enter your inputs there. Only run skills from sources you
+            trust — your values are typed onto these sites.
+          </p>
+          <label className="mt-3 flex items-center gap-2 text-sm text-ink-2">
+            <input
+              type="checkbox"
+              checked={trusted}
+              onChange={(e) => setTrusted(e.target.checked)}
+              className="accent-white"
+            />
+            I understand and want to run this skill.
+          </label>
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-3">
         {!ready ? (
           <Button variant="primary" onClick={gate}>
             {label}
           </Button>
         ) : (
-          <Button variant="primary" onClick={run} disabled={busy || out}>
+          <Button
+            variant="primary"
+            onClick={run}
+            disabled={busy || out || !trusted}
+          >
             {busy ? "Running…" : out ? "Daily limit reached" : "▶ Run now"}
           </Button>
         )}

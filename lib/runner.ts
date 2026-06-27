@@ -4,6 +4,7 @@ import path from "node:path";
 import { id } from "./ids";
 import { createRun, addRunStep, finishRun, getRun } from "./runs";
 import { operatorChooseSelector, type Candidate } from "./operate";
+import { assertSafeUrl } from "./safe-url";
 import type { Run, RunOverrides, RunStatus, Skill, SkillStep } from "./types";
 
 /**
@@ -58,6 +59,7 @@ export async function executeRun(
         }
 
         if (step.action === "navigate") {
+          await assertSafeUrl(step.target); // SSRF guard before any navigation
           await page.goto(step.target, { waitUntil: "domcontentloaded" });
           await page.screenshot({ path: shotPath });
           await recordStep(run.id, step, "", value, shotRel, DETERMINISTIC_CONFIDENCE, false, "");

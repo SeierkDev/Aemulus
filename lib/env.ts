@@ -35,9 +35,20 @@ export const env = {
     return optional("TURSO_AUTH_TOKEN");
   },
 
-  /** Secret for signing session JWTs. Falls back to a dev-only constant. */
+  /**
+   * Secret for signing session JWTs. A dev-only fallback is allowed locally,
+   * but in production an unset/default secret is fatal — otherwise anyone could
+   * forge a session JWT for any wallet.
+   */
   get authSecret(): string {
-    return optional("AUTH_SECRET") ?? "mimic-dev-secret-change-me";
+    const v = optional("AUTH_SECRET");
+    const DEV_DEFAULT = "mimic-dev-secret-change-me";
+    if (this.isProd && (!v || v === DEV_DEFAULT)) {
+      throw new Error(
+        "AUTH_SECRET must be set to a strong, unique value in production.",
+      );
+    }
+    return v ?? DEV_DEFAULT;
   },
 
   get isProd(): boolean {
