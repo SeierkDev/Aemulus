@@ -1,5 +1,6 @@
 import { db, ready } from "./db";
 import { id } from "./ids";
+import { decryptJSON, encryptJSON } from "./encrypt";
 import type { Demonstration, RecordedAction } from "./types";
 
 /** Persist a recorded trace as a demonstration owned by a wallet. */
@@ -26,7 +27,7 @@ export async function createDemonstration(input: {
       dem.owner,
       dem.title,
       dem.startUrl,
-      JSON.stringify(dem.trace),
+      encryptJSON(dem.trace),
       dem.createdAt,
     ],
   });
@@ -62,7 +63,10 @@ function rowToDemonstration(row: Record<string, unknown>): Demonstration {
     owner: row.owner == null ? "" : String(row.owner),
     title: String(row.title),
     startUrl: row.start_url == null ? null : String(row.start_url),
-    trace: JSON.parse(String(row.trace || "[]")) as RecordedAction[],
+    trace: decryptJSON<RecordedAction[]>(
+      row.trace == null ? null : String(row.trace),
+      [],
+    ),
     createdAt: Number(row.created_at),
   };
 }

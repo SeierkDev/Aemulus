@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
+import { logError } from "@/lib/log";
 import { getQuota } from "@/lib/quota";
 import { getRun } from "@/lib/runs";
 import { getSkill } from "@/lib/skills";
@@ -64,6 +65,7 @@ export async function POST(
     const run = await executeRun(skill, original.input, overrides, session.pubkey);
     return NextResponse.json({ run });
   } catch (err) {
+    logError("api/runs/resolve", err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Resolve failed" },
       { status: 500 },

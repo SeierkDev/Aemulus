@@ -1,5 +1,6 @@
 import { db, ready } from "./db";
 import { id } from "./ids";
+import { decryptJSON, encryptJSON } from "./encrypt";
 import type { Run, RunOverrides, RunStatus, RunStepRecord } from "./types";
 
 export async function createRun(input: {
@@ -31,7 +32,7 @@ export async function createRun(input: {
       run.owner,
       run.skillId,
       run.status,
-      JSON.stringify(run.input),
+      encryptJSON(run.input),
       JSON.stringify(run.overrides),
       null,
       null,
@@ -52,7 +53,7 @@ export async function addRunStep(step: RunStepRecord): Promise<void> {
       step.runId,
       step.idx,
       step.intent,
-      JSON.stringify({
+      encryptJSON({
         type: step.action,
         selectorUsed: step.selectorUsed,
         value: step.value,
@@ -116,7 +117,10 @@ function rowToRun(row: Record<string, unknown>, steps: RunStepRecord[]): Run {
     owner: row.owner == null ? "" : String(row.owner),
     skillId: String(row.skill_id),
     status: String(row.status) as RunStatus,
-    input: JSON.parse(String(row.input || "{}")),
+    input: decryptJSON<Record<string, string>>(
+      row.input == null ? null : String(row.input),
+      {},
+    ),
     overrides: JSON.parse(String(row.overrides || "{}")),
     result: row.result == null ? null : String(row.result),
     error: row.error == null ? null : String(row.error),
@@ -127,13 +131,17 @@ function rowToRun(row: Record<string, unknown>, steps: RunStepRecord[]): Run {
 }
 
 function rowToStep(row: Record<string, unknown>): RunStepRecord {
-  const action = JSON.parse(String(row.action || "{}"));
+  const action = decryptJSON<{
+    type?: RunStepRecord["action"];
+    selectorUsed?: string;
+    value?: string;
+  }>(row.action == null ? null : String(row.action), {});
   return {
     id: String(row.id),
     runId: String(row.run_id),
     idx: Number(row.idx),
     intent: String(row.intent),
-    action: action.type,
+    action: action.type ?? "click",
     selectorUsed: action.selectorUsed ?? "",
     value: action.value ?? "",
     screenshot: row.screenshot == null ? "" : String(row.screenshot),

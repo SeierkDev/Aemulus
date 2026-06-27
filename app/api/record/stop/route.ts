@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
-import { recorder } from "@/lib/recorder";
+import { getRecorder } from "@/lib/recorder";
 import { createDemonstration } from "@/lib/demonstrations";
 
 export const runtime = "nodejs";
@@ -11,7 +11,8 @@ export async function POST() {
   if (!session) {
     return NextResponse.json({ error: "Not authorized" }, { status: 401 });
   }
-  const state = await recorder.stop();
+  const rec = getRecorder(session.pubkey);
+  const state = await rec.stop();
   if (!state.id || state.actions.length === 0) {
     return NextResponse.json({ state, demonstrationId: null });
   }
@@ -21,6 +22,6 @@ export async function POST() {
     startUrl: state.startUrl || null,
     trace: state.actions,
   });
-  recorder.markSaved(dem.id);
-  return NextResponse.json({ state: recorder.snapshot(), demonstrationId: dem.id });
+  rec.markSaved(dem.id);
+  return NextResponse.json({ state: rec.snapshot(), demonstrationId: dem.id });
 }

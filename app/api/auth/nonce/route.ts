@@ -5,10 +5,24 @@ import { env } from "@/lib/env";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+function domainFrom(req: Request): string {
+  return process.env.MIMIC_DOMAIN ?? req.headers.get("host") ?? "mimic";
+}
+
+export async function GET(req: Request) {
   const nonce = newNonce();
-  const res = NextResponse.json({ nonce, message: buildSignInMessage(nonce) });
-  res.cookies.set(NONCE_COOKIE, nonce, {
+  // One timestamp, used for BOTH the signed message and the cookie, so verify
+  // rebuilds a byte-identical message.
+  const issuedMs = Date.now();
+  const message = buildSignInMessage(
+    nonce,
+    domainFrom(req),
+    new Date(issuedMs).toISOString(),
+  );
+
+  const res = NextResponse.json({ nonce, message });
+  // Cookie carries nonce + issue time so verify can rebuild + enforce expiry.
+  res.cookies.set(NONCE_COOKIE, `${nonce}|${issuedMs}`, {
     httpOnly: true,
     sameSite: "lax",
     secure: env.isProd,

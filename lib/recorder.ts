@@ -242,9 +242,21 @@ function safeUrl(page: Page): string {
   }
 }
 
-/** globalThis-cached singleton (survives HMR in dev). */
+/**
+ * Per-wallet recorder registry (globalThis-cached, HMR-safe). Each user gets
+ * their own session, so many people can record at once — no global lock.
+ */
 declare global {
-  var __mimicRecorder: RecorderSession | undefined;
+  var __mimicRecorders: Map<string, RecorderSession> | undefined;
 }
-export const recorder: RecorderSession =
-  globalThis.__mimicRecorder ?? (globalThis.__mimicRecorder = new RecorderSession());
+const registry: Map<string, RecorderSession> = (globalThis.__mimicRecorders ??=
+  new Map());
+
+export function getRecorder(owner: string): RecorderSession {
+  let r = registry.get(owner);
+  if (!r) {
+    r = new RecorderSession();
+    registry.set(owner, r);
+  }
+  return r;
+}

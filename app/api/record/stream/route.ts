@@ -1,5 +1,5 @@
 import { requireAccess } from "@/lib/auth";
-import { recorder } from "@/lib/recorder";
+import { getRecorder } from "@/lib/recorder";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,23 +10,19 @@ export async function GET(req: Request) {
   const session = await requireAccess();
   if (!session) return new Response("Unauthorized", { status: 401 });
 
-  const snap = recorder.snapshot();
-  if (snap.owner && snap.owner !== session.pubkey) {
-    return new Response("Forbidden", { status: 403 });
-  }
-
+  const rec = getRecorder(session.pubkey);
   const encoder = new TextEncoder();
   let lastSeq = -1;
   const stream = new ReadableStream({
     async start(controller) {
       const send = (s: string) => controller.enqueue(encoder.encode(s));
       while (!req.signal.aborted) {
-        const st = recorder.snapshot();
+        const st = rec.snapshot();
         if (st.status !== "recording") {
           send(`event: end\ndata: {}\n\n`);
           break;
         }
-        const f = recorder.getFrame();
+        const f = rec.getFrame();
         if (f.data && f.seq !== lastSeq) {
           lastSeq = f.seq;
           send(`data: ${JSON.stringify({ seq: f.seq, url: f.url, data: f.data })}\n\n`);

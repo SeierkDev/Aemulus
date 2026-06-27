@@ -28,14 +28,19 @@ export function newNonce(): string {
   return randomUUID().replace(/-/g, "");
 }
 
-/** The message the user signs in Phantom. */
-export function buildSignInMessage(nonce: string): string {
+/** The message the user signs in Phantom (SIWS-style: domain + nonce + time). */
+export function buildSignInMessage(
+  nonce: string,
+  domain = "mimic",
+  issuedAt = "",
+): string {
   return [
-    "Mimic — Sign in",
+    `${domain} wants you to sign in with your Solana account.`,
     "",
-    "Sign this message to authenticate. This is free and does not authorize any transaction.",
+    "Mimic — Sign in. This is free and authorizes no transaction.",
     "",
     `Nonce: ${nonce}`,
+    `Issued At: ${issuedAt}`,
   ].join("\n");
 }
 

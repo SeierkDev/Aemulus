@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
 import { assertSafeUrl } from "@/lib/safe-url";
-import { recorder } from "@/lib/recorder";
+import { getRecorder } from "@/lib/recorder";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,7 +38,11 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    const state = await recorder.start(body.title ?? "", url, session.pubkey);
+    const state = await getRecorder(session.pubkey).start(
+      body.title ?? "",
+      url,
+      session.pubkey,
+    );
     return NextResponse.json(state);
   } catch (err) {
     return NextResponse.json(

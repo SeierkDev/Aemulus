@@ -26,15 +26,28 @@ export async function POST(req: Request) {
     );
   }
 
-  const nonce = (await cookies()).get(NONCE_COOKIE)?.value;
-  if (!nonce) {
+  const cookie = (await cookies()).get(NONCE_COOKIE)?.value;
+  const [nonce, issuedStr] = (cookie ?? "").split("|");
+  const issuedAt = Number(issuedStr);
+  if (!nonce || !Number.isFinite(issuedAt)) {
     return NextResponse.json(
-      { error: "Missing or expired nonce — request a new one." },
+      { error: "Missing nonce — request a new one." },
+      { status: 400 },
+    );
+  }
+  if (Date.now() - issuedAt > 5 * 60 * 1000) {
+    return NextResponse.json(
+      { error: "Sign-in challenge expired — request a new one." },
       { status: 400 },
     );
   }
 
-  const message = buildSignInMessage(nonce);
+  const domain = process.env.MIMIC_DOMAIN ?? req.headers.get("host") ?? "mimic";
+  const message = buildSignInMessage(
+    nonce,
+    domain,
+    new Date(issuedAt).toISOString(),
+  );
   if (!verifyWalletSignature(message, signature, pubkey)) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
+import { logError } from "@/lib/log";
 import { getQuota } from "@/lib/quota";
 import { getSkill, incrementRunCount } from "@/lib/skills";
 import { executeRun } from "@/lib/runner";
@@ -39,6 +40,7 @@ export async function POST(req: Request) {
     await incrementRunCount(skill.id);
     return NextResponse.json({ run });
   } catch (err) {
+    logError("api/runs", err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Run failed" },
       { status: 500 },
