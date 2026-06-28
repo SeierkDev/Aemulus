@@ -167,6 +167,9 @@ export function Marketing() {
             <div className="mt-1 text-xs text-ink-3">show once · run forever</div>
           </div>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-2">
+            <Link href="/litepaper" className="hover:text-ink">
+              Litepaper
+            </Link>
             <a href={SOLANA.pumpUrl} target="_blank" rel="noopener noreferrer" className="hover:text-ink">
               pump.fun
             </a>
