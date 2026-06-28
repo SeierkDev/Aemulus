@@ -27,18 +27,18 @@ function ensureLocalDir(url: string) {
  */
 
 declare global {
-  var __mimicDb: Client | undefined;
-  var __mimicDbReady: Promise<void> | undefined;
+  var __aemDb: Client | undefined;
+  var __aemDbReady: Promise<void> | undefined;
 }
 
 export const db: Client =
-  globalThis.__mimicDb ??
-  (globalThis.__mimicDb = (() => {
+  globalThis.__aemDb ??
+  (globalThis.__aemDb = (() => {
     ensureLocalDir(env.dbUrl);
     return createClient({ url: env.dbUrl, authToken: env.dbAuthToken });
   })());
 
 /** Idempotently create tables. Awaited by data-access code before queries. */
 export function ready(): Promise<void> {
-  return (globalThis.__mimicDbReady ??= db.executeMultiple(SCHEMA));
+  return (globalThis.__aemDbReady ??= db.executeMultiple(SCHEMA));
 }

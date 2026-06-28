@@ -30,11 +30,11 @@ export class Semaphore {
   }
 }
 
-const MAX = Math.max(1, Number(process.env.MIMIC_MAX_CONCURRENT_RUNS) || 3);
+const MAX = Math.max(1, Number(process.env.AEMULUS_MAX_CONCURRENT_RUNS) || 3);
 
 declare global {
-  var __mimicRunSlots: Semaphore | undefined;
+  var __aemRunSlots: Semaphore | undefined;
 }
 
 export const runSlots: Semaphore =
-  globalThis.__mimicRunSlots ?? (globalThis.__mimicRunSlots = new Semaphore(MAX));
+  globalThis.__aemRunSlots ?? (globalThis.__aemRunSlots = new Semaphore(MAX));

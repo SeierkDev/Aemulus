@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Button } from "./ui";
 import { WalletStatus } from "./WalletStatus";
 
-/** The Mimic mark — two nested squares (the original and its copy). */
+/** The Aemulus mark — two nested squares (the original and its copy). */
 export function Brand() {
   return (
     <span className="flex items-center gap-2.5">
@@ -12,7 +12,7 @@ export function Brand() {
           <span className="absolute -right-1 -top-1 h-3 w-3 rounded-[3px] border border-ink bg-bg" />
         </span>
       </span>
-      <span className="mono text-sm font-semibold tracking-tight">mimic</span>
+      <span className="mono text-sm font-semibold tracking-tight">aemulus</span>
     </span>
   );
 }

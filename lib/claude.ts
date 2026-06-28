@@ -2,9 +2,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { env } from "./env";
 
 /**
- * Shared Anthropic client + the two model roles Mimic uses.
+ * Shared Anthropic client + the two model roles Aemulus uses.
  *
- * Mimic splits work across two model tiers on purpose:
+ * Aemulus splits work across two model tiers on purpose:
  *  - GENERALIZER turns a raw demonstration into a reusable, parameterized
  *    skill. This is the hardest reasoning step (intent inference), so it gets
  *    the strongest model.
@@ -22,7 +22,7 @@ export const MODELS = {
 } as const;
 
 declare global {
-  var __mimicAnthropic: Anthropic | undefined;
+  var __aemAnthropic: Anthropic | undefined;
 }
 
 /**
@@ -31,7 +31,7 @@ declare global {
  * Claude does. Cached on globalThis to survive HMR.
  */
 export function getClaude(): Anthropic {
-  return (globalThis.__mimicAnthropic ??= new Anthropic({
+  return (globalThis.__aemAnthropic ??= new Anthropic({
     apiKey: env.anthropicApiKey,
   }));
 }

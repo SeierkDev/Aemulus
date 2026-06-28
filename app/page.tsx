@@ -48,12 +48,12 @@ const FAQ = [
   ["Do I need to code?", "No. If you can do the task in a browser, you can teach it — you record yourself doing it once."],
   ["What can it run?", "Anything you can do in a web browser today. Recording any app on your screen is on the roadmap."],
   ["Will it do something I didn't intend?", "It pauses and asks whenever it isn't confident, and every step is screenshotted — so you stay in control."],
-  ["What happens when a site changes?", "Mimic reasons about the page to find the right element, and flags the step for a quick fix if it can't."],
-  ["What is $MIMIC for?", "Browsing is free. Holding $MIMIC unlocks usage — the more you hold, the more autonomous runs you get each day."],
+  ["What happens when a site changes?", "Aemulus reasons about the page to find the right element, and flags the step for a quick fix if it can't."],
+  ["What is $AEM for?", "Browsing is free. Holding $AEM unlocks usage — the more you hold, the more autonomous runs you get each day."],
 ];
 
 const STAGES = [
-  ["Record", "Do the task once in a controlled browser — Mimic captures every action with a screenshot."],
+  ["Record", "Do the task once in a controlled browser — Aemulus captures every action with a screenshot."],
   ["Generalize", "Claude turns that one demonstration into a reusable skill: the intent, and the fields that vary."],
   ["Run", "Point the skill at new inputs and it executes on its own — flagging only what it isn't sure about."],
 ];
@@ -89,7 +89,7 @@ export default async function Home() {
           <span className="text-ink-2">demonstrating</span> it — not coding it.
         </h1>
         <p className="max-w-2xl text-lg leading-relaxed text-ink-2">
-          Mimic watches you do a repetitive task one time, learns the intent,
+          Aemulus watches you do a repetitive task one time, learns the intent,
           and runs it autonomously — stopping to ask only when it hits something
           genuinely new.
         </p>
@@ -266,12 +266,12 @@ export default async function Home() {
               Access tiers
             </h2>
             <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-ink-2">
-              Browsing Mimic is free. Running skills is powered by $MIMIC — the
+              Browsing Aemulus is free. Running skills is powered by $AEM — the
               more you hold, the more autonomous runs you get each day.
             </p>
           </div>
           <a href={SOLANA.pumpUrl} target="_blank" rel="noopener noreferrer">
-            <Button variant="primary">Get $MIMIC →</Button>
+            <Button variant="primary">Get $AEM →</Button>
           </a>
         </div>
 
@@ -288,7 +288,7 @@ export default async function Home() {
               <div className="text-sm text-ink-2">
                 Hold{" "}
                 <span className="text-ink">
-                  ≥ {t.min.toLocaleString()} $MIMIC
+                  ≥ {t.min.toLocaleString()} $AEM
                 </span>
               </div>
             </Card>
@@ -296,8 +296,8 @@ export default async function Home() {
         </div>
         <p className="mt-4 text-xs text-ink-3">
           {gatingEnabled()
-            ? "Gating is live — hold $MIMIC to run."
-            : "Token not launched yet — sign in with any wallet to use Mimic free during pre-launch."}
+            ? "Gating is live — hold $AEM to run."
+            : "Token not launched yet — sign in with any wallet to use Aemulus free during pre-launch."}
         </p>
       </section>
 
@@ -320,14 +320,14 @@ export default async function Home() {
           Show it once. Let it run.
         </h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-ink-2">
-          Record your first task and watch Mimic take it from there.
+          Record your first task and watch Aemulus take it from there.
         </p>
         <div className="mt-5 flex items-center justify-center gap-3">
           <Link href="/record">
             <Button variant="primary">Record a task</Button>
           </Link>
           <a href={SOLANA.pumpUrl} target="_blank" rel="noopener noreferrer">
-            <Button variant="default">Get $MIMIC</Button>
+            <Button variant="default">Get $AEM</Button>
           </a>
         </div>
       </section>
@@ -336,7 +336,7 @@ export default async function Home() {
       <footer className="mt-auto border-t border-border py-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <div className="mono text-sm font-semibold">mimic</div>
+            <div className="mono text-sm font-semibold">aemulus</div>
             <div className="mt-1 text-xs text-ink-3">show once · run forever</div>
           </div>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-2">
@@ -353,7 +353,7 @@ export default async function Home() {
         </div>
         <div className="mt-4 border-t border-border pt-4">
           <span className="mono text-xs text-ink-3">
-            $MIMIC CA: {SOLANA.mint || "TBA — launching on pump.fun"}
+            $AEM CA: {SOLANA.mint || "TBA — launching on pump.fun"}
           </span>
         </div>
       </footer>

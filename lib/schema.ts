@@ -1,5 +1,5 @@
 /**
- * Database schema for Mimic.
+ * Database schema for Aemulus.
  *
  * The data model mirrors the product's three stages:
  *   demonstrations → skills → runs (with flagged steps for human review)
@@ -7,7 +7,7 @@
  * A `demonstration` is a single recorded trace of the user doing a task.
  * A `skill` is the generalized, parameterized procedure Claude infers from
  * one or more demonstrations. A `run` is one autonomous execution of a skill
- * over a new input; steps inside a run can be `flagged` when Mimic isn't
+ * over a new input; steps inside a run can be `flagged` when Aemulus isn't
  * confident enough to proceed unsupervised (calibrated autonomy).
  */
 

@@ -29,7 +29,7 @@ export const env = {
    * local SQLite file so the project runs with zero cloud setup in dev.
    */
   get dbUrl(): string {
-    return optional("TURSO_DATABASE_URL") ?? "file:./.data/mimic.db";
+    return optional("TURSO_DATABASE_URL") ?? "file:./.data/aemulus.db";
   },
   get dbAuthToken(): string | undefined {
     return optional("TURSO_AUTH_TOKEN");
@@ -42,7 +42,7 @@ export const env = {
    */
   get authSecret(): string {
     const v = optional("AUTH_SECRET");
-    const DEV_DEFAULT = "mimic-dev-secret-change-me";
+    const DEV_DEFAULT = "aemulus-dev-secret-change-me";
     if (this.isProd && (!v || v === DEV_DEFAULT)) {
       throw new Error(
         "AUTH_SECRET must be set to a strong, unique value in production.",

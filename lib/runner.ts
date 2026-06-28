@@ -39,7 +39,7 @@ export async function executeRun(
   await runSlots.acquire();
   try {
     browser = await chromium.launch({
-      headless: process.env.MIMIC_RUN_HEADED !== "1",
+      headless: process.env.AEMULUS_RUN_HEADED !== "1",
     });
     const context = await browser.newContext({
       viewport: { width: 1280, height: 800 },

@@ -3,18 +3,18 @@
  * addInitScript, so it MUST be fully self-contained — it may not reference
  * anything outside its own body (it gets serialized and runs in the browser).
  *
- * It reports each meaningful user interaction to window.__mimicRecord, which
+ * It reports each meaningful user interaction to window.__aemRecord, which
  * Playwright bridges back to the Node recorder.
  */
 export function recorderInitScript() {
   // Run once, top frame only.
   const w = window as unknown as {
-    __mimicAttached?: boolean;
-    __mimicRecord?: (a: unknown) => void;
+    __aemAttached?: boolean;
+    __aemRecord?: (a: unknown) => void;
     top: Window;
   };
-  if (w.top !== window || w.__mimicAttached || !w.__mimicRecord) return;
-  w.__mimicAttached = true;
+  if (w.top !== window || w.__aemAttached || !w.__aemRecord) return;
+  w.__aemAttached = true;
 
   const esc = (s: string) =>
     typeof CSS !== "undefined" && CSS.escape
@@ -80,7 +80,7 @@ export function recorderInitScript() {
 
   const send = (a: unknown) => {
     try {
-      w.__mimicRecord!(a);
+      w.__aemRecord!(a);
     } catch {
       /* binding may be unavailable mid-teardown */
     }

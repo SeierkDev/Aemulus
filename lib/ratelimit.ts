@@ -5,9 +5,9 @@
  * a multi-instance deploy would move this to a shared store).
  */
 declare global {
-  var __mimicRateHits: Map<string, number[]> | undefined;
+  var __aemRateHits: Map<string, number[]> | undefined;
 }
-const hits: Map<string, number[]> = (globalThis.__mimicRateHits ??= new Map());
+const hits: Map<string, number[]> = (globalThis.__aemRateHits ??= new Map());
 
 export interface RateResult {
   ok: boolean;

@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-const PER_HOUR = Math.max(1, Number(process.env.MIMIC_GENERALIZE_PER_HOUR) || 20);
+const PER_HOUR = Math.max(1, Number(process.env.AEMULUS_GENERALIZE_PER_HOUR) || 20);
 
 export async function POST(req: Request) {
   try {

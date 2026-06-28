@@ -14,7 +14,7 @@ const RPC =
 
 /**
  * App-wide client providers: Solana connection + wallet adapter (Phantom is
- * auto-detected via the Wallet Standard), the wallet modal, and Mimic's auth
+ * auto-detected via the Wallet Standard), the wallet modal, and Aemulus's auth
  * context. Wraps the whole app from the root layout.
  */
 export function Providers({ children }: { children: React.ReactNode }) {

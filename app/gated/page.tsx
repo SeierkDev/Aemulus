@@ -15,13 +15,13 @@ export default async function GatedPage() {
         <Card className="w-full max-w-md p-8 text-center">
           <Label>Token-gated</Label>
           <h1 className="mt-3 text-2xl font-semibold tracking-tight">
-            Hold $MIMIC to enter
+            Hold $AEM to enter
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-ink-2">
-            Mimic is open to $MIMIC holders. Your wallet is connected — you just
+            Aemulus is open to $AEM holders. Your wallet is connected — you just
             need at least{" "}
             <span className="text-ink">
-              {SOLANA.holderMin.toLocaleString()} $MIMIC
+              {SOLANA.holderMin.toLocaleString()} $AEM
             </span>{" "}
             to unlock recording, skills, and runs.
           </p>
@@ -49,7 +49,7 @@ export default async function GatedPage() {
 
           <a href={SOLANA.pumpUrl} target="_blank" rel="noopener noreferrer">
             <span className="mt-6 inline-flex w-full items-center justify-center rounded-[var(--radius-base)] bg-signal px-3.5 py-2.5 text-sm font-medium text-bg transition-colors hover:bg-ink">
-              Get $MIMIC on pump.fun →
+              Get $AEM on pump.fun →
             </span>
           </a>
           <p className="mt-3 text-xs text-ink-3">

@@ -22,10 +22,10 @@ describe("computeTier with gating OFF (no mint)", () => {
 describe("computeTier with gating ON (mint set)", () => {
   it("maps balance to tiers and locks below the floor", async () => {
     vi.resetModules();
-    vi.stubEnv("MIMIC_MINT", "SoMeMintAddress1111111111111111111111111111");
-    vi.stubEnv("MIMIC_MIN_BALANCE", "1");
-    vi.stubEnv("MIMIC_PRO_BALANCE", "1000");
-    vi.stubEnv("MIMIC_WHALE_BALANCE", "100000");
+    vi.stubEnv("AEMULUS_MINT", "SoMeMintAddress1111111111111111111111111111");
+    vi.stubEnv("AEMULUS_MIN_BALANCE", "1");
+    vi.stubEnv("AEMULUS_PRO_BALANCE", "1000");
+    vi.stubEnv("AEMULUS_WHALE_BALANCE", "100000");
     const solana = await import("../lib/solana");
     expect(solana.computeTier(0).name).toBe("Locked");
     expect(solana.computeTier(0).allowed).toBe(false);

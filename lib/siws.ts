@@ -31,13 +31,13 @@ export function newNonce(): string {
 /** The message the user signs in Phantom (SIWS-style: domain + nonce + time). */
 export function buildSignInMessage(
   nonce: string,
-  domain = "mimic",
+  domain = "aemulus",
   issuedAt = "",
 ): string {
   return [
     `${domain} wants you to sign in with your Solana account.`,
     "",
-    "Mimic — Sign in. This is free and authorizes no transaction.",
+    "Aemulus — Sign in. This is free and authorizes no transaction.",
     "",
     `Nonce: ${nonce}`,
     `Issued At: ${issuedAt}`,

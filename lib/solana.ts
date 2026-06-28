@@ -1,10 +1,10 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 
 /**
- * Solana / $MIMIC token-gating config and helpers (server-side).
+ * Solana / $AEM token-gating config and helpers (server-side).
  *
- * Key behavior: if MIMIC_MINT is unset, gating is OFF — every signed-in wallet
- * is treated as "Open" with full access. Set MIMIC_MINT to the pump.fun token
+ * Key behavior: if AEMULUS_MINT is unset, gating is OFF — every signed-in wallet
+ * is treated as "Open" with full access. Set AEMULUS_MINT to the pump.fun token
  * address after launch and gating activates automatically, no code change.
  */
 
@@ -15,22 +15,22 @@ function num(name: string, fallback: number): number {
 }
 
 export const SOLANA = {
-  /** The $MIMIC SPL mint. Empty until the pump.fun launch. */
-  mint: process.env.MIMIC_MINT ?? "",
+  /** The $AEM SPL mint. Empty until the pump.fun launch. */
+  mint: process.env.AEMULUS_MINT ?? "",
   rpcUrl: process.env.SOLANA_RPC_URL ?? "https://api.mainnet-beta.solana.com",
   /** Minimum balance for access, and the higher tier cutoffs (tunable). */
-  holderMin: num("MIMIC_MIN_BALANCE", 1),
-  proMin: num("MIMIC_PRO_BALANCE", 1_000_000),
-  whaleMin: num("MIMIC_WHALE_BALANCE", 10_000_000),
+  holderMin: num("AEMULUS_MIN_BALANCE", 1),
+  proMin: num("AEMULUS_PRO_BALANCE", 1_000_000),
+  whaleMin: num("AEMULUS_WHALE_BALANCE", 10_000_000),
   /** Public pump.fun link shown on the gated screen (set after launch). */
-  pumpUrl: process.env.MIMIC_PUMP_URL ?? "https://pump.fun",
+  pumpUrl: process.env.AEMULUS_PUMP_URL ?? "https://pump.fun",
   /** Social links for the footer (set when live). */
-  xUrl: process.env.MIMIC_X_URL ?? "https://x.com",
-  githubUrl: process.env.MIMIC_GITHUB_URL ?? "https://github.com",
+  xUrl: process.env.AEMULUS_X_URL ?? "https://x.com",
+  githubUrl: process.env.AEMULUS_GITHUB_URL ?? "https://github.com",
   /** Daily run quotas per tier. A negative value means unlimited. */
-  quotaHolder: num("MIMIC_QUOTA_HOLDER", 5),
-  quotaPro: num("MIMIC_QUOTA_PRO", 50),
-  quotaWhale: num("MIMIC_QUOTA_WHALE", -1),
+  quotaHolder: num("AEMULUS_QUOTA_HOLDER", 5),
+  quotaPro: num("AEMULUS_QUOTA_PRO", 50),
+  quotaWhale: num("AEMULUS_QUOTA_WHALE", -1),
 };
 
 /** Daily run limit for an access level (Whale/Open = level 3). <0 = unlimited. */
@@ -66,10 +66,10 @@ function connection(): Connection {
 }
 
 /**
- * Read a wallet's total $MIMIC balance (UI amount, summed across token
+ * Read a wallet's total $AEM balance (UI amount, summed across token
  * accounts). Returns 0 when gating is off, on any RPC error, or no holdings.
  */
-export async function getMimicBalance(owner: string): Promise<number> {
+export async function getAemulusBalance(owner: string): Promise<number> {
   if (!gatingEnabled()) return 0;
   try {
     const res = await connection().getParsedTokenAccountsByOwner(

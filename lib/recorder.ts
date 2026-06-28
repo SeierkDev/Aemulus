@@ -73,15 +73,15 @@ class RecorderSession {
     await mkdir(path.join(RECORDINGS_DIR, owner, sid), { recursive: true });
 
     // Headless — the user drives it remotely via the streamed view.
-    // MIMIC_RECORD_HEADED=1 opens a real window for local debugging.
+    // AEMULUS_RECORD_HEADED=1 opens a real window for local debugging.
     this.browser = await chromium.launch({
-      headless: process.env.MIMIC_RECORD_HEADED !== "1",
+      headless: process.env.AEMULUS_RECORD_HEADED !== "1",
     });
     this.context = await this.browser.newContext({ viewport: VIEWPORT });
 
-    // Bridge: in-page script calls window.__mimicRecord(action).
+    // Bridge: in-page script calls window.__aemRecord(action).
     await this.context.exposeBinding(
-      "__mimicRecord",
+      "__aemRecord",
       async (source, raw: RawAction) => {
         this.enqueue(source.page, raw);
       },
@@ -247,9 +247,9 @@ function safeUrl(page: Page): string {
  * their own session, so many people can record at once — no global lock.
  */
 declare global {
-  var __mimicRecorders: Map<string, RecorderSession> | undefined;
+  var __aemRecorders: Map<string, RecorderSession> | undefined;
 }
-const registry: Map<string, RecorderSession> = (globalThis.__mimicRecorders ??=
+const registry: Map<string, RecorderSession> = (globalThis.__aemRecorders ??=
   new Map());
 
 export function getRecorder(owner: string): RecorderSession {

@@ -44,7 +44,7 @@ export async function POST(
     if (!quota.ok) {
       return NextResponse.json(
         {
-          error: `Daily run limit reached (${quota.limit}/24h on the ${quota.tier} tier). Hold more $MIMIC to raise it.`,
+          error: `Daily run limit reached (${quota.limit}/24h on the ${quota.tier} tier). Hold more $AEM to raise it.`,
         },
         { status: 429 },
       );

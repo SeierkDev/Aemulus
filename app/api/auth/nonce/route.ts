@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function domainFrom(req: Request): string {
-  return process.env.MIMIC_DOMAIN ?? req.headers.get("host") ?? "mimic";
+  return process.env.AEMULUS_DOMAIN ?? req.headers.get("host") ?? "aemulus";
 }
 
 export async function GET(req: Request) {

@@ -175,7 +175,7 @@ export default function RecordPage() {
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6">
       <header className="flex items-center justify-between py-6">
         <Link href="/" className="mono text-sm font-semibold tracking-tight">
-          ← mimic
+          ← aemulus
         </Link>
         <Badge>
           <span

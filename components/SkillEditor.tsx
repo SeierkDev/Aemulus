@@ -170,7 +170,7 @@ export function SkillEditor({ initial }: { initial: Skill }) {
         <div className="mt-10">
           <h2 className="text-lg font-semibold tracking-tight">Steps</h2>
           <p className="mt-1 text-sm text-ink-2">
-            The generalized plan Mimic will execute.
+            The generalized plan Aemulus will execute.
           </p>
         </div>
         <div className="mt-4 grid gap-2">

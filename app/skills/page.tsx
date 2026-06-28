@@ -33,7 +33,7 @@ export default async function SkillsPage() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Skills</h1>
             <p className="mt-1.5 text-sm text-ink-2">
-              Generalized procedures Mimic can run on new inputs.
+              Generalized procedures Aemulus can run on new inputs.
             </p>
           </div>
           <Badge>{skills.length} skills</Badge>

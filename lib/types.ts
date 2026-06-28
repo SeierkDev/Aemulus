@@ -1,4 +1,4 @@
-/** Shared domain types for Mimic. */
+/** Shared domain types for Aemulus. */
 
 /** A single user action captured during a recording. */
 export type ActionType =

@@ -68,7 +68,7 @@ export function RunPanel({
         <div>
           <Label>Run this skill</Label>
           <p className="mt-1 text-sm text-ink-2">
-            Mimic will execute the plan on its own and bring back proof.
+            Aemulus will execute the plan on its own and bring back proof.
           </p>
         </div>
       </div>
@@ -137,7 +137,7 @@ export function RunPanel({
       {out && (
         <p className="text-xs text-ink-3">
           You&apos;ve used your daily runs for the {quota?.tier} tier. Hold more
-          $MIMIC to raise your limit, or come back in 24h.
+          $AEM to raise your limit, or come back in 24h.
         </p>
       )}
     </Card>

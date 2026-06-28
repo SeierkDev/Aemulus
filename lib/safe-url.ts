@@ -2,7 +2,7 @@ import { lookup } from "node:dns/promises";
 import net from "node:net";
 
 /**
- * SSRF guard. Mimic navigates a server-side browser to user/skill-supplied
+ * SSRF guard. Aemulus navigates a server-side browser to user/skill-supplied
  * URLs (record start + the runner's navigate steps), so we must refuse any URL
  * that resolves to a private, loopback, link-local, or cloud-metadata address —
  * otherwise a crafted skill could make the server hit internal services or the

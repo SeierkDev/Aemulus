@@ -8,7 +8,7 @@ import {
   verifyWalletSignature,
   type Session,
 } from "@/lib/auth";
-import { computeTier, getMimicBalance } from "@/lib/solana";
+import { computeTier, getAemulusBalance } from "@/lib/solana";
 import { readJson, VerifyBody } from "@/lib/validate";
 import { env } from "@/lib/env";
 
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const domain = process.env.MIMIC_DOMAIN ?? req.headers.get("host") ?? "mimic";
+  const domain = process.env.AEMULUS_DOMAIN ?? req.headers.get("host") ?? "aemulus";
   const message = buildSignInMessage(
     nonce,
     domain,
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  const balance = await getMimicBalance(pubkey);
+  const balance = await getAemulusBalance(pubkey);
   const tier = computeTier(balance);
   const session: Session = {
     pubkey,

@@ -29,7 +29,7 @@ export default async function RunsPage() {
             <Badge>{review.length} paused</Badge>
           </div>
           <p className="mt-1.5 text-sm text-ink-2">
-            Runs Mimic paused because it wasn&apos;t confident. Open one to
+            Runs Aemulus paused because it wasn&apos;t confident. Open one to
             resolve and retry.
           </p>
           <div className="mt-4 grid gap-3">

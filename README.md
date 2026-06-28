@@ -1,21 +1,21 @@
-# Mimic
+# Aemulus
 
 **Show it once. It does the rest.**
 
-Mimic watches you do a repetitive browser task one time, learns the *intent*
+Aemulus watches you do a repetitive browser task one time, learns the *intent*
 behind it, and then runs it autonomously across many cases — handling variation,
 capturing proof of every step, and stopping to ask only when it hits something
 genuinely new.
 
 It's the dream that RPA never delivered: automation for people who can't (or
-shouldn't have to) code. No selectors, no scripts. If you can do it, Mimic can
+shouldn't have to) code. No selectors, no scripts. If you can do it, Aemulus can
 learn it.
 
 ## How it works
 
 | Stage | What happens |
 |-------|--------------|
-| **Record** | Do the task once in a controlled browser. Mimic captures actions + screen context. |
+| **Record** | Do the task once in a controlled browser. Aemulus captures actions + screen context. |
 | **Generalize** | Claude turns that single demonstration into a reusable, parameterized *skill*. |
 | **Run** | The skill executes on new inputs on its own — with per-step proof and confidence-based flagging. |
 
@@ -44,7 +44,7 @@ npx playwright install chromium
 npm run dev                 # http://localhost:3000
 ```
 
-In dev, the database is a local SQLite file at `./.data/mimic.db` — no cloud
+In dev, the database is a local SQLite file at `./.data/aemulus.db` — no cloud
 setup required. Set `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` for production.
 
 ## Project layout

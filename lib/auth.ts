@@ -19,8 +19,8 @@ export {
   type Session,
 } from "./siws";
 
-export const SESSION_COOKIE = "mimic_session";
-export const NONCE_COOKIE = "mimic_nonce";
+export const SESSION_COOKIE = "aem_session";
+export const NONCE_COOKIE = "aem_nonce";
 
 /** Current session from the cookie (server components / route handlers). */
 export async function getSession(): Promise<Session | null> {
