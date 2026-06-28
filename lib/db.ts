@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { createClient, type Client } from "@libsql/client";
 import { env } from "./env";
-import { SCHEMA } from "./schema";
+import { MIGRATIONS } from "./migrations";
 
 // For the local file fallback, libsql won't create the parent directory — do it.
 function ensureLocalDir(url: string) {
@@ -38,7 +38,45 @@ export const db: Client =
     return createClient({ url: env.dbUrl, authToken: env.dbAuthToken });
   })());
 
-/** Idempotently create tables. Awaited by data-access code before queries. */
+/** ALTER ... ADD COLUMN, but only if the column isn't already present. */
+export async function addColumnIfMissing(
+  table: string,
+  column: string,
+  def: string,
+): Promise<void> {
+  const info = await db.execute(`PRAGMA table_info(${table})`);
+  const exists = info.rows.some((r) => String(r.name) === column);
+  if (!exists) {
+    await db.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${def}`);
+  }
+}
+
+/** Apply pending migrations in id order; each runs once per database. */
+export async function migrate(): Promise<void> {
+  await db.executeMultiple(
+    `CREATE TABLE IF NOT EXISTS schema_migrations (
+       id INTEGER PRIMARY KEY,
+       name TEXT NOT NULL,
+       applied_at INTEGER NOT NULL
+     );`,
+  );
+  const r = await db.execute(`SELECT id FROM schema_migrations`);
+  const applied = new Set(r.rows.map((row) => Number(row.id)));
+
+  for (const m of MIGRATIONS) {
+    if (applied.has(m.id)) continue;
+    for (const sql of m.statements ?? []) await db.executeMultiple(sql);
+    for (const c of m.addColumns ?? []) {
+      await addColumnIfMissing(c.table, c.column, c.def);
+    }
+    await db.execute({
+      sql: `INSERT INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)`,
+      args: [m.id, m.name, Date.now()],
+    });
+  }
+}
+
+/** Idempotently bring the schema up to date. Awaited before any query. */
 export function ready(): Promise<void> {
-  return (globalThis.__aemDbReady ??= db.executeMultiple(SCHEMA));
+  return (globalThis.__aemDbReady ??= migrate());
 }
