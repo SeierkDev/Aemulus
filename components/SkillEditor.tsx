@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Button, Card, Label, cx } from "@/components/ui";
 import { RunPanel } from "@/components/RunPanel";
+import { SchedulePanel } from "@/components/SchedulePanel";
 import { PublishToggle } from "@/components/PublishToggle";
 import type { Skill, SkillInputField, SkillStep } from "@/lib/types";
 
@@ -110,6 +111,14 @@ export function SkillEditor({ initial }: { initial: Skill }) {
         {/* Run */}
         <div className="mt-6">
           <RunPanel
+            skillId={initial.id}
+            fields={initial.inputSchema.fields}
+          />
+        </div>
+
+        {/* Schedule */}
+        <div className="mt-6">
+          <SchedulePanel
             skillId={initial.id}
             fields={initial.inputSchema.fields}
           />

@@ -49,7 +49,10 @@ export default async function RunsPage() {
               {review.length > 0 ? "All runs" : "Runs"}
             </h1>
             <p className="mt-1.5 text-sm text-ink-2">
-              Autonomous executions, each with step-by-step proof.
+              Autonomous executions, each with step-by-step proof.{" "}
+              <Link href="/schedules" className="text-ink underline">
+                Schedules →
+              </Link>
             </p>
           </div>
           <Badge>{runs.length} runs</Badge>

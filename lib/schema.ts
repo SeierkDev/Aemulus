@@ -72,6 +72,33 @@ CREATE TABLE IF NOT EXISTS run_steps (
   created_at  INTEGER NOT NULL
 );
 
+-- Creator earnings ledger: a credit each time someone runs your published skill.
+CREATE TABLE IF NOT EXISTS earnings (
+  id          TEXT PRIMARY KEY,
+  owner       TEXT NOT NULL,        -- the skill creator who earns
+  skill_id    TEXT NOT NULL,
+  run_id      TEXT NOT NULL,
+  runner      TEXT NOT NULL,        -- who ran it
+  amount      REAL NOT NULL,        -- $AEMU accrued
+  created_at  INTEGER NOT NULL
+);
+
+-- Scheduled autonomous runs: a skill runs itself on a cadence.
+CREATE TABLE IF NOT EXISTS schedules (
+  id           TEXT PRIMARY KEY,
+  owner        TEXT NOT NULL,
+  skill_id     TEXT NOT NULL,
+  input        TEXT NOT NULL DEFAULT '{}',  -- encrypted JSON
+  cadence      TEXT NOT NULL,               -- hourly | daily
+  level        INTEGER NOT NULL DEFAULT 3,  -- owner tier snapshot (for quota)
+  tier         TEXT NOT NULL DEFAULT 'Open',
+  active       INTEGER NOT NULL DEFAULT 1,
+  last_run_id  TEXT,
+  last_run_at  INTEGER,
+  next_run_at  INTEGER NOT NULL,
+  created_at   INTEGER NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_runs_skill   ON runs(skill_id);
 CREATE INDEX IF NOT EXISTS idx_steps_run    ON run_steps(run_id);
 CREATE INDEX IF NOT EXISTS idx_skills_demo  ON skills(source_demo_id);
@@ -79,4 +106,7 @@ CREATE INDEX IF NOT EXISTS idx_demos_owner  ON demonstrations(owner);
 CREATE INDEX IF NOT EXISTS idx_skills_owner ON skills(owner);
 CREATE INDEX IF NOT EXISTS idx_runs_owner   ON runs(owner);
 CREATE INDEX IF NOT EXISTS idx_skills_pub   ON skills(published);
+CREATE INDEX IF NOT EXISTS idx_earn_owner   ON earnings(owner);
+CREATE INDEX IF NOT EXISTS idx_sched_owner  ON schedules(owner);
+CREATE INDEX IF NOT EXISTS idx_sched_due    ON schedules(active, next_run_at);
 `;

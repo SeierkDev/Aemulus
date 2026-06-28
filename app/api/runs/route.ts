@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
 import { logError } from "@/lib/log";
 import { getQuota } from "@/lib/quota";
-import { getSkill, incrementRunCount } from "@/lib/skills";
-import { executeRun } from "@/lib/runner";
+import { getSkill } from "@/lib/skills";
+import { executeAndAccount } from "@/lib/run-service";
 import { readJson, RunBody } from "@/lib/validate";
 
 export const runtime = "nodejs";
@@ -33,8 +33,7 @@ export async function POST(req: Request) {
         { status: 429 },
       );
     }
-    const run = await executeRun(skill, input ?? {}, {}, session.pubkey);
-    await incrementRunCount(skill.id);
+    const run = await executeAndAccount(skill, input ?? {}, {}, session.pubkey);
     return NextResponse.json({ run });
   } catch (err) {
     logError("api/runs", err);

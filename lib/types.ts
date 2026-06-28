@@ -142,6 +142,41 @@ export interface StepOverride {
 
 export type RunOverrides = Record<number, StepOverride>;
 
+/* ─── Creator earnings + scheduling (self-running, self-paying economy) ──── */
+
+export interface Earning {
+  id: string;
+  owner: string;
+  skillId: string;
+  runId: string;
+  runner: string;
+  amount: number;
+  createdAt: number;
+}
+
+export interface EarningsSummary {
+  total: number;
+  runs: number;
+  bySkill: { skillId: string; name: string; total: number; runs: number }[];
+  recent: { skillId: string; name: string; amount: number; createdAt: number }[];
+}
+
+export type Cadence = "hourly" | "daily";
+
+export interface Schedule {
+  id: string;
+  owner: string;
+  skillId: string;
+  skillName: string;
+  input: Record<string, string>;
+  cadence: Cadence;
+  active: boolean;
+  lastRunId: string | null;
+  lastRunAt: number | null;
+  nextRunAt: number;
+  createdAt: number;
+}
+
 export interface Run {
   id: string;
   owner: string;

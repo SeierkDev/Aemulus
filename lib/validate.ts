@@ -75,6 +75,14 @@ export const ResolveBody = z.object({
   skip: z.boolean().optional(),
 });
 
+export const ScheduleCreateBody = z.object({
+  skillId: z.string().min(1).max(64),
+  cadence: z.enum(["hourly", "daily"]),
+  input: z.record(z.string().max(200), z.string().max(5000)).optional(),
+});
+
+export const ScheduleToggleBody = z.object({ active: z.boolean() });
+
 /** Parse + validate a JSON request body; returns data or a 400 Response. */
 export async function readJson<T>(
   req: Request,

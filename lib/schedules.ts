@@ -1,0 +1,160 @@
+import { db, ready } from "./db";
+import { id } from "./ids";
+import { decryptJSON, encryptJSON } from "./encrypt";
+import type { Cadence, Schedule } from "./types";
+
+const CADENCE_MS: Record<Cadence, number> = {
+  hourly: 60 * 60 * 1000,
+  daily: 24 * 60 * 60 * 1000,
+};
+export function cadenceMs(c: Cadence): number {
+  return CADENCE_MS[c];
+}
+
+/** Richer shape the scheduler needs to actually run a due schedule. */
+export interface ScheduleDue {
+  id: string;
+  owner: string;
+  skillId: string;
+  input: Record<string, string>;
+  cadence: Cadence;
+  level: number;
+  tier: string;
+}
+
+export async function createSchedule(input: {
+  owner: string;
+  skillId: string;
+  input: Record<string, string>;
+  cadence: Cadence;
+  level: number;
+  tier: string;
+}): Promise<string> {
+  await ready();
+  const sid = id("sch");
+  const now = Date.now();
+  await db.execute({
+    sql: `INSERT INTO schedules (id, owner, skill_id, input, cadence, level, tier, active, last_run_id, last_run_at, next_run_at, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 1, NULL, NULL, ?, ?)`,
+    args: [
+      sid,
+      input.owner,
+      input.skillId,
+      encryptJSON(input.input),
+      input.cadence,
+      input.level,
+      input.tier,
+      now + cadenceMs(input.cadence),
+      now,
+    ],
+  });
+  return sid;
+}
+
+export async function listSchedules(owner: string): Promise<Schedule[]> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT sc.*, COALESCE(sk.name, sc.skill_id) AS skill_name
+          FROM schedules sc LEFT JOIN skills sk ON sk.id = sc.skill_id
+          WHERE sc.owner = ? ORDER BY sc.created_at DESC`,
+    args: [owner],
+  });
+  return r.rows.map(rowToSchedule);
+}
+
+export async function setScheduleActive(
+  scheduleId: string,
+  owner: string,
+  active: boolean,
+): Promise<boolean> {
+  await ready();
+  const r = await db.execute({
+    sql: `UPDATE schedules SET active = ? WHERE id = ? AND owner = ?`,
+    args: [active ? 1 : 0, scheduleId, owner],
+  });
+  return r.rowsAffected > 0;
+}
+
+export async function deleteSchedule(
+  scheduleId: string,
+  owner: string,
+): Promise<boolean> {
+  await ready();
+  const r = await db.execute({
+    sql: `DELETE FROM schedules WHERE id = ? AND owner = ?`,
+    args: [scheduleId, owner],
+  });
+  return r.rowsAffected > 0;
+}
+
+/** Active schedules whose next_run_at has passed (for the scheduler tick). */
+export async function dueSchedules(now: number): Promise<ScheduleDue[]> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT * FROM schedules WHERE active = 1 AND next_run_at <= ? LIMIT 25`,
+    args: [now],
+  });
+  return r.rows.map((row) => ({
+    id: String(row.id),
+    owner: String(row.owner),
+    skillId: String(row.skill_id),
+    input: decryptJSON<Record<string, string>>(
+      row.input == null ? null : String(row.input),
+      {},
+    ),
+    cadence: String(row.cadence) as Cadence,
+    level: Number(row.level),
+    tier: String(row.tier),
+  }));
+}
+
+export async function markRan(
+  scheduleId: string,
+  runId: string,
+  nextRunAt: number,
+): Promise<void> {
+  await ready();
+  await db.execute({
+    sql: `UPDATE schedules SET last_run_id = ?, last_run_at = ?, next_run_at = ? WHERE id = ?`,
+    args: [runId, Date.now(), nextRunAt, scheduleId],
+  });
+}
+
+/** Advance next_run_at without recording a run (e.g. skipped by quota). */
+export async function bumpNextRun(
+  scheduleId: string,
+  nextRunAt: number,
+): Promise<void> {
+  await ready();
+  await db.execute({
+    sql: `UPDATE schedules SET next_run_at = ? WHERE id = ?`,
+    args: [nextRunAt, scheduleId],
+  });
+}
+
+export async function deactivate(scheduleId: string): Promise<void> {
+  await ready();
+  await db.execute({
+    sql: `UPDATE schedules SET active = 0 WHERE id = ?`,
+    args: [scheduleId],
+  });
+}
+
+function rowToSchedule(row: Record<string, unknown>): Schedule {
+  return {
+    id: String(row.id),
+    owner: String(row.owner),
+    skillId: String(row.skill_id),
+    skillName: String(row.skill_name ?? row.skill_id),
+    input: decryptJSON<Record<string, string>>(
+      row.input == null ? null : String(row.input),
+      {},
+    ),
+    cadence: String(row.cadence) as Cadence,
+    active: Number(row.active) === 1,
+    lastRunId: row.last_run_id == null ? null : String(row.last_run_id),
+    lastRunAt: row.last_run_at == null ? null : Number(row.last_run_at),
+    nextRunAt: Number(row.next_run_at),
+    createdAt: Number(row.created_at),
+  };
+}

@@ -34,6 +34,9 @@ export function Nav() {
         <Link href="/runs">
           <Button variant="ghost">Runs</Button>
         </Link>
+        <Link href="/earnings">
+          <Button variant="ghost">Earnings</Button>
+        </Link>
         <Link href="/record">
           <Button variant="primary">Record a task</Button>
         </Link>

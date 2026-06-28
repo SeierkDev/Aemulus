@@ -31,6 +31,8 @@ export const SOLANA = {
   quotaHolder: num("AEMULUS_QUOTA_HOLDER", 5),
   quotaPro: num("AEMULUS_QUOTA_PRO", 50),
   quotaWhale: num("AEMULUS_QUOTA_WHALE", -1),
+  /** $AEMU credited to a creator each time someone else runs their skill. */
+  runFee: num("AEMULUS_RUN_FEE", 10),
 };
 
 /** Daily run limit for an access level (Whale/Open = level 3). <0 = unlimited. */
