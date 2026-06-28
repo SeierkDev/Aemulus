@@ -121,11 +121,13 @@ export default async function BulkRunPage({
         </div>
 
         {outputKeys.length === 0 && (
-          <p className="mt-4 text-xs text-ink-3">
+          <div className="mt-4 text-xs text-ink-3">
             <Label>Tip</Label>
-            Add an <span className="mono">extract</span> step to a skill to
-            capture values into these results.
-          </p>
+            <p className="mt-1">
+              Add an <span className="mono">extract</span> step to a skill to
+              capture values into these results.
+            </p>
+          </div>
         )}
       </div>
       <div className="py-10" />

@@ -24,24 +24,29 @@ export function Nav() {
       <Link href="/" aria-label="Home">
         <Brand />
       </Link>
-      <nav className="flex flex-wrap items-center gap-1">
-        <Link href="/market">
-          <Button variant="ghost">Explore</Button>
-        </Link>
-        <Link href="/skills">
-          <Button variant="ghost">Skills</Button>
-        </Link>
-        <Link href="/runs">
-          <Button variant="ghost">Runs</Button>
-        </Link>
-        <Link href="/earnings">
-          <Button variant="ghost">Earnings</Button>
-        </Link>
-        <Link href="/record">
+      <nav className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:gap-x-5">
+        <NavLink href="/market">Explore</NavLink>
+        <NavLink href="/skills">Skills</NavLink>
+        <NavLink href="/runs">Runs</NavLink>
+        <NavLink href="/earnings">Earnings</NavLink>
+        <NavLink href="/litepaper">Litepaper</NavLink>
+        <NavLink href="/roadmap">Roadmap</NavLink>
+        <Link href="/record" className="ml-1">
           <Button variant="primary">Record a task</Button>
         </Link>
         <WalletStatus />
       </nav>
     </header>
+  );
+}
+
+function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className="text-sm text-ink-2 transition-colors hover:text-ink"
+    >
+      {children}
+    </Link>
   );
 }

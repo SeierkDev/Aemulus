@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Badge, Card, Label } from "@/components/ui";
 import { Nav } from "@/components/Nav";
 import { BuyAemu } from "@/components/BuyAemu";
+import { SiteFooter } from "@/components/SiteFooter";
 import { SOLANA } from "@/lib/solana";
 
 export const dynamic = "force-dynamic";
@@ -27,58 +28,6 @@ const TIERS = [
   { name: "Holder", min: SOLANA.holderMin, quota: SOLANA.quotaHolder },
   { name: "Pro", min: SOLANA.proMin, quota: SOLANA.quotaPro },
   { name: "Whale", min: SOLANA.whaleMin, quota: SOLANA.quotaWhale },
-];
-
-const ROADMAP = [
-  {
-    phase: "Phase 1",
-    title: "Launch",
-    body: [
-      "$AEMU goes live on pump.fun; usage gating activates automatically.",
-      "On-chain creator payouts — escrow + claim — replace the off-chain earnings ledger.",
-      "Receipt roots anchored live on Solana mainnet, with funded signing.",
-    ],
-  },
-  {
-    phase: "Phase 2",
-    title: "Trust at scale",
-    body: [
-      "Network-isolated micro-VM sandbox per run, so untrusted marketplace skills can't reach anything they shouldn't.",
-      "Permanent receipt + screenshot storage on Arweave — proofs that outlive the app.",
-      "Run notifications: email, webhook, and Telegram when a run finishes or needs review.",
-      "Marketplace search, categories, and curated collections.",
-    ],
-  },
-  {
-    phase: "Phase 3",
-    title: "Deeper intelligence",
-    body: [
-      "Vision-grounded synthesis — the model sees the page, not just the trace.",
-      "Self-healing selectors via embeddings, so skills survive bigger UI changes.",
-      "Skills that chain other skills into multi-app workflows.",
-      "Zero-knowledge proofs of execution: prove a run followed its skill without revealing inputs.",
-    ],
-  },
-  {
-    phase: "Phase 4",
-    title: "Open ecosystem",
-    body: [
-      "Public API + SDK to run and compose skills programmatically.",
-      "Skill versioning and forking, with full history.",
-      "Reputation as a portable, on-chain credential.",
-      "Team workspaces and shared skill libraries.",
-    ],
-  },
-  {
-    phase: "Phase 5",
-    title: "Frontier",
-    body: [
-      "Multi-chain receipt anchoring.",
-      "An on-chain skill registry anyone can build on.",
-      "Agents that discover and compose marketplace skills autonomously.",
-      "Capture beyond the browser — desktop and mobile.",
-    ],
-  },
 ];
 
 function quotaLabel(q: number): string {
@@ -216,73 +165,15 @@ export default function LitepaperPage() {
             </Card>
           ))}
         </div>
-        <div className="mt-5">
+        <div className="mt-5 flex flex-wrap items-center gap-4">
           <BuyAemu variant="primary" />
-        </div>
-      </section>
-
-      {/* Roadmap */}
-      <section className="border-t border-border py-14">
-        <Label>Roadmap · what&apos;s next</Label>
-        <h2 className="mt-3 text-2xl font-semibold tracking-tight">
-          Where Aemulus is going
-        </h2>
-        <p className="mt-2 max-w-2xl text-sm text-ink-2">
-          Forward-looking. Each phase builds on what&apos;s already live above.
-        </p>
-        <div className="mt-6 grid gap-3">
-          {ROADMAP.map((r) => (
-            <Card key={r.phase} className="p-5">
-              <div className="flex items-center gap-3">
-                <Badge>{r.phase}</Badge>
-                <h3 className="text-lg font-semibold tracking-tight">
-                  {r.title}
-                </h3>
-              </div>
-              <ul className="mt-3 grid gap-2">
-                {r.body.map((b) => (
-                  <li key={b} className="flex gap-2.5 text-sm text-ink-2">
-                    <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-ink-3" />
-                    <span className="leading-relaxed">{b}</span>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          ))}
-        </div>
-        <p className="mt-4 text-xs text-ink-3">
-          Roadmap items are directional, not commitments, and may change as the
-          project and community evolve.
-        </p>
-      </section>
-
-      {/* Footer */}
-      <footer className="mt-auto border-t border-border py-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <Link href="/" className="mono text-sm font-semibold">
-            aemulus
+          <Link href="/roadmap" className="text-sm text-ink-2 hover:text-ink">
+            See the roadmap →
           </Link>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-2">
-            <a href={SOLANA.pumpUrl} target="_blank" rel="noopener noreferrer" className="hover:text-ink">
-              pump.fun
-            </a>
-            <a href={SOLANA.xUrl} target="_blank" rel="noopener noreferrer" className="hover:text-ink">
-              X
-            </a>
-            <a href={SOLANA.githubUrl} target="_blank" rel="noopener noreferrer" className="hover:text-ink">
-              GitHub
-            </a>
-            <Link href="/market" className="hover:text-ink">
-              Marketplace
-            </Link>
-          </div>
         </div>
-        <div className="mt-4 border-t border-border pt-4">
-          <span className="mono text-xs text-ink-3">
-            $AEMU CA: {SOLANA.mint || "TBA — launching on pump.fun"}
-          </span>
-        </div>
-      </footer>
+      </section>
+
+      <SiteFooter />
     </div>
   );
 }

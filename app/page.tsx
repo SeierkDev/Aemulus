@@ -26,31 +26,29 @@ export default async function Home() {
       <Nav />
 
       {/* Hero */}
-      <section className="flex flex-col items-start gap-5 border-t border-border pt-14">
+      <section className="flex flex-col items-center gap-6 border-t border-border pt-24 pb-20 text-center">
         <Badge>
           <span className="h-1.5 w-1.5 rounded-full bg-ink" />
           Show it once. It does the rest.
         </Badge>
-        <h1 className="max-w-3xl text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl">
+        <h1 className="mx-auto max-w-3xl text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
           Automate any browser task by{" "}
           <span className="text-ink-2">demonstrating</span> it — not coding it.
         </h1>
-        <p className="max-w-2xl text-lg leading-relaxed text-ink-2">
-          Aemulus watches you do a repetitive task one time, learns the intent,
-          and runs it autonomously — stopping to ask only when it hits something
+        <p className="mx-auto max-w-xl text-lg leading-relaxed text-ink-2">
+          Aemulus watches you do a repetitive task once, learns the intent, and
+          runs it autonomously — stopping to ask only when it hits something
           genuinely new.
         </p>
-        <div className="flex items-center gap-3 pt-1">
+        <div className="flex items-center justify-center gap-3 pt-2">
           <Link href="/record">
             <Button variant="primary">
               {hasData ? "Record another task" : "Record your first task"}
             </Button>
           </Link>
-          {hasData && (
-            <Link href="/skills">
-              <Button variant="default">View skills</Button>
-            </Link>
-          )}
+          <Link href="/market">
+            <Button variant="default">Explore skills</Button>
+          </Link>
         </div>
       </section>
 
