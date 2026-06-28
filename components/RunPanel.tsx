@@ -137,7 +137,7 @@ export function RunPanel({
       {out && (
         <p className="text-xs text-ink-3">
           You&apos;ve used your daily runs for the {quota?.tier} tier. Hold more
-          $AEM to raise your limit, or come back in 24h.
+          $AEMU to raise your limit, or come back in 24h.
         </p>
       )}
     </Card>

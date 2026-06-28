@@ -49,7 +49,7 @@ const FAQ = [
   ["What can it run?", "Anything you can do in a web browser today. Recording any app on your screen is on the roadmap."],
   ["Will it do something I didn't intend?", "It pauses and asks whenever it isn't confident, and every step is screenshotted — so you stay in control."],
   ["What happens when a site changes?", "Aemulus reasons about the page to find the right element, and flags the step for a quick fix if it can't."],
-  ["What is $AEM for?", "Browsing is free. Holding $AEM unlocks usage — the more you hold, the more autonomous runs you get each day."],
+  ["What is $AEMU for?", "Browsing is free. Holding $AEMU unlocks usage — the more you hold, the more autonomous runs you get each day."],
 ];
 
 const STAGES = [
@@ -266,12 +266,12 @@ export default async function Home() {
               Access tiers
             </h2>
             <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-ink-2">
-              Browsing Aemulus is free. Running skills is powered by $AEM — the
+              Browsing Aemulus is free. Running skills is powered by $AEMU — the
               more you hold, the more autonomous runs you get each day.
             </p>
           </div>
           <a href={SOLANA.pumpUrl} target="_blank" rel="noopener noreferrer">
-            <Button variant="primary">Get $AEM →</Button>
+            <Button variant="primary">Get $AEMU →</Button>
           </a>
         </div>
 
@@ -288,7 +288,7 @@ export default async function Home() {
               <div className="text-sm text-ink-2">
                 Hold{" "}
                 <span className="text-ink">
-                  ≥ {t.min.toLocaleString()} $AEM
+                  ≥ {t.min.toLocaleString()} $AEMU
                 </span>
               </div>
             </Card>
@@ -296,7 +296,7 @@ export default async function Home() {
         </div>
         <p className="mt-4 text-xs text-ink-3">
           {gatingEnabled()
-            ? "Gating is live — hold $AEM to run."
+            ? "Gating is live — hold $AEMU to run."
             : "Token not launched yet — sign in with any wallet to use Aemulus free during pre-launch."}
         </p>
       </section>
@@ -327,7 +327,7 @@ export default async function Home() {
             <Button variant="primary">Record a task</Button>
           </Link>
           <a href={SOLANA.pumpUrl} target="_blank" rel="noopener noreferrer">
-            <Button variant="default">Get $AEM</Button>
+            <Button variant="default">Get $AEMU</Button>
           </a>
         </div>
       </section>
@@ -353,7 +353,7 @@ export default async function Home() {
         </div>
         <div className="mt-4 border-t border-border pt-4">
           <span className="mono text-xs text-ink-3">
-            $AEM CA: {SOLANA.mint || "TBA — launching on pump.fun"}
+            $AEMU CA: {SOLANA.mint || "TBA — launching on pump.fun"}
           </span>
         </div>
       </footer>

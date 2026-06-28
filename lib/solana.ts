@@ -1,7 +1,7 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 
 /**
- * Solana / $AEM token-gating config and helpers (server-side).
+ * Solana / $AEMU token-gating config and helpers (server-side).
  *
  * Key behavior: if AEMULUS_MINT is unset, gating is OFF — every signed-in wallet
  * is treated as "Open" with full access. Set AEMULUS_MINT to the pump.fun token
@@ -15,7 +15,7 @@ function num(name: string, fallback: number): number {
 }
 
 export const SOLANA = {
-  /** The $AEM SPL mint. Empty until the pump.fun launch. */
+  /** The $AEMU SPL mint. Empty until the pump.fun launch. */
   mint: process.env.AEMULUS_MINT ?? "",
   rpcUrl: process.env.SOLANA_RPC_URL ?? "https://api.mainnet-beta.solana.com",
   /** Minimum balance for access, and the higher tier cutoffs (tunable). */
@@ -66,7 +66,7 @@ function connection(): Connection {
 }
 
 /**
- * Read a wallet's total $AEM balance (UI amount, summed across token
+ * Read a wallet's total $AEMU balance (UI amount, summed across token
  * accounts). Returns 0 when gating is off, on any RPC error, or no holdings.
  */
 export async function getAemulusBalance(owner: string): Promise<number> {
