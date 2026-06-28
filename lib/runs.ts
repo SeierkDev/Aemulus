@@ -20,6 +20,9 @@ export async function createRun(input: {
     overrides: input.overrides ?? {},
     result: null,
     error: null,
+    receiptHash: null,
+    receiptSig: null,
+    receiptCluster: null,
     steps: [],
     createdAt: now,
     updatedAt: now,
@@ -78,6 +81,17 @@ export async function finishRun(
   });
 }
 
+export async function updateReceipt(
+  runId: string,
+  receipt: { hash: string; sig: string | null; cluster: string | null },
+): Promise<void> {
+  await ready();
+  await db.execute({
+    sql: `UPDATE runs SET receipt_hash = ?, receipt_sig = ?, receipt_cluster = ? WHERE id = ?`,
+    args: [receipt.hash, receipt.sig, receipt.cluster, runId],
+  });
+}
+
 export async function getRun(runId: string): Promise<Run | null> {
   await ready();
   const r = await db.execute({ sql: `SELECT * FROM runs WHERE id = ?`, args: [runId] });
@@ -124,6 +138,10 @@ function rowToRun(row: Record<string, unknown>, steps: RunStepRecord[]): Run {
     overrides: JSON.parse(String(row.overrides || "{}")),
     result: row.result == null ? null : String(row.result),
     error: row.error == null ? null : String(row.error),
+    receiptHash: row.receipt_hash == null ? null : String(row.receipt_hash),
+    receiptSig: row.receipt_sig == null ? null : String(row.receipt_sig),
+    receiptCluster:
+      row.receipt_cluster == null ? null : String(row.receipt_cluster),
     steps,
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),

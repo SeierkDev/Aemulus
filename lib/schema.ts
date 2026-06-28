@@ -54,6 +54,10 @@ CREATE TABLE IF NOT EXISTS runs (
   -- JSON: structured result / extracted output
   result      TEXT,
   error       TEXT,
+  -- verifiable receipt: sha256 of run + proof screenshots, + optional Solana anchor
+  receipt_hash    TEXT,
+  receipt_sig     TEXT,
+  receipt_cluster TEXT,
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL
 );

@@ -6,6 +6,7 @@ import { createRun, addRunStep, finishRun, getRun } from "./runs";
 import { operatorChooseSelector, type Candidate } from "./operate";
 import { assertSafeUrl } from "./safe-url";
 import { runSlots } from "./semaphore";
+import { attachReceipt } from "./receipt";
 import type { Run, RunOverrides, RunStatus, Skill, SkillStep } from "./types";
 
 /**
@@ -139,6 +140,7 @@ export async function executeRun(
       ? `Completed ${skill.plan.length} steps.`
       : null;
   await finishRun(run.id, { status: finalStatus, result, error });
+  await attachReceipt(run.id); // verifiable receipt (+ on-chain anchor if configured)
   return (await getRun(run.id))!;
 }
 

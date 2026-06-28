@@ -202,6 +202,9 @@ export interface Run {
   overrides: RunOverrides;
   result: string | null;
   error: string | null;
+  receiptHash: string | null;
+  receiptSig: string | null;
+  receiptCluster: string | null;
   steps: RunStepRecord[];
   createdAt: number;
   updatedAt: number;

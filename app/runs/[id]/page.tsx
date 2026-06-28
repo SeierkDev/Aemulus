@@ -6,6 +6,7 @@ import { ResolveForm } from "@/components/ResolveForm";
 import { getRun } from "@/lib/runs";
 import { getSkill } from "@/lib/skills";
 import { getSession } from "@/lib/auth";
+import { explorerUrl } from "@/lib/receipt";
 import type { RunStepRecord } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -66,6 +67,38 @@ export default async function RunPage({
                 </div>
               ))}
             </div>
+          </Card>
+        )}
+
+        {/* Verifiable receipt */}
+        {run.receiptHash && (
+          <Card className="mt-6 p-4">
+            <div className="flex items-center justify-between">
+              <Label>Verifiable receipt</Label>
+              {run.receiptSig && run.receiptCluster ? (
+                <a
+                  href={explorerUrl(run.receiptSig, run.receiptCluster)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-ink hover:underline"
+                >
+                  Anchored on Solana →
+                </a>
+              ) : (
+                <span className="text-xs text-ink-3">
+                  on-chain anchoring at launch
+                </span>
+              )}
+            </div>
+            <div
+              className="mono mt-2 truncate text-xs text-ink-2"
+              title={run.receiptHash}
+            >
+              sha256:{run.receiptHash}
+            </div>
+            <p className="mt-1.5 text-xs text-ink-3">
+              A tamper-evident hash of this run and every proof screenshot.
+            </p>
           </Card>
         )}
 
