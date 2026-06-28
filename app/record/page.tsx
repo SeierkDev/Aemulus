@@ -4,32 +4,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Badge, Button, Card, Label, cx } from "@/components/ui";
 import { useUsageGate } from "@/components/use-usage-gate";
-import type { RecordedAction, RecorderState } from "@/lib/types";
+import { Trace } from "@/components/record/Trace";
+import { LiveView } from "@/components/record/LiveView";
+import type { RecorderState } from "@/lib/types";
 
 const VIEW_W = 1280;
 const VIEW_H = 800;
 
 const input =
   "w-full rounded-[var(--radius-base)] border border-border-strong bg-surface-2 px-3 py-2 text-sm outline-none placeholder:text-ink-3 focus:border-ink-3";
-
-function actionLabel(a: RecordedAction): string {
-  switch (a.type) {
-    case "navigate":
-      return `Open ${a.value ?? ""}`;
-    case "click":
-      return `Click ${a.name || a.text || a.tag || "element"}`;
-    case "input":
-      return `Type "${a.value ?? ""}" into ${a.name || a.tag}`;
-    case "select":
-      return `Select "${a.value ?? ""}" in ${a.name || a.tag}`;
-    case "key":
-      return `Press ${a.key}`;
-    case "submit":
-      return `Submit ${a.name || "form"}`;
-    default:
-      return a.type;
-  }
-}
 
 const SPECIAL_KEYS = new Set([
   "Enter",
@@ -273,72 +256,19 @@ export default function RecordPage() {
             </Card>
           )}
 
-          <Card className="flex min-h-[160px] flex-col">
-            <div className="border-b border-border px-4 py-3">
-              <Label>Trace</Label>
-            </div>
-            <ol className="flex-1 divide-y divide-border overflow-auto">
-              {actions.length === 0 && (
-                <li className="px-4 py-6 text-sm text-ink-3">
-                  Steps appear here as you interact with the view.
-                </li>
-              )}
-              {[...actions].reverse().map((a) => (
-                <li
-                  key={a.idx}
-                  className="flex items-center gap-3 px-4 py-2.5 text-sm"
-                >
-                  <span className="mono w-8 shrink-0 text-ink-3">
-                    {String(a.idx).padStart(2, "0")}
-                  </span>
-                  <span className="rounded border border-border-strong bg-surface-2 px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wide text-ink-3">
-                    {a.type}
-                  </span>
-                  <span className="truncate text-ink-2">{actionLabel(a)}</span>
-                </li>
-              ))}
-            </ol>
-          </Card>
+          <Trace actions={actions} />
         </div>
 
         {/* Right: live interactive view */}
-        <Card className="overflow-hidden">
-          <div className="flex items-center justify-between border-b border-border px-4 py-3">
-            <Label>Live browser</Label>
-            <span className="mono truncate text-xs text-ink-3">
-              {state?.startUrl}
-            </span>
-          </div>
-          <div
-            className="grid aspect-[16/10] place-items-center bg-bg outline-none"
-            tabIndex={0}
-            onKeyDown={onViewKey}
-          >
-            {recording && frame ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                ref={imgRef}
-                src={`data:image/jpeg;base64,${frame}`}
-                alt="live browser"
-                className="h-full w-full cursor-crosshair object-contain"
-                onClick={onViewClick}
-                onWheel={onViewWheel}
-                draggable={false}
-              />
-            ) : (
-              <span className="text-sm text-ink-3">
-                {recording
-                  ? "Connecting to the live browser…"
-                  : "The live browser will appear here once you start."}
-              </span>
-            )}
-          </div>
-          {recording && (
-            <div className="border-t border-border px-4 py-2 text-xs text-ink-3">
-              Click in the view to interact. Click a field first, then type.
-            </div>
-          )}
-        </Card>
+        <LiveView
+          recording={recording}
+          frame={frame}
+          startUrl={state?.startUrl}
+          imgRef={imgRef}
+          onClick={onViewClick}
+          onWheel={onViewWheel}
+          onKey={onViewKey}
+        />
       </div>
 
       <div className="py-6" />

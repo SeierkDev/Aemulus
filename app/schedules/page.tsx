@@ -4,12 +4,10 @@ import { Nav } from "@/components/Nav";
 import { ScheduleControls } from "@/components/ScheduleControls";
 import { getSession } from "@/lib/auth";
 import { listSchedules } from "@/lib/schedules";
+import { when } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-function when(ts: number | null): string {
-  return ts ? new Date(ts).toLocaleString() : "—";
-}
 
 export default async function SchedulesPage() {
   const session = await getSession();

@@ -4,10 +4,8 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Button } from "./ui";
 import { useAuth } from "./auth-context";
+import { short } from "@/lib/format";
 
-function short(pk: string): string {
-  return `${pk.slice(0, 4)}…${pk.slice(-4)}`;
-}
 
 /** Connect → Sign in → signed-in identity, shown in the nav. Monochrome. */
 export function WalletStatus() {

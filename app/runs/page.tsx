@@ -5,12 +5,10 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { listRuns } from "@/lib/runs";
 import { getSession } from "@/lib/auth";
 import type { Run } from "@/lib/types";
+import { when } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-function when(ts: number): string {
-  return new Date(ts).toLocaleString();
-}
 
 export default async function RunsPage() {
   const owner = (await getSession())?.pubkey ?? "";

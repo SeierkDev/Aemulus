@@ -8,6 +8,7 @@ import { RatingWidget } from "@/components/RatingWidget";
 import { getSkill, skillTargets } from "@/lib/skills";
 import { hasRunSkill } from "@/lib/runs";
 import { getSession } from "@/lib/auth";
+import { short } from "@/lib/format";
 import {
   getSkillReputation,
   getMyRating,
@@ -16,9 +17,6 @@ import {
 
 export const dynamic = "force-dynamic";
 
-function short(pk: string): string {
-  return pk ? `${pk.slice(0, 4)}…${pk.slice(-4)}` : "anon";
-}
 
 export default async function MarketSkillPage({
   params,

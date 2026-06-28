@@ -4,12 +4,10 @@ import { Nav } from "@/components/Nav";
 import { Stars } from "@/components/Stars";
 import { listPublishedSkills } from "@/lib/skills";
 import { getReputationBatch } from "@/lib/reputation";
+import { short } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-function short(pk: string): string {
-  return pk ? `${pk.slice(0, 4)}…${pk.slice(-4)}` : "anon";
-}
 
 export default async function MarketPage() {
   const skills = await listPublishedSkills();

@@ -5,12 +5,10 @@ import { GenerateButton } from "@/components/GenerateButton";
 import { listDemonstrations } from "@/lib/demonstrations";
 import { listSkills } from "@/lib/skills";
 import { getSession } from "@/lib/auth";
+import { when } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-function when(ts: number): string {
-  return new Date(ts).toLocaleString();
-}
 
 export default async function SkillsPage() {
   const owner = (await getSession())?.pubkey ?? "";

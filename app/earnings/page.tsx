@@ -4,12 +4,10 @@ import { Nav } from "@/components/Nav";
 import { getSession } from "@/lib/auth";
 import { getEarningsSummary } from "@/lib/earnings";
 import { SOLANA } from "@/lib/solana";
+import { when } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-function when(ts: number): string {
-  return new Date(ts).toLocaleString();
-}
 
 export default async function EarningsPage() {
   const session = await getSession();
