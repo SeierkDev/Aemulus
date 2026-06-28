@@ -13,6 +13,7 @@ import {
 import bs58 from "bs58";
 import { getRun, updateReceipt } from "./runs";
 import { logError, logInfo } from "./log";
+import type { Run } from "./types";
 
 /**
  * Verifiable run receipts. Each run gets a deterministic sha256 over its
@@ -101,27 +102,32 @@ async function maybeAnchor(
   }
 }
 
+/** Recompute the digest from a run's current stored data + screenshots. */
+async function digestForRun(run: Run): Promise<string> {
+  const steps: ReceiptStep[] = await Promise.all(
+    run.steps.map(async (s) => ({
+      idx: s.idx,
+      action: s.action,
+      confidence: s.confidence,
+      flagged: s.flagged,
+      shotHash: await hashScreenshot(s.screenshot),
+    })),
+  );
+  return receiptDigest({
+    runId: run.id,
+    skillId: run.skillId,
+    owner: run.owner,
+    status: run.status,
+    steps,
+  });
+}
+
 /** Compute, optionally anchor, and persist a run's receipt. */
 export async function attachReceipt(runId: string): Promise<void> {
   const run = await getRun(runId);
   if (!run) return;
   try {
-    const steps: ReceiptStep[] = await Promise.all(
-      run.steps.map(async (s) => ({
-        idx: s.idx,
-        action: s.action,
-        confidence: s.confidence,
-        flagged: s.flagged,
-        shotHash: await hashScreenshot(s.screenshot),
-      })),
-    );
-    const hash = receiptDigest({
-      runId: run.id,
-      skillId: run.skillId,
-      owner: run.owner,
-      status: run.status,
-      steps,
-    });
+    const hash = await digestForRun(run);
     const anchored = await maybeAnchor(hash);
     await updateReceipt(runId, {
       hash,
@@ -138,4 +144,77 @@ export async function attachReceipt(runId: string): Promise<void> {
 export function explorerUrl(sig: string, cluster: string): string {
   const q = cluster && cluster !== "mainnet-beta" ? `?cluster=${cluster}` : "";
   return `https://explorer.solana.com/tx/${sig}${q}`;
+}
+
+export interface ReceiptVerification {
+  found: boolean;
+  runId: string;
+  status?: string;
+  steps?: number;
+  hash?: string | null;
+  /** Recomputed digest equals the recorded receipt (tamper-evident). */
+  matches?: boolean;
+  anchor?: {
+    sig: string;
+    cluster: string;
+    url: string;
+    /** true/false from on-chain read, or null if the chain couldn't be reached. */
+    memoMatches: boolean | null;
+  };
+}
+
+/** Read the anchored Memo back from chain and confirm it carries the hash. */
+async function checkOnChainMemo(
+  sig: string,
+  cluster: string,
+  hash: string,
+): Promise<boolean | null> {
+  try {
+    const rpc =
+      process.env.AEMULUS_RECEIPT_RPC || clusterApiUrl(cluster as never);
+    const conn = new Connection(rpc, "confirmed");
+    const tx = await conn.getParsedTransaction(sig, {
+      maxSupportedTransactionVersion: 0,
+    });
+    if (!tx) return null;
+    const logs = tx.meta?.logMessages ?? [];
+    return logs.some((l) => l.includes(hash));
+  } catch (e) {
+    logError("receipt.readback", e);
+    return null;
+  }
+}
+
+/**
+ * Public verification: recompute the digest from stored data and compare to the
+ * recorded receipt, and (if anchored) confirm the on-chain memo carries it.
+ * Returns only non-sensitive fields — never inputs or screenshots.
+ */
+export async function verifyReceipt(
+  runId: string,
+): Promise<ReceiptVerification> {
+  const run = await getRun(runId);
+  if (!run || !run.receiptHash) return { found: false, runId };
+  const recomputed = await digestForRun(run);
+  const verification: ReceiptVerification = {
+    found: true,
+    runId,
+    status: run.status,
+    steps: run.steps.length,
+    hash: run.receiptHash,
+    matches: recomputed === run.receiptHash,
+  };
+  if (run.receiptSig && run.receiptCluster) {
+    verification.anchor = {
+      sig: run.receiptSig,
+      cluster: run.receiptCluster,
+      url: explorerUrl(run.receiptSig, run.receiptCluster),
+      memoMatches: await checkOnChainMemo(
+        run.receiptSig,
+        run.receiptCluster,
+        run.receiptHash,
+      ),
+    };
+  }
+  return verification;
 }

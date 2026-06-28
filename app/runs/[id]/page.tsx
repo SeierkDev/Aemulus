@@ -77,20 +77,28 @@ export default async function RunPage({
           <Card className="mt-6 p-4">
             <div className="flex items-center justify-between">
               <Label>Verifiable receipt</Label>
-              {run.receiptSig && run.receiptCluster ? (
-                <a
-                  href={explorerUrl(run.receiptSig, run.receiptCluster)}
-                  target="_blank"
-                  rel="noopener noreferrer"
+              <div className="flex items-center gap-3">
+                {run.receiptSig && run.receiptCluster ? (
+                  <a
+                    href={explorerUrl(run.receiptSig, run.receiptCluster)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-ink hover:underline"
+                  >
+                    Anchored on Solana →
+                  </a>
+                ) : (
+                  <span className="text-xs text-ink-3">
+                    on-chain anchoring at launch
+                  </span>
+                )}
+                <Link
+                  href={`/verify/${run.id}`}
                   className="text-xs text-ink hover:underline"
                 >
-                  Anchored on Solana →
-                </a>
-              ) : (
-                <span className="text-xs text-ink-3">
-                  on-chain anchoring at launch
-                </span>
-              )}
+                  Verify →
+                </Link>
+              </div>
             </div>
             <div
               className="mono mt-2 truncate text-xs text-ink-2"
