@@ -58,6 +58,10 @@ CREATE TABLE IF NOT EXISTS runs (
   receipt_hash    TEXT,
   receipt_sig     TEXT,
   receipt_cluster TEXT,
+  -- Merkle batching: run's leaf is anchored as part of a batch root on-chain
+  batch_id      TEXT,
+  leaf_index    INTEGER,
+  merkle_proof  TEXT,   -- JSON: sibling path from leaf to root
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL
 );
@@ -114,6 +118,16 @@ CREATE TABLE IF NOT EXISTS ratings (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ratings_uniq ON ratings(skill_id, rater);
 
+-- Merkle batches: one anchored root commits to many run receipts at once.
+CREATE TABLE IF NOT EXISTS receipt_batches (
+  id           TEXT PRIMARY KEY,
+  merkle_root  TEXT NOT NULL,
+  leaf_count   INTEGER NOT NULL,
+  sig          TEXT,            -- Solana tx signature anchoring the root (if any)
+  cluster      TEXT,
+  created_at   INTEGER NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_runs_skill   ON runs(skill_id);
 CREATE INDEX IF NOT EXISTS idx_steps_run    ON run_steps(run_id);
 CREATE INDEX IF NOT EXISTS idx_skills_demo  ON skills(source_demo_id);
@@ -124,4 +138,5 @@ CREATE INDEX IF NOT EXISTS idx_skills_pub   ON skills(published);
 CREATE INDEX IF NOT EXISTS idx_earn_owner   ON earnings(owner);
 CREATE INDEX IF NOT EXISTS idx_sched_owner  ON schedules(owner);
 CREATE INDEX IF NOT EXISTS idx_sched_due    ON schedules(active, next_run_at);
+CREATE INDEX IF NOT EXISTS idx_runs_unbatched ON runs(batch_id, receipt_hash);
 `;

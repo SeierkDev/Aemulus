@@ -11,8 +11,9 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import bs58 from "bs58";
-import { getRun, updateReceipt } from "./runs";
-import { logError, logInfo } from "./log";
+import { getBatch, getRun, updateReceipt } from "./runs";
+import { verifyProof } from "./merkle";
+import { logError } from "./log";
 import type { Run } from "./types";
 
 /**
@@ -76,9 +77,12 @@ function explorerCluster(): string {
   return process.env.AEMULUS_RECEIPT_CLUSTER || "devnet";
 }
 
-/** Anchor a hash on Solana via Memo, if a signer is configured. */
-async function maybeAnchor(
-  hash: string,
+/**
+ * Anchor an arbitrary memo on Solana, if a signer is configured. Used to commit
+ * a Merkle batch root in a single transaction (one tx for thousands of runs).
+ */
+export async function anchorOnChain(
+  memo: string,
 ): Promise<{ sig: string; cluster: string } | null> {
   const secret = process.env.AEMULUS_RECEIPT_SECRET;
   if (!secret) return null;
@@ -91,7 +95,7 @@ async function maybeAnchor(
       new TransactionInstruction({
         keys: [],
         programId: MEMO_PROGRAM,
-        data: Buffer.from(`aemulus:run:${hash}`, "utf8"),
+        data: Buffer.from(memo, "utf8"),
       }),
     );
     const sig = await sendAndConfirmTransaction(conn, tx, [signer]);
@@ -127,14 +131,10 @@ export async function attachReceipt(runId: string): Promise<void> {
   const run = await getRun(runId);
   if (!run) return;
   try {
+    // Compute + store the leaf hash only. Anchoring happens later, in a Merkle
+    // batch, so thousands of runs commit in a single transaction.
     const hash = await digestForRun(run);
-    const anchored = await maybeAnchor(hash);
-    await updateReceipt(runId, {
-      hash,
-      sig: anchored?.sig ?? null,
-      cluster: anchored?.cluster ?? null,
-    });
-    if (anchored) logInfo("receipt.anchored", anchored.sig, { run: runId });
+    await updateReceipt(runId, { hash, sig: null, cluster: null });
   } catch (e) {
     logError("receipt.attach", e, { run: runId });
   }
@@ -154,12 +154,21 @@ export interface ReceiptVerification {
   hash?: string | null;
   /** Recomputed digest equals the recorded receipt (tamper-evident). */
   matches?: boolean;
-  anchor?: {
-    sig: string;
-    cluster: string;
-    url: string;
-    /** true/false from on-chain read, or null if the chain couldn't be reached. */
-    memoMatches: boolean | null;
+  /** Merkle batch this run was anchored in, if batched. */
+  batch?: {
+    id: string;
+    root: string;
+    index: number;
+    leafCount: number;
+    /** Recomputed leaf proves into the batch root (membership). */
+    proofValid: boolean;
+    anchor?: {
+      sig: string;
+      cluster: string;
+      url: string;
+      /** true/false from on-chain read, or null if the chain was unreachable. */
+      memoMatches: boolean | null;
+    };
   };
 }
 
@@ -204,17 +213,37 @@ export async function verifyReceipt(
     hash: run.receiptHash,
     matches: recomputed === run.receiptHash,
   };
-  if (run.receiptSig && run.receiptCluster) {
-    verification.anchor = {
-      sig: run.receiptSig,
-      cluster: run.receiptCluster,
-      url: explorerUrl(run.receiptSig, run.receiptCluster),
-      memoMatches: await checkOnChainMemo(
-        run.receiptSig,
-        run.receiptCluster,
-        run.receiptHash,
-      ),
-    };
+
+  if (run.batchId && run.merkleProof) {
+    const batch = await getBatch(run.batchId);
+    if (batch) {
+      // Prove the RECOMPUTED leaf into the on-chain root: ties data integrity
+      // and membership into one check (tampered data → leaf changes → fails).
+      const proofValid = verifyProof(
+        recomputed,
+        run.merkleProof,
+        batch.merkleRoot,
+      );
+      verification.batch = {
+        id: batch.id,
+        root: batch.merkleRoot,
+        index: run.leafIndex ?? -1,
+        leafCount: batch.leafCount,
+        proofValid,
+      };
+      if (batch.sig && batch.cluster) {
+        verification.batch.anchor = {
+          sig: batch.sig,
+          cluster: batch.cluster,
+          url: explorerUrl(batch.sig, batch.cluster),
+          memoMatches: await checkOnChainMemo(
+            batch.sig,
+            batch.cluster,
+            batch.merkleRoot,
+          ),
+        };
+      }
+    }
   }
   return verification;
 }

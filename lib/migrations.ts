@@ -35,4 +35,26 @@ export const MIGRATIONS: Migration[] = [
       { table: "runs", column: "receipt_cluster", def: "TEXT" },
     ],
   },
+
+  // 3 — Merkle-batched receipts: per-run proof columns + the batches table.
+  {
+    id: 3,
+    name: "merkle_batches",
+    addColumns: [
+      { table: "runs", column: "batch_id", def: "TEXT" },
+      { table: "runs", column: "leaf_index", def: "INTEGER" },
+      { table: "runs", column: "merkle_proof", def: "TEXT" },
+    ],
+    statements: [
+      `CREATE TABLE IF NOT EXISTS receipt_batches (
+         id TEXT PRIMARY KEY,
+         merkle_root TEXT NOT NULL,
+         leaf_count INTEGER NOT NULL,
+         sig TEXT,
+         cluster TEXT,
+         created_at INTEGER NOT NULL
+       );`,
+      `CREATE INDEX IF NOT EXISTS idx_runs_unbatched ON runs(batch_id, receipt_hash);`,
+    ],
+  },
 ];

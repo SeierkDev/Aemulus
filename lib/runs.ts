@@ -1,7 +1,13 @@
 import { db, ready } from "./db";
 import { id } from "./ids";
 import { decryptJSON, encryptJSON } from "./encrypt";
-import type { Run, RunOverrides, RunStatus, RunStepRecord } from "./types";
+import type {
+  ReceiptBatch,
+  Run,
+  RunOverrides,
+  RunStatus,
+  RunStepRecord,
+} from "./types";
 
 export async function createRun(input: {
   owner: string;
@@ -23,6 +29,9 @@ export async function createRun(input: {
     receiptHash: null,
     receiptSig: null,
     receiptCluster: null,
+    batchId: null,
+    leafIndex: null,
+    merkleProof: null,
     steps: [],
     createdAt: now,
     updatedAt: now,
@@ -78,6 +87,43 @@ export async function finishRun(
   await db.execute({
     sql: `UPDATE runs SET status = ?, result = ?, error = ?, updated_at = ? WHERE id = ?`,
     args: [patch.status, patch.result ?? null, patch.error ?? null, Date.now(), runId],
+  });
+}
+
+export async function getBatch(batchId: string): Promise<ReceiptBatch | null> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT * FROM receipt_batches WHERE id = ?`,
+    args: [batchId],
+  });
+  const row = r.rows[0];
+  if (!row) return null;
+  return {
+    id: String(row.id),
+    merkleRoot: String(row.merkle_root),
+    leafCount: Number(row.leaf_count),
+    sig: row.sig == null ? null : String(row.sig),
+    cluster: row.cluster == null ? null : String(row.cluster),
+    createdAt: Number(row.created_at),
+  };
+}
+
+/** Attach a run's Merkle proof + batch (and the batch's anchor) after batching. */
+export async function setRunBatch(
+  runId: string,
+  b: {
+    batchId: string;
+    leafIndex: number;
+    proof: unknown;
+    sig: string | null;
+    cluster: string | null;
+  },
+): Promise<void> {
+  await ready();
+  await db.execute({
+    sql: `UPDATE runs SET batch_id = ?, leaf_index = ?, merkle_proof = ?,
+          receipt_sig = ?, receipt_cluster = ? WHERE id = ?`,
+    args: [b.batchId, b.leafIndex, JSON.stringify(b.proof), b.sig, b.cluster, runId],
   });
 }
 
@@ -155,6 +201,10 @@ function rowToRun(row: Record<string, unknown>, steps: RunStepRecord[]): Run {
     receiptSig: row.receipt_sig == null ? null : String(row.receipt_sig),
     receiptCluster:
       row.receipt_cluster == null ? null : String(row.receipt_cluster),
+    batchId: row.batch_id == null ? null : String(row.batch_id),
+    leafIndex: row.leaf_index == null ? null : Number(row.leaf_index),
+    merkleProof:
+      row.merkle_proof == null ? null : JSON.parse(String(row.merkle_proof)),
     steps,
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),

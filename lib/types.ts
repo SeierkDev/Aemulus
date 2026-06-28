@@ -205,7 +205,20 @@ export interface Run {
   receiptHash: string | null;
   receiptSig: string | null;
   receiptCluster: string | null;
+  // Merkle batching: this run's leaf, its position, and proof to the batch root.
+  batchId: string | null;
+  leafIndex: number | null;
+  merkleProof: { siblings: { hash: string; left: boolean }[] } | null;
   steps: RunStepRecord[];
   createdAt: number;
   updatedAt: number;
+}
+
+export interface ReceiptBatch {
+  id: string;
+  merkleRoot: string;
+  leafCount: number;
+  sig: string | null;
+  cluster: string | null;
+  createdAt: number;
 }

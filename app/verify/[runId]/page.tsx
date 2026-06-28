@@ -61,31 +61,55 @@ export default async function VerifyPage({
             </div>
           </Card>
 
-          {/* On-chain anchor */}
+          {/* Merkle batch membership */}
           <Card className="p-6">
-            <Label>On-chain anchor</Label>
-            {v.anchor ? (
+            <div className="flex items-center justify-between">
+              <Label>Merkle batch anchor</Label>
+              {v.batch && (
+                <Badge className="text-ink">
+                  {v.batch.proofValid ? "✓ in batch" : "✗ not in batch"}
+                </Badge>
+              )}
+            </div>
+            {v.batch ? (
               <div className="mt-2 text-sm text-ink-2">
                 <p>
-                  {v.anchor.memoMatches === true
-                    ? "Confirmed on Solana — the anchored memo carries this exact hash."
-                    : v.anchor.memoMatches === false
-                      ? "Anchored, but the on-chain memo did not match (investigate)."
-                      : "Anchored on Solana. Could not reach an RPC to read it back right now."}
+                  {v.batch.proofValid
+                    ? `This run is leaf #${v.batch.index} of a batch of ${v.batch.leafCount}. Its Merkle proof resolves to the batch root — independently confirmed.`
+                    : "The Merkle proof does NOT resolve to the batch root for this run's data."}
                 </p>
-                <a
-                  href={v.anchor.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-2 inline-block text-xs text-ink hover:underline"
+                <div
+                  className="mono mt-3 break-all text-xs text-ink-3"
+                  title={v.batch.root}
                 >
-                  View transaction on explorer →
-                </a>
+                  root: {v.batch.root}
+                </div>
+                {v.batch.anchor ? (
+                  <p className="mt-2">
+                    {v.batch.anchor.memoMatches === true
+                      ? "The batch root is anchored on Solana — confirmed on-chain."
+                      : v.batch.anchor.memoMatches === false
+                        ? "Anchored, but the on-chain memo did not match (investigate)."
+                        : "Anchored on Solana. Could not reach an RPC to read it back right now."}{" "}
+                    <a
+                      href={v.batch.anchor.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-ink hover:underline"
+                    >
+                      View on explorer →
+                    </a>
+                  </p>
+                ) : (
+                  <p className="mt-2 text-ink-3">
+                    Root recorded; on-chain anchoring activates at launch.
+                  </p>
+                )}
               </div>
             ) : (
               <p className="mt-2 text-sm text-ink-3">
-                Not yet anchored — on-chain anchoring activates at launch. The
-                integrity check above is independent of the chain.
+                Awaiting the next Merkle batch — its proof appears here once
+                anchored. The integrity check above is independent of the chain.
               </p>
             )}
           </Card>
