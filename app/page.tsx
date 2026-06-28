@@ -6,6 +6,7 @@ import { listSkills, listPublishedSkills } from "@/lib/skills";
 import { listRuns } from "@/lib/runs";
 import { getReputationBatch } from "@/lib/reputation";
 import { Stars } from "@/components/Stars";
+import { BuyAemu } from "@/components/BuyAemu";
 import { getSession } from "@/lib/auth";
 import { SOLANA, gatingEnabled, limitForLevel } from "@/lib/solana";
 
@@ -281,9 +282,7 @@ export default async function Home() {
               more you hold, the more autonomous runs you get each day.
             </p>
           </div>
-          <a href={SOLANA.pumpUrl} target="_blank" rel="noopener noreferrer">
-            <Button variant="primary">Get $AEMU →</Button>
-          </a>
+          <BuyAemu variant="primary" />
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-3">
@@ -337,9 +336,7 @@ export default async function Home() {
           <Link href="/record">
             <Button variant="primary">Record a task</Button>
           </Link>
-          <a href={SOLANA.pumpUrl} target="_blank" rel="noopener noreferrer">
-            <Button variant="default">Get $AEMU</Button>
-          </a>
+          <BuyAemu variant="default" />
         </div>
       </section>
 

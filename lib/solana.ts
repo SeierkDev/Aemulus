@@ -47,6 +47,11 @@ export function gatingEnabled(): boolean {
   return SOLANA.mint.length > 0;
 }
 
+/** Whether $AEMU has launched (mint configured). Drives "coming soon" UI. */
+export function tokenLaunched(): boolean {
+  return SOLANA.mint.length > 0;
+}
+
 export type Tier = {
   name: "Open" | "Whale" | "Pro" | "Holder" | "Locked";
   level: 0 | 1 | 2 | 3;
