@@ -5,6 +5,7 @@ import { rateLimit } from "@/lib/ratelimit";
 import { getDemonstration } from "@/lib/demonstrations";
 import { generalizeDemonstration } from "@/lib/generalize";
 import { createSkill } from "@/lib/skills";
+import { readJson, GeneralizeBody } from "@/lib/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,16 +28,9 @@ export async function POST(req: Request) {
         { status: 429 },
       );
     }
-    const { demonstrationId } = (await req.json().catch(() => ({}))) as {
-      demonstrationId?: string;
-    };
-    if (!demonstrationId) {
-      return NextResponse.json(
-        { error: "demonstrationId is required" },
-        { status: 400 },
-      );
-    }
-    const demo = await getDemonstration(demonstrationId);
+    const parsed = await readJson(req, GeneralizeBody);
+    if (!parsed.ok) return parsed.res;
+    const demo = await getDemonstration(parsed.data.demonstrationId);
     if (!demo || demo.owner !== session.pubkey) {
       return NextResponse.json(
         { error: "Demonstration not found" },

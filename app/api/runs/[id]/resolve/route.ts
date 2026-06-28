@@ -5,6 +5,7 @@ import { getQuota } from "@/lib/quota";
 import { getRun } from "@/lib/runs";
 import { getSkill } from "@/lib/skills";
 import { executeRun } from "@/lib/runner";
+import { readJson, ResolveBody } from "@/lib/validate";
 import type { RunOverrides } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -35,14 +36,9 @@ export async function POST(
       return NextResponse.json({ error: "Skill not found" }, { status: 404 });
     }
 
-    const body = (await req.json().catch(() => ({}))) as {
-      stepIdx?: number;
-      selector?: string;
-      skip?: boolean;
-    };
-    if (typeof body.stepIdx !== "number") {
-      return NextResponse.json({ error: "stepIdx is required" }, { status: 400 });
-    }
+    const parsed = await readJson(req, ResolveBody);
+    if (!parsed.ok) return parsed.res;
+    const body = parsed.data;
 
     const quota = await getQuota(session);
     if (!quota.ok) {

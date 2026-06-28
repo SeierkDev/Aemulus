@@ -4,6 +4,7 @@ import { logError } from "@/lib/log";
 import { getQuota } from "@/lib/quota";
 import { getSkill, incrementRunCount } from "@/lib/skills";
 import { executeRun } from "@/lib/runner";
+import { readJson, RunBody } from "@/lib/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,13 +16,9 @@ export async function POST(req: Request) {
     if (!session) {
       return NextResponse.json({ error: "Not authorized" }, { status: 401 });
     }
-    const { skillId, input } = (await req.json().catch(() => ({}))) as {
-      skillId?: string;
-      input?: Record<string, string>;
-    };
-    if (!skillId) {
-      return NextResponse.json({ error: "skillId is required" }, { status: 400 });
-    }
+    const parsed = await readJson(req, RunBody);
+    if (!parsed.ok) return parsed.res;
+    const { skillId, input } = parsed.data;
     const skill = await getSkill(skillId);
     // Runnable if you own it, or it's published to the marketplace.
     if (!skill || (skill.owner !== session.pubkey && !skill.published)) {

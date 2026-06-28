@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
-import { getRecorder, type InputEvent } from "@/lib/recorder";
+import { getRecorder } from "@/lib/recorder";
+import { readJson, RecordInputBody } from "@/lib/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,12 +12,11 @@ export async function POST(req: Request) {
   if (!session) {
     return NextResponse.json({ error: "Not authorized" }, { status: 401 });
   }
+  const parsed = await readJson(req, RecordInputBody);
+  if (!parsed.ok) return parsed.res;
+  const { event, events } = parsed.data;
   const rec = getRecorder(session.pubkey);
-  const body = (await req.json().catch(() => ({}))) as {
-    event?: InputEvent;
-    events?: InputEvent[];
-  };
-  const events = body.events ?? (body.event ? [body.event] : []);
-  for (const ev of events) await rec.dispatchInput(ev);
+  const list = events ?? (event ? [event] : []);
+  for (const ev of list) await rec.dispatchInput(ev);
   return NextResponse.json({ ok: true });
 }

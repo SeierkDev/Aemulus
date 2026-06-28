@@ -9,22 +9,16 @@ import {
   type Session,
 } from "@/lib/auth";
 import { computeTier, getMimicBalance } from "@/lib/solana";
+import { readJson, VerifyBody } from "@/lib/validate";
 import { env } from "@/lib/env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  const { pubkey, signature } = (await req.json().catch(() => ({}))) as {
-    pubkey?: string;
-    signature?: string;
-  };
-  if (!pubkey || !signature) {
-    return NextResponse.json(
-      { error: "pubkey and signature are required" },
-      { status: 400 },
-    );
-  }
+  const parsed = await readJson(req, VerifyBody);
+  if (!parsed.ok) return parsed.res;
+  const { pubkey, signature } = parsed.data;
 
   const cookie = (await cookies()).get(NONCE_COOKIE)?.value;
   const [nonce, issuedStr] = (cookie ?? "").split("|");

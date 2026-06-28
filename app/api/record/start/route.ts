@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
 import { assertSafeUrl } from "@/lib/safe-url";
 import { getRecorder } from "@/lib/recorder";
+import { readJson, RecordStartBody } from "@/lib/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,16 +20,9 @@ export async function POST(req: Request) {
     if (!session) {
       return NextResponse.json({ error: "Not authorized" }, { status: 401 });
     }
-    const body = (await req.json().catch(() => ({}))) as {
-      title?: string;
-      startUrl?: string;
-    };
-    if (!body.startUrl) {
-      return NextResponse.json(
-        { error: "startUrl is required" },
-        { status: 400 },
-      );
-    }
+    const parsed = await readJson(req, RecordStartBody);
+    if (!parsed.ok) return parsed.res;
+    const body = parsed.data;
     const url = normalizeUrl(body.startUrl);
     try {
       await assertSafeUrl(url);
