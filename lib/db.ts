@@ -65,10 +65,12 @@ export async function migrate(): Promise<void> {
 
   for (const m of MIGRATIONS) {
     if (applied.has(m.id)) continue;
-    for (const sql of m.statements ?? []) await db.executeMultiple(sql);
+    // Columns first, then statements — so an index/table in the same migration
+    // can safely reference a column this migration adds.
     for (const c of m.addColumns ?? []) {
       await addColumnIfMissing(c.table, c.column, c.def);
     }
+    for (const sql of m.statements ?? []) await db.executeMultiple(sql);
     await db.execute({
       sql: `INSERT INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)`,
       args: [m.id, m.name, Date.now()],
