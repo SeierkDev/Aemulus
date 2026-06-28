@@ -3,7 +3,7 @@ import { requireAccess } from "@/lib/auth";
 import { logError } from "@/lib/log";
 import { getQuota } from "@/lib/quota";
 import { getSkill } from "@/lib/skills";
-import { executeAndAccount } from "@/lib/run-service";
+import { startRun } from "@/lib/run-service";
 import { readJson, RunBody } from "@/lib/validate";
 
 export const runtime = "nodejs";
@@ -33,7 +33,11 @@ export async function POST(req: Request) {
         { status: 429 },
       );
     }
-    const run = await executeAndAccount(skill, input ?? {}, {}, session.pubkey);
+    const run = await startRun({
+      skill,
+      input: input ?? {},
+      runner: session.pubkey,
+    });
     return NextResponse.json({ run });
   } catch (err) {
     logError("api/runs", err);

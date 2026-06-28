@@ -4,7 +4,7 @@ import { logError } from "@/lib/log";
 import { getQuota } from "@/lib/quota";
 import { getRun } from "@/lib/runs";
 import { getSkill } from "@/lib/skills";
-import { executeRun } from "@/lib/runner";
+import { startRun } from "@/lib/run-service";
 import { readJson, ResolveBody } from "@/lib/validate";
 import type { RunOverrides } from "@/lib/types";
 
@@ -58,7 +58,12 @@ export async function POST(
       },
     };
 
-    const run = await executeRun(skill, original.input, overrides, session.pubkey);
+    const run = await startRun({
+      skill,
+      input: original.input,
+      overrides,
+      runner: session.pubkey,
+    });
     return NextResponse.json({ run });
   } catch (err) {
     logError("api/runs/resolve", err);

@@ -2,7 +2,7 @@ import { chromium, type Browser, type Locator, type Page } from "playwright";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { id } from "./ids";
-import { createRun, addRunStep, finishRun, getRun } from "./runs";
+import { addRunStep, finishRun, getRun } from "./runs";
 import { operatorChooseSelector, type Candidate } from "./operate";
 import { assertSafeUrl } from "./safe-url";
 import { runSlots } from "./semaphore";
@@ -10,7 +10,9 @@ import { attachReceipt } from "./receipt";
 import type { Run, RunOverrides, RunStatus, Skill, SkillStep } from "./types";
 
 /**
- * Execute a skill against a set of inputs.
+ * Execute a skill against an ALREADY-CREATED run row (status "running").
+ * The run-service creates the row and returns immediately; this does the work
+ * in the background.
  *
  * Strategy: replay each step deterministically using the recorded selectors
  * (cheap, reliable, no LLM). When a selector no longer resolves, fall back to
@@ -25,12 +27,12 @@ const DETERMINISTIC_CONFIDENCE = 0.99;
 
 export async function executeRun(
   skill: Skill,
+  runId: string,
+  owner: string,
   input: Record<string, string>,
   overrides: RunOverrides = {},
-  owner = "",
 ): Promise<Run> {
-  const run = await createRun({ owner, skillId: skill.id, input, overrides });
-  await mkdir(path.join(RUNS_DIR, owner, run.id), { recursive: true });
+  await mkdir(path.join(RUNS_DIR, owner, runId), { recursive: true });
 
   let browser: Browser | null = null;
   let finalStatus: RunStatus = "completed";
@@ -51,14 +53,14 @@ export async function executeRun(
       const value = resolveValue(step, input);
       const override = overrides[step.idx];
       const shotFile = `step-${String(step.idx).padStart(4, "0")}.png`;
-      const shotRel = path.posix.join("recordings", owner, run.id, shotFile);
-      const shotPath = path.join(RUNS_DIR, owner, run.id, shotFile);
+      const shotRel = path.posix.join("recordings", owner, runId, shotFile);
+      const shotPath = path.join(RUNS_DIR, owner, runId, shotFile);
 
       try {
         // Reviewer chose to skip this step.
         if (override?.skip) {
           await page.screenshot({ path: shotPath }).catch(() => {});
-          await recordStep(run.id, step, "", value, shotRel, 1, false, "Skipped by reviewer.");
+          await recordStep(runId, step, "", value, shotRel, 1, false, "Skipped by reviewer.");
           continue;
         }
 
@@ -66,7 +68,7 @@ export async function executeRun(
           await assertSafeUrl(step.target); // SSRF guard before any navigation
           await page.goto(step.target, { waitUntil: "domcontentloaded" });
           await page.screenshot({ path: shotPath });
-          await recordStep(run.id, step, "", value, shotRel, DETERMINISTIC_CONFIDENCE, false, "");
+          await recordStep(runId, step, "", value, shotRel, DETERMINISTIC_CONFIDENCE, false, "");
           continue;
         }
 
@@ -93,7 +95,7 @@ export async function executeRun(
         if (!loc || confidence < CONFIDENCE_FLOOR) {
           await page.screenshot({ path: shotPath });
           await recordStep(
-            run.id,
+            runId,
             step,
             selectorUsed,
             value,
@@ -109,11 +111,11 @@ export async function executeRun(
         await perform(page, loc.locator, step, value);
         await page.waitForTimeout(150);
         await page.screenshot({ path: shotPath });
-        await recordStep(run.id, step, selectorUsed, value, shotRel, confidence, false, note);
+        await recordStep(runId, step, selectorUsed, value, shotRel, confidence, false, note);
       } catch (stepErr) {
         await page.screenshot({ path: shotPath }).catch(() => {});
         await recordStep(
-          run.id,
+          runId,
           step,
           "",
           value,
@@ -139,9 +141,9 @@ export async function executeRun(
     finalStatus === "completed"
       ? `Completed ${skill.plan.length} steps.`
       : null;
-  await finishRun(run.id, { status: finalStatus, result, error });
-  await attachReceipt(run.id); // verifiable receipt (+ on-chain anchor if configured)
-  return (await getRun(run.id))!;
+  await finishRun(runId, { status: finalStatus, result, error });
+  await attachReceipt(runId); // verifiable receipt (+ on-chain anchor if configured)
+  return (await getRun(runId))!;
 }
 
 function resolveValue(step: SkillStep, input: Record<string, string>): string {

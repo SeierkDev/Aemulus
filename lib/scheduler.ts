@@ -7,7 +7,7 @@ import {
 } from "./schedules";
 import { getSkill } from "./skills";
 import { getQuota } from "./quota";
-import { executeAndAccount } from "./run-service";
+import { startRun } from "./run-service";
 import { logError, logInfo } from "./log";
 import type { Session } from "./siws";
 
@@ -48,7 +48,7 @@ async function runDue(): Promise<void> {
         logInfo("scheduler.skip", "quota exhausted", { schedule: s.id });
         continue;
       }
-      const run = await executeAndAccount(skill, s.input, {}, s.owner);
+      const run = await startRun({ skill, input: s.input, runner: s.owner });
       await markRan(s.id, run.id, next);
       logInfo("scheduler.ran", "ok", {
         schedule: s.id,

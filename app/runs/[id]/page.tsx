@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Card, Label } from "@/components/ui";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ResolveForm } from "@/components/ResolveForm";
+import { RunLive } from "@/components/RunLive";
 import { getRun } from "@/lib/runs";
 import { getSkill } from "@/lib/skills";
 import { getSession } from "@/lib/auth";
@@ -29,6 +30,7 @@ export default async function RunPage({
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-6">
+      <RunLive runId={run.id} status={run.status} />
       <header className="flex items-center justify-between py-6">
         <Link href="/runs" className="mono text-sm font-semibold tracking-tight">
           ← runs
