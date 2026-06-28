@@ -36,6 +36,10 @@ export const GeneralizeBody = z.object({
   demonstrationId: z.string().min(1).max(64),
 });
 
+export const SynthesizeBody = z.object({
+  demonstrationIds: z.array(z.string().min(1).max(64)).min(2).max(10),
+});
+
 const SkillStepSchema = z.object({
   idx: z.number().int(),
   intent: z.string().max(2000),

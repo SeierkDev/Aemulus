@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Badge, Card, Label } from "@/components/ui";
 import { Nav } from "@/components/Nav";
-import { GenerateButton } from "@/components/GenerateButton";
+import { SynthesizePanel } from "@/components/SynthesizePanel";
 import { listDemonstrations } from "@/lib/demonstrations";
 import { listSkills } from "@/lib/skills";
 import { getSession } from "@/lib/auth";
@@ -77,37 +77,19 @@ export default async function SkillsPage() {
           <Badge>{pending.length} to generalize</Badge>
         </div>
         <p className="mt-1.5 text-sm text-ink-2">
-          Raw demonstrations, ready to turn into skills.
+          Raw demonstrations, ready to turn into skills. Record the same task two
+          or more times, select them, and synthesize a skill that learns what
+          varies.
         </p>
 
-        <div className="mt-6 grid gap-3">
-          {pending.length === 0 && (
-            <Card className="p-8 text-center">
-              <p className="text-sm text-ink-2">
-                Nothing waiting.{" "}
-                <Link href="/record" className="text-ink underline">
-                  Record a task
-                </Link>
-                .
-              </p>
-            </Card>
-          )}
-          {pending.map((d) => (
-            <Card key={d.id} className="flex items-center justify-between p-4">
-              <div className="min-w-0">
-                <div className="truncate font-medium">{d.title}</div>
-                <div className="mt-1 flex items-center gap-2 text-xs text-ink-3">
-                  <span className="mono">{d.id}</span>
-                  <span>·</span>
-                  <span>{d.trace.length} steps</span>
-                  <span>·</span>
-                  <span>{when(d.createdAt)}</span>
-                </div>
-              </div>
-              <GenerateButton demonstrationId={d.id} />
-            </Card>
-          ))}
-        </div>
+        <SynthesizePanel
+          demos={pending.map((d) => ({
+            id: d.id,
+            title: d.title,
+            steps: d.trace.length,
+            createdAt: d.createdAt,
+          }))}
+        />
       </div>
 
       <div className="py-10" />

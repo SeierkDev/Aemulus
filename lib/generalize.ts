@@ -12,7 +12,7 @@ import type { Demonstration, GeneralizedSkill } from "./types";
  * output through a strict tool so the shape is guaranteed, then validate.
  */
 
-const EMIT_SKILL_TOOL: Anthropic.Tool = {
+export const EMIT_SKILL_TOOL: Anthropic.Tool = {
   name: "emit_skill",
   description: "Emit the generalized skill derived from the demonstration.",
   // strict tool use → input is guaranteed to match this schema
@@ -117,7 +117,7 @@ The demonstration is one example of a repetitive task (e.g. entering data into a
 Be conservative and faithful to the trace. Use clear snake_case keys. Always call emit_skill exactly once.`;
 
 /** Compact the raw trace into the lines we feed the model. */
-function traceForPrompt(demo: Demonstration): string {
+export function traceForPrompt(demo: Demonstration): string {
   const lines = demo.trace.map((a) => {
     const parts: string[] = [`#${a.idx} ${a.type}`];
     if (a.name) parts.push(`target="${a.name}"`);
@@ -148,7 +148,7 @@ const StepSchema = z.object({
   key: z.string(),
 });
 
-const GeneralizedSchema = z.object({
+export const GeneralizedSchema = z.object({
   name: z.string(),
   description: z.string(),
   inputFields: z.array(InputFieldSchema),
