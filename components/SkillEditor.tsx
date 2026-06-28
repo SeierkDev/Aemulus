@@ -4,12 +4,23 @@ import { useState } from "react";
 import Link from "next/link";
 import { Button, Card, Label, cx } from "@/components/ui";
 import { RunPanel } from "@/components/RunPanel";
+import { BulkRunPanel } from "@/components/BulkRunPanel";
 import { SchedulePanel } from "@/components/SchedulePanel";
 import { PublishToggle } from "@/components/PublishToggle";
-import type { Skill, SkillInputField, SkillStep } from "@/lib/types";
+import type { ActionType, Skill, SkillInputField, SkillStep } from "@/lib/types";
 
 const input =
   "w-full rounded-[var(--radius-base)] border border-border-strong bg-surface-2 px-3 py-2 text-sm outline-none placeholder:text-ink-3 focus:border-ink-3";
+
+const STEP_ACTIONS: ActionType[] = [
+  "navigate",
+  "click",
+  "input",
+  "select",
+  "key",
+  "submit",
+  "extract",
+];
 
 export function SkillEditor({ initial }: { initial: Skill }) {
   const [name, setName] = useState(initial.name);
@@ -35,6 +46,30 @@ export function SkillEditor({ initial }: { initial: Skill }) {
   }
   function patchStep(i: number, p: Partial<SkillStep>) {
     setSteps((s) => s.map((x, j) => (j === i ? { ...x, ...p } : x)));
+    setSaved(false);
+  }
+  function addStep() {
+    setSteps((s) => [
+      ...s,
+      {
+        idx: s.length,
+        intent: "Capture a value",
+        action: "extract",
+        selectors: [],
+        target: "",
+        valueSource: "none",
+        value: "",
+        inputKey: "",
+        key: "",
+        outputKey: "",
+      },
+    ]);
+    setSaved(false);
+  }
+  function removeStep(i: number) {
+    setSteps((s) =>
+      s.filter((_, j) => j !== i).map((x, j) => ({ ...x, idx: j })),
+    );
     setSaved(false);
   }
 
@@ -116,6 +151,16 @@ export function SkillEditor({ initial }: { initial: Skill }) {
           />
         </div>
 
+        {/* Bulk run */}
+        {initial.inputSchema.fields.length > 0 && (
+          <div className="mt-6">
+            <BulkRunPanel
+              skillId={initial.id}
+              fields={initial.inputSchema.fields}
+            />
+          </div>
+        )}
+
         {/* Schedule */}
         <div className="mt-6">
           <SchedulePanel
@@ -176,11 +221,17 @@ export function SkillEditor({ initial }: { initial: Skill }) {
         </div>
 
         {/* Steps */}
-        <div className="mt-10">
-          <h2 className="text-lg font-semibold tracking-tight">Steps</h2>
-          <p className="mt-1 text-sm text-ink-2">
-            The generalized plan Aemulus will execute.
-          </p>
+        <div className="mt-10 flex items-end justify-between">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Steps</h2>
+            <p className="mt-1 text-sm text-ink-2">
+              The generalized plan Aemulus will execute. Add an{" "}
+              <span className="mono">extract</span> step to capture a value.
+            </p>
+          </div>
+          <Button variant="default" onClick={addStep}>
+            + Add step
+          </Button>
         </div>
         <div className="mt-4 grid gap-2">
           {steps.map((s, i) => (
@@ -189,56 +240,104 @@ export function SkillEditor({ initial }: { initial: Skill }) {
                 <span className="mono w-8 shrink-0 text-ink-3">
                   {String(i).padStart(2, "0")}
                 </span>
-                <span className="rounded border border-border-strong bg-surface-2 px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wide text-ink-3">
-                  {s.action}
-                </span>
+                <select
+                  className={cx(input, "w-28 shrink-0")}
+                  value={s.action}
+                  onChange={(e) =>
+                    patchStep(i, { action: e.target.value as ActionType })
+                  }
+                  aria-label="Step action"
+                >
+                  {STEP_ACTIONS.map((a) => (
+                    <option key={a} value={a}>
+                      {a}
+                    </option>
+                  ))}
+                </select>
                 <input
                   className={cx(input, "flex-1")}
                   value={s.intent}
                   onChange={(e) => patchStep(i, { intent: e.target.value })}
                 />
-              </div>
-              <div className="mt-3 grid grid-cols-[160px_1fr] items-center gap-3 pl-11">
-                <select
-                  className={input}
-                  value={s.valueSource}
-                  onChange={(e) =>
-                    patchStep(i, {
-                      valueSource: e.target.value as SkillStep["valueSource"],
-                    })
-                  }
+                <button
+                  onClick={() => removeStep(i)}
+                  className="shrink-0 text-xs text-ink-3 hover:text-ink"
                 >
-                  <option value="none">no value</option>
-                  <option value="input">from input</option>
-                  <option value="constant">constant</option>
-                </select>
-                {s.valueSource === "input" ? (
+                  Remove
+                </button>
+              </div>
+              {s.action === "extract" ? (
+                <div className="mt-3 grid gap-2 pl-11">
+                  <div className="grid grid-cols-[160px_1fr] items-center gap-3">
+                    <span className="text-xs text-ink-3">capture into key</span>
+                    <input
+                      className={input}
+                      value={s.outputKey ?? ""}
+                      placeholder="e.g. price"
+                      aria-label="Output key"
+                      onChange={(e) =>
+                        patchStep(i, { outputKey: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="grid grid-cols-[160px_1fr] items-center gap-3">
+                    <span className="text-xs text-ink-3">selector</span>
+                    <input
+                      className={input}
+                      value={s.selectors?.[0] ?? ""}
+                      placeholder="CSS selector of the element to read"
+                      aria-label="Selector"
+                      onChange={(e) =>
+                        patchStep(i, { selectors: [e.target.value] })
+                      }
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-3 grid grid-cols-[160px_1fr] items-center gap-3 pl-11">
                   <select
                     className={input}
-                    value={s.inputKey}
-                    onChange={(e) => patchStep(i, { inputKey: e.target.value })}
+                    value={s.valueSource}
+                    onChange={(e) =>
+                      patchStep(i, {
+                        valueSource: e.target.value as SkillStep["valueSource"],
+                      })
+                    }
                   >
-                    <option value="">— pick input —</option>
-                    {fields.map((f) => (
-                      <option key={f.key} value={f.key}>
-                        {f.label || f.key}
-                      </option>
-                    ))}
+                    <option value="none">no value</option>
+                    <option value="input">from input</option>
+                    <option value="constant">constant</option>
                   </select>
-                ) : s.valueSource === "constant" ? (
-                  <input
-                    className={input}
-                    value={s.value}
-                    placeholder="constant value"
-                    onChange={(e) => patchStep(i, { value: e.target.value })}
-                  />
-                ) : (
-                  <span className="truncate text-xs text-ink-3">
-                    {s.target}
-                    {s.selectors?.[0] ? `  ·  ${s.selectors[0]}` : ""}
-                  </span>
-                )}
-              </div>
+                  {s.valueSource === "input" ? (
+                    <select
+                      className={input}
+                      value={s.inputKey}
+                      onChange={(e) =>
+                        patchStep(i, { inputKey: e.target.value })
+                      }
+                    >
+                      <option value="">— pick input —</option>
+                      {fields.map((f) => (
+                        <option key={f.key} value={f.key}>
+                          {f.label || f.key}
+                        </option>
+                      ))}
+                    </select>
+                  ) : s.valueSource === "constant" ? (
+                    <input
+                      className={input}
+                      value={s.value}
+                      placeholder="constant value"
+                      onChange={(e) => patchStep(i, { value: e.target.value })}
+                    />
+                  ) : (
+                    <span className="truncate text-xs text-ink-3">
+                      {s.target}
+                      {s.selectors?.[0] ? `  ·  ${s.selectors[0]}` : ""}
+                    </span>
+                  )}
+                </div>
+              )}
             </Card>
           ))}
         </div>

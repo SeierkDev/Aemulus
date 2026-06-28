@@ -2,6 +2,7 @@ import { db, ready } from "./db";
 import { id } from "./ids";
 import { decryptJSON, encryptJSON } from "./encrypt";
 import type {
+  BulkRun,
   ReceiptBatch,
   Run,
   RunOverrides,
@@ -14,6 +15,8 @@ export async function createRun(input: {
   skillId: string;
   input: Record<string, string>;
   overrides?: RunOverrides;
+  bulkId?: string;
+  rowIndex?: number;
 }): Promise<Run> {
   await ready();
   const now = Date.now();
@@ -32,13 +35,16 @@ export async function createRun(input: {
     batchId: null,
     leafIndex: null,
     merkleProof: null,
+    bulkId: input.bulkId ?? null,
+    rowIndex: input.rowIndex ?? null,
+    output: null,
     steps: [],
     createdAt: now,
     updatedAt: now,
   };
   await db.execute({
-    sql: `INSERT INTO runs (id, owner, skill_id, status, input, overrides, result, error, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO runs (id, owner, skill_id, status, input, overrides, result, error, bulk_id, row_index, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       run.id,
       run.owner,
@@ -48,6 +54,8 @@ export async function createRun(input: {
       JSON.stringify(run.overrides),
       null,
       null,
+      run.bulkId,
+      run.rowIndex,
       now,
       now,
     ],
@@ -88,6 +96,41 @@ export async function finishRun(
     sql: `UPDATE runs SET status = ?, result = ?, error = ?, updated_at = ? WHERE id = ?`,
     args: [patch.status, patch.result ?? null, patch.error ?? null, Date.now(), runId],
   });
+}
+
+export async function getBulkRun(bulkId: string): Promise<BulkRun | null> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT * FROM bulk_runs WHERE id = ?`,
+    args: [bulkId],
+  });
+  const row = r.rows[0];
+  if (!row) return null;
+  return {
+    id: String(row.id),
+    owner: String(row.owner),
+    skillId: String(row.skill_id),
+    total: Number(row.total),
+    createdAt: Number(row.created_at),
+  };
+}
+
+/** All child runs of a bulk run, in row order (input + output decrypted). */
+export async function listRunsByBulk(bulkId: string): Promise<Run[]> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT * FROM runs WHERE bulk_id = ? ORDER BY row_index ASC`,
+    args: [bulkId],
+  });
+  return Promise.all(
+    r.rows.map(async (row) => {
+      const steps = await db.execute({
+        sql: `SELECT * FROM run_steps WHERE run_id = ? ORDER BY idx ASC`,
+        args: [String(row.id)],
+      });
+      return rowToRun(row, steps.rows.map(rowToStep));
+    }),
+  );
 }
 
 export async function getBatch(batchId: string): Promise<ReceiptBatch | null> {
@@ -138,6 +181,19 @@ export async function hasRunSkill(
     args: [owner, skillId],
   });
   return r.rows.length > 0;
+}
+
+/** Persist values captured by "extract" steps during a run. */
+export async function setRunOutput(
+  runId: string,
+  output: Record<string, string>,
+): Promise<void> {
+  if (Object.keys(output).length === 0) return;
+  await ready();
+  await db.execute({
+    sql: `UPDATE runs SET output = ? WHERE id = ?`,
+    args: [encryptJSON(output), runId],
+  });
 }
 
 export async function updateReceipt(
@@ -205,6 +261,12 @@ function rowToRun(row: Record<string, unknown>, steps: RunStepRecord[]): Run {
     leafIndex: row.leaf_index == null ? null : Number(row.leaf_index),
     merkleProof:
       row.merkle_proof == null ? null : JSON.parse(String(row.merkle_proof)),
+    bulkId: row.bulk_id == null ? null : String(row.bulk_id),
+    rowIndex: row.row_index == null ? null : Number(row.row_index),
+    output:
+      row.output == null
+        ? null
+        : decryptJSON<Record<string, string>>(String(row.output), {}),
     steps,
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),

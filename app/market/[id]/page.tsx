@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Badge, Card, Label } from "@/components/ui";
 import { Nav } from "@/components/Nav";
 import { RunPanel } from "@/components/RunPanel";
+import { BulkRunPanel } from "@/components/BulkRunPanel";
 import { Stars } from "@/components/Stars";
 import { RatingWidget } from "@/components/RatingWidget";
 import { getSkill, skillTargets } from "@/lib/skills";
@@ -91,6 +92,17 @@ export default async function MarketSkillPage({
             requireTrust={!isOwner}
           />
         </div>
+
+        {/* Bulk run */}
+        {skill.inputSchema.fields.length > 0 && (
+          <div className="mt-4">
+            <BulkRunPanel
+              skillId={skill.id}
+              fields={skill.inputSchema.fields}
+              requireTrust={!isOwner}
+            />
+          </div>
+        )}
 
         {/* What it does (read-only) */}
         <h2 className="mt-10 text-lg font-semibold tracking-tight">

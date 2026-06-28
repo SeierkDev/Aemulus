@@ -7,7 +7,7 @@ import { NextResponse } from "next/server";
  * with a 400 before it reaches business logic.
  */
 
-const ACTIONS = ["navigate", "click", "input", "select", "key", "submit"] as const;
+const ACTIONS = ["navigate", "click", "input", "select", "key", "submit", "extract"] as const;
 
 export const VerifyBody = z.object({
   pubkey: z.string().min(32).max(64),
@@ -40,6 +40,13 @@ export const SynthesizeBody = z.object({
   demonstrationIds: z.array(z.string().min(1).max(64)).min(2).max(10),
 });
 
+export const BulkBody = z.object({
+  rows: z
+    .array(z.record(z.string().max(200), z.string().max(5000)))
+    .min(1)
+    .max(1000),
+});
+
 const SkillStepSchema = z.object({
   idx: z.number().int(),
   intent: z.string().max(2000),
@@ -50,6 +57,7 @@ const SkillStepSchema = z.object({
   value: z.string().max(5000),
   inputKey: z.string().max(200),
   key: z.string().max(40),
+  outputKey: z.string().max(200).optional(),
 });
 const InputFieldSchema = z.object({
   key: z.string().max(200),

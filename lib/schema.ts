@@ -62,6 +62,10 @@ CREATE TABLE IF NOT EXISTS runs (
   batch_id      TEXT,
   leaf_index    INTEGER,
   merkle_proof  TEXT,   -- JSON: sibling path from leaf to root
+  -- Bulk runs: this run is row #row_index of bulk_id. output = extracted data.
+  bulk_id     TEXT,
+  row_index   INTEGER,
+  output      TEXT,   -- JSON: { outputKey: capturedValue }
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL
 );
@@ -128,6 +132,15 @@ CREATE TABLE IF NOT EXISTS receipt_batches (
   created_at   INTEGER NOT NULL
 );
 
+-- Bulk runs: one skill executed across many input rows ("the next hundred").
+CREATE TABLE IF NOT EXISTS bulk_runs (
+  id        TEXT PRIMARY KEY,
+  owner     TEXT NOT NULL,
+  skill_id  TEXT NOT NULL,
+  total     INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_runs_skill   ON runs(skill_id);
 CREATE INDEX IF NOT EXISTS idx_steps_run    ON run_steps(run_id);
 CREATE INDEX IF NOT EXISTS idx_skills_demo  ON skills(source_demo_id);
@@ -139,4 +152,5 @@ CREATE INDEX IF NOT EXISTS idx_earn_owner   ON earnings(owner);
 CREATE INDEX IF NOT EXISTS idx_sched_owner  ON schedules(owner);
 CREATE INDEX IF NOT EXISTS idx_sched_due    ON schedules(active, next_run_at);
 -- idx_runs_unbatched lives in migration 3 (created after batch_id is added).
+-- idx_runs_bulk lives in migration 4 (created after bulk_id is added).
 `;

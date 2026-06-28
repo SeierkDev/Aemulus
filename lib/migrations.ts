@@ -57,4 +57,25 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_runs_unbatched ON runs(batch_id, receipt_hash);`,
     ],
   },
+
+  // 4 — Bulk runs (run a skill across many rows) + extracted output.
+  {
+    id: 4,
+    name: "bulk_runs",
+    addColumns: [
+      { table: "runs", column: "bulk_id", def: "TEXT" },
+      { table: "runs", column: "row_index", def: "INTEGER" },
+      { table: "runs", column: "output", def: "TEXT" },
+    ],
+    statements: [
+      `CREATE TABLE IF NOT EXISTS bulk_runs (
+         id TEXT PRIMARY KEY,
+         owner TEXT NOT NULL,
+         skill_id TEXT NOT NULL,
+         total INTEGER NOT NULL,
+         created_at INTEGER NOT NULL
+       );`,
+      `CREATE INDEX IF NOT EXISTS idx_runs_bulk ON runs(bulk_id);`,
+    ],
+  },
 ];

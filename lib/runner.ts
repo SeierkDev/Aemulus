@@ -2,7 +2,7 @@ import { chromium, type Browser, type Locator, type Page } from "playwright";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { id } from "./ids";
-import { addRunStep, finishRun, getRun } from "./runs";
+import { addRunStep, finishRun, getRun, setRunOutput } from "./runs";
 import { operatorChooseSelector, type Candidate } from "./operate";
 import { assertSafeUrl } from "./safe-url";
 import { runSlots } from "./semaphore";
@@ -37,6 +37,7 @@ export async function executeRun(
   let browser: Browser | null = null;
   let finalStatus: RunStatus = "completed";
   let error: string | null = null;
+  const outputs: Record<string, string> = {}; // values captured by extract steps
 
   // Bound concurrent Chromium launches; excess runs queue here.
   await runSlots.acquire();
@@ -108,10 +109,19 @@ export async function executeRun(
           break;
         }
 
-        await perform(page, loc.locator, step, value);
-        await page.waitForTimeout(150);
-        await page.screenshot({ path: shotPath });
-        await recordStep(runId, step, selectorUsed, value, shotRel, confidence, false, note);
+        if (step.action === "extract") {
+          // Read a value off the page into the run's structured output.
+          const captured = await captureValue(loc.locator);
+          const key = step.outputKey || `value_${step.idx}`;
+          outputs[key] = captured;
+          await page.screenshot({ path: shotPath });
+          await recordStep(runId, step, selectorUsed, captured, shotRel, confidence, false, `Captured ${key} = "${captured}"`);
+        } else {
+          await perform(page, loc.locator, step, value);
+          await page.waitForTimeout(150);
+          await page.screenshot({ path: shotPath });
+          await recordStep(runId, step, selectorUsed, value, shotRel, confidence, false, note);
+        }
       } catch (stepErr) {
         await page.screenshot({ path: shotPath }).catch(() => {});
         await recordStep(
@@ -142,6 +152,7 @@ export async function executeRun(
       ? `Completed ${skill.plan.length} steps.`
       : null;
   await finishRun(runId, { status: finalStatus, result, error });
+  await setRunOutput(runId, outputs); // structured data captured by extract steps
   await attachReceipt(runId); // verifiable receipt (+ on-chain anchor if configured)
   return (await getRun(runId))!;
 }
@@ -166,6 +177,19 @@ async function locate(
     }
   }
   return null;
+}
+
+/** Read a value off an element: form value for inputs, else visible text. */
+async function captureValue(loc: Locator): Promise<string> {
+  try {
+    const tag = await loc.evaluate((el) => el.tagName.toLowerCase());
+    if (tag === "input" || tag === "textarea" || tag === "select") {
+      return (await loc.inputValue()).trim();
+    }
+  } catch {
+    /* fall through to text */
+  }
+  return ((await loc.textContent()) ?? "").trim();
 }
 
 async function perform(

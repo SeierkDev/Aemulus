@@ -12,6 +12,8 @@ interface RunArgs {
   input: Record<string, string>;
   overrides?: RunOverrides;
   runner: string;
+  bulkId?: string;
+  rowIndex?: number;
 }
 
 /**
@@ -27,6 +29,8 @@ export async function startRun(args: RunArgs): Promise<Run> {
     skillId: args.skill.id,
     input: args.input,
     overrides: args.overrides ?? {},
+    bulkId: args.bulkId,
+    rowIndex: args.rowIndex,
   });
   void completeRun(run.id, args);
   return run; // status: "running"

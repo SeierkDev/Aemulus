@@ -7,7 +7,8 @@ export type ActionType =
   | "input"
   | "select"
   | "key"
-  | "submit";
+  | "submit"
+  | "extract";
 
 export interface RecordedAction {
   idx: number;
@@ -85,6 +86,8 @@ export interface SkillStep {
   value: string;
   inputKey: string;
   key: string;
+  /** For "extract" steps: the key to store the captured value under. */
+  outputKey?: string;
 }
 
 export interface Skill {
@@ -209,9 +212,21 @@ export interface Run {
   batchId: string | null;
   leafIndex: number | null;
   merkleProof: { siblings: { hash: string; left: boolean }[] } | null;
+  // Bulk runs + extracted output.
+  bulkId: string | null;
+  rowIndex: number | null;
+  output: Record<string, string> | null;
   steps: RunStepRecord[];
   createdAt: number;
   updatedAt: number;
+}
+
+export interface BulkRun {
+  id: string;
+  owner: string;
+  skillId: string;
+  total: number;
+  createdAt: number;
 }
 
 export interface ReceiptBatch {
