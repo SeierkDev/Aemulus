@@ -120,6 +120,38 @@ export async function markRan(
   });
 }
 
+/**
+ * Atomically claim a due schedule by advancing its next_run_at. Returns true
+ * only for the caller that wins the race — so a restart's catch-up tick or a
+ * second instance can't run the same firing twice. A claimed-but-failed run
+ * (quota/error) simply waits for the next cadence, exactly like a skip.
+ */
+export async function claimSchedule(
+  scheduleId: string,
+  now: number,
+  nextRunAt: number,
+): Promise<boolean> {
+  await ready();
+  const r = await db.execute({
+    sql: `UPDATE schedules SET next_run_at = ?
+          WHERE id = ? AND active = 1 AND next_run_at <= ?`,
+    args: [nextRunAt, scheduleId, now],
+  });
+  return r.rowsAffected > 0;
+}
+
+/** Record that a claimed schedule ran (next_run_at was already advanced). */
+export async function recordRun(
+  scheduleId: string,
+  runId: string,
+): Promise<void> {
+  await ready();
+  await db.execute({
+    sql: `UPDATE schedules SET last_run_id = ?, last_run_at = ? WHERE id = ?`,
+    args: [runId, Date.now(), scheduleId],
+  });
+}
+
 /** Advance next_run_at without recording a run (e.g. skipped by quota). */
 export async function bumpNextRun(
   scheduleId: string,

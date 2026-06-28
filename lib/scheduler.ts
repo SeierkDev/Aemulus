@@ -1,13 +1,14 @@
 import {
-  bumpNextRun,
   cadenceMs,
+  claimSchedule,
   deactivate,
   dueSchedules,
-  markRan,
+  recordRun,
 } from "./schedules";
 import { getSkill } from "./skills";
 import { getQuota } from "./quota";
 import { startRun } from "./run-service";
+import { computeTier, gatingEnabled, getAemulusBalance } from "./solana";
 import { logError, logInfo } from "./log";
 import type { Session } from "./siws";
 
@@ -16,6 +17,12 @@ import type { Session } from "./siws";
  * with no human in the loop — the "self-running" half of the economy. Started
  * once at server boot via instrumentation.ts; cached on globalThis so HMR
  * doesn't spawn duplicate tickers.
+ *
+ * Durable: schedule state (next_run_at) lives in the DB, so a restart's first
+ * tick catches up anything that came due while down. Each firing is claimed
+ * atomically (claimSchedule), so overlapping ticks or a second instance can't
+ * double-run it. Tiers are refreshed from the live balance at run time rather
+ * than trusting the snapshot stored at creation.
  */
 async function runDue(): Promise<void> {
   const now = Date.now();
@@ -29,6 +36,9 @@ async function runDue(): Promise<void> {
 
   for (const s of due) {
     const next = Date.now() + cadenceMs(s.cadence);
+    // Reserve this firing before doing anything — losers (other ticks /
+    // instances) skip it. A claimed run that then fails just waits a cadence.
+    if (!(await claimSchedule(s.id, now, next))) continue;
     try {
       const skill = await getSkill(s.skillId);
       // Skill gone or no longer runnable by this owner → stop the schedule.
@@ -36,28 +46,40 @@ async function runDue(): Promise<void> {
         await deactivate(s.id);
         continue;
       }
+      // Refresh tier from the current balance when gating is live; the
+      // snapshot stored at creation can be stale.
+      let level = s.level;
+      let tier = s.tier;
+      if (gatingEnabled()) {
+        const t = computeTier(await getAemulusBalance(s.owner));
+        level = t.level;
+        tier = t.name;
+        if (!t.allowed) {
+          await deactivate(s.id); // wallet no longer holds enough — stop it
+          logInfo("scheduler.skip", "no longer eligible", { schedule: s.id });
+          continue;
+        }
+      }
       const session: Session = {
         pubkey: s.owner,
-        tier: s.tier as Session["tier"],
-        level: s.level,
+        tier: tier as Session["tier"],
+        level,
         balance: 0,
       };
       const quota = await getQuota(session);
       if (!quota.ok) {
-        await bumpNextRun(s.id, next); // skip this firing, try next cadence
         logInfo("scheduler.skip", "quota exhausted", { schedule: s.id });
-        continue;
+        continue; // already advanced by the claim
       }
       const run = await startRun({ skill, input: s.input, runner: s.owner });
-      await markRan(s.id, run.id, next);
+      await recordRun(s.id, run.id);
       logInfo("scheduler.ran", "ok", {
         schedule: s.id,
         run: run.id,
         status: run.status,
       });
     } catch (e) {
-      logError("scheduler.run", e, { schedule: s.id });
-      await bumpNextRun(s.id, next).catch(() => {});
+      logError("scheduler.run", e, { schedule: s.id }); // already advanced
     }
   }
 }

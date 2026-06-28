@@ -28,6 +28,8 @@ import {
   dueSchedules,
   markRan,
   bumpNextRun,
+  claimSchedule,
+  recordRun,
   deactivate,
   listSchedules,
   cadenceMs,
@@ -258,5 +260,34 @@ describe("schedules", () => {
     await bumpNextRun(sid, Date.now() - 1000);
     await deactivate(sid);
     expect((await dueSchedules(Date.now())).find((s) => s.id === sid)).toBeUndefined();
+  });
+
+  it("claims a firing exactly once (durable against double-run)", async () => {
+    const skill = await createSkill({
+      owner: CREATOR,
+      generalized: gen("Claimable"),
+      sourceDemoId: null,
+    });
+    const sid = await createSchedule({
+      owner: CREATOR,
+      skillId: skill.id,
+      input: {},
+      cadence: "hourly",
+      level: 1,
+      tier: "Holder",
+    });
+    const now = Date.now();
+    await bumpNextRun(sid, now - 1000); // force due
+
+    // Two concurrent ticks/instances race to claim — only one wins.
+    const next = now + cadenceMs("hourly");
+    const first = await claimSchedule(sid, now, next);
+    const second = await claimSchedule(sid, now, next);
+    expect(first).toBe(true);
+    expect(second).toBe(false);
+
+    await recordRun(sid, "run_y");
+    const sched = (await listSchedules(CREATOR)).find((s) => s.id === sid);
+    expect(sched!.lastRunId).toBe("run_y");
   });
 });
