@@ -4,6 +4,7 @@ import {
   ResolveBody,
   RecordInputBody,
   PublishBody,
+  RateBody,
 } from "../lib/validate";
 
 describe("API body schemas", () => {
@@ -45,5 +46,13 @@ describe("API body schemas", () => {
   it("PublishBody requires a boolean", () => {
     expect(PublishBody.safeParse({ published: true }).success).toBe(true);
     expect(PublishBody.safeParse({ published: "yes" }).success).toBe(false);
+  });
+
+  it("RateBody requires stars 1..5", () => {
+    expect(RateBody.safeParse({ stars: 5 }).success).toBe(true);
+    expect(RateBody.safeParse({ stars: 4, comment: "nice" }).success).toBe(true);
+    expect(RateBody.safeParse({ stars: 0 }).success).toBe(false);
+    expect(RateBody.safeParse({ stars: 6 }).success).toBe(false);
+    expect(RateBody.safeParse({ stars: 3.5 }).success).toBe(false);
   });
 });

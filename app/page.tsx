@@ -4,6 +4,8 @@ import { Nav } from "@/components/Nav";
 import { StatusBadge } from "@/components/StatusBadge";
 import { listSkills, listPublishedSkills } from "@/lib/skills";
 import { listRuns } from "@/lib/runs";
+import { getReputationBatch } from "@/lib/reputation";
+import { Stars } from "@/components/Stars";
 import { getSession } from "@/lib/auth";
 import { SOLANA, gatingEnabled, limitForLevel } from "@/lib/solana";
 
@@ -73,6 +75,7 @@ export default async function Home() {
   const needsReview = runs.filter((r) => r.status === "needs_review");
   const skillName = new Map(skills.map((s) => [s.id, s.name]));
   const recentRuns = runs.slice(0, 5);
+  const popularRep = await getReputationBatch(popular.map((s) => s.id));
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6">
@@ -190,24 +193,32 @@ export default async function Home() {
             </Link>
           </div>
           <div className="mt-6 grid gap-3 md:grid-cols-3">
-            {popular.map((s) => (
-              <Link key={s.id} href={`/market/${s.id}`}>
-                <Card className="flex h-full flex-col p-5 transition-colors hover:bg-surface-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-sm font-semibold">{s.name}</h3>
-                    <span className="mono shrink-0 text-xs text-ink-3">
-                      {s.runCount}↻
-                    </span>
-                  </div>
-                  <p className="mt-1.5 flex-1 text-sm leading-relaxed text-ink-3">
-                    {s.description}
-                  </p>
-                  <div className="mono mt-3 text-xs text-ink-3">
-                    by {s.owner ? `${s.owner.slice(0, 4)}…${s.owner.slice(-4)}` : "anon"}
-                  </div>
-                </Card>
-              </Link>
-            ))}
+            {popular.map((s) => {
+              const r = popularRep.get(s.id);
+              return (
+                <Link key={s.id} href={`/market/${s.id}`}>
+                  <Card className="flex h-full flex-col p-5 transition-colors hover:bg-surface-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="text-sm font-semibold">{s.name}</h3>
+                      {r && r.ratingCount > 0 && (
+                        <span className="shrink-0 text-xs">
+                          <Stars value={r.avgStars} />
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1.5 flex-1 text-sm leading-relaxed text-ink-3">
+                      {s.description}
+                    </p>
+                    <div className="mono mt-3 flex items-center gap-2 text-xs text-ink-3">
+                      <span>{s.runCount} runs</span>
+                      {r && r.runs > 0 && (
+                        <span>· {Math.round(r.successRate * 100)}%</span>
+                      )}
+                    </div>
+                  </Card>
+                </Link>
+              );
+            })}
           </div>
         </section>
       )}

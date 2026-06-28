@@ -3,8 +3,15 @@ import { notFound } from "next/navigation";
 import { Badge, Card, Label } from "@/components/ui";
 import { Nav } from "@/components/Nav";
 import { RunPanel } from "@/components/RunPanel";
+import { Stars } from "@/components/Stars";
+import { RatingWidget } from "@/components/RatingWidget";
 import { getSkill, skillTargets } from "@/lib/skills";
 import { getSession } from "@/lib/auth";
+import {
+  getSkillReputation,
+  getMyRating,
+  listReviews,
+} from "@/lib/reputation";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +30,11 @@ export default async function MarketSkillPage({
   // Owners running their own skill don't need the trust ack.
   const isOwner = session?.pubkey === skill.owner;
   const domains = skillTargets(skill.plan);
+  const [rep, reviews, myRating] = await Promise.all([
+    getSkillReputation(skill.id),
+    listReviews(skill.id),
+    session ? getMyRating(skill.id, session.pubkey) : Promise.resolve(null),
+  ]);
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-6">
@@ -39,12 +51,29 @@ export default async function MarketSkillPage({
             <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-ink-2">
               {skill.description}
             </p>
-            <div className="mt-2 flex items-center gap-2 text-xs text-ink-3">
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-3">
               <span className="mono">by {short(skill.owner)}</span>
               <span>·</span>
               <span>{skill.runCount} runs</span>
               <span>·</span>
               <span>{skill.plan.length} steps</span>
+              {rep.ratingCount > 0 && (
+                <>
+                  <span>·</span>
+                  <span className="text-sm">
+                    <Stars value={rep.avgStars} />
+                  </span>
+                  <span>
+                    {rep.avgStars.toFixed(1)} ({rep.ratingCount})
+                  </span>
+                </>
+              )}
+              {rep.runs > 0 && (
+                <>
+                  <span>·</span>
+                  <span>{Math.round(rep.successRate * 100)}% success</span>
+                </>
+              )}
             </div>
           </div>
           <Badge>Published</Badge>
@@ -97,6 +126,42 @@ export default async function MarketSkillPage({
               </div>
             </Card>
           </>
+        )}
+
+        {/* Ratings & reviews */}
+        <h2 className="mt-10 text-lg font-semibold tracking-tight">
+          Ratings {rep.ratingCount > 0 && `(${rep.ratingCount})`}
+        </h2>
+        {!isOwner && (
+          <div className="mt-4">
+            <RatingWidget
+              skillId={skill.id}
+              initialStars={myRating?.stars ?? 0}
+              initialComment={myRating?.comment ?? ""}
+            />
+          </div>
+        )}
+        {reviews.length > 0 && (
+          <div className="mt-4 grid gap-2">
+            {reviews.map((rv, i) => (
+              <Card key={i} className="p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">
+                    <Stars value={rv.stars} />
+                  </span>
+                  <span className="mono text-xs text-ink-3">
+                    {short(rv.rater)}
+                  </span>
+                </div>
+                <p className="mt-1.5 text-sm leading-relaxed text-ink-2">
+                  {rv.comment}
+                </p>
+              </Card>
+            ))}
+          </div>
+        )}
+        {reviews.length === 0 && rep.ratingCount === 0 && (
+          <p className="mt-3 text-sm text-ink-3">No ratings yet.</p>
         )}
       </div>
       <div className="py-10" />

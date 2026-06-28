@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { Badge, Card } from "@/components/ui";
 import { Nav } from "@/components/Nav";
+import { Stars } from "@/components/Stars";
 import { listPublishedSkills } from "@/lib/skills";
+import { getReputationBatch } from "@/lib/reputation";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +13,7 @@ function short(pk: string): string {
 
 export default async function MarketPage() {
   const skills = await listPublishedSkills();
+  const rep = await getReputationBatch(skills.map((s) => s.id));
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6">
@@ -36,28 +39,38 @@ export default async function MarketPage() {
               first.
             </Card>
           )}
-          {skills.map((s) => (
-            <Link key={s.id} href={`/market/${s.id}`}>
-              <Card className="flex h-full flex-col p-5 transition-colors hover:bg-surface-2">
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="font-medium tracking-tight">{s.name}</h3>
-                  <span className="mono shrink-0 text-xs text-ink-3">
-                    {s.runCount} runs
-                  </span>
-                </div>
-                <p className="mt-1.5 flex-1 text-sm leading-relaxed text-ink-2">
-                  {s.description}
-                </p>
-                <div className="mt-3 flex items-center gap-2 text-xs text-ink-3">
-                  <span className="mono">by {short(s.owner)}</span>
-                  <span>·</span>
-                  <span>{s.plan.length} steps</span>
-                  <span>·</span>
-                  <span>{s.inputSchema.fields.length} inputs</span>
-                </div>
-              </Card>
-            </Link>
-          ))}
+          {skills.map((s) => {
+            const r = rep.get(s.id);
+            return (
+              <Link key={s.id} href={`/market/${s.id}`}>
+                <Card className="flex h-full flex-col p-5 transition-colors hover:bg-surface-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="font-medium tracking-tight">{s.name}</h3>
+                    {r && r.ratingCount > 0 && (
+                      <span className="shrink-0 text-xs">
+                        <Stars value={r.avgStars} />{" "}
+                        <span className="text-ink-3">({r.ratingCount})</span>
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1.5 flex-1 text-sm leading-relaxed text-ink-2">
+                    {s.description}
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-ink-3">
+                    <span className="mono">by {short(s.owner)}</span>
+                    <span>·</span>
+                    <span>{s.runCount} runs</span>
+                    {r && r.runs > 0 && (
+                      <>
+                        <span>·</span>
+                        <span>{Math.round(r.successRate * 100)}% success</span>
+                      </>
+                    )}
+                  </div>
+                </Card>
+              </Link>
+            );
+          })}
         </div>
       </div>
       <div className="py-10" />

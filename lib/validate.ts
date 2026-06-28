@@ -83,6 +83,11 @@ export const ScheduleCreateBody = z.object({
 
 export const ScheduleToggleBody = z.object({ active: z.boolean() });
 
+export const RateBody = z.object({
+  stars: z.number().int().min(1).max(5),
+  comment: z.string().max(500).optional(),
+});
+
 /** Parse + validate a JSON request body; returns data or a 400 Response. */
 export async function readJson<T>(
   req: Request,

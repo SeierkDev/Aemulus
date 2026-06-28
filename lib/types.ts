@@ -161,6 +161,22 @@ export interface EarningsSummary {
   recent: { skillId: string; name: string; amount: number; createdAt: number }[];
 }
 
+/** Trust signals for a skill: outcomes (from runs) + user ratings. */
+export interface SkillReputation {
+  runs: number;
+  completed: number;
+  successRate: number; // 0..1 (completed / runs)
+  avgStars: number; // 0..5
+  ratingCount: number;
+}
+
+export interface SkillReview {
+  rater: string;
+  stars: number;
+  comment: string;
+  createdAt: number;
+}
+
 export type Cadence = "hourly" | "daily";
 
 export interface Schedule {

@@ -99,6 +99,17 @@ CREATE TABLE IF NOT EXISTS schedules (
   created_at   INTEGER NOT NULL
 );
 
+-- User star ratings/reviews for published skills (one per wallet per skill).
+CREATE TABLE IF NOT EXISTS ratings (
+  id          TEXT PRIMARY KEY,
+  skill_id    TEXT NOT NULL,
+  rater       TEXT NOT NULL,
+  stars       INTEGER NOT NULL,   -- 1..5
+  comment     TEXT NOT NULL DEFAULT '',
+  created_at  INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ratings_uniq ON ratings(skill_id, rater);
+
 CREATE INDEX IF NOT EXISTS idx_runs_skill   ON runs(skill_id);
 CREATE INDEX IF NOT EXISTS idx_steps_run    ON run_steps(run_id);
 CREATE INDEX IF NOT EXISTS idx_skills_demo  ON skills(source_demo_id);
