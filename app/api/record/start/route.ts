@@ -2,10 +2,16 @@ import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
 import { assertSafeUrl } from "@/lib/safe-url";
 import { getRecorder } from "@/lib/recorder";
+import { enforceRateLimit } from "@/lib/ratelimit";
 import { readJson, RecordStartBody } from "@/lib/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const RECORD_PER_HOUR = Math.max(
+  1,
+  Number(process.env.AEMULUS_RECORD_PER_HOUR) || 30,
+);
 
 /** Normalize a user-typed URL into something Playwright can navigate to. */
 function normalizeUrl(raw: string): string {
@@ -20,6 +26,13 @@ export async function POST(req: Request) {
     if (!session) {
       return NextResponse.json({ error: "Not authorized" }, { status: 401 });
     }
+    const limited = enforceRateLimit(
+      `rec:${session.pubkey}`,
+      RECORD_PER_HOUR,
+      60 * 60 * 1000,
+      `Too many recordings (limit ${RECORD_PER_HOUR}/hour)`,
+    );
+    if (limited) return limited;
     const parsed = await readJson(req, RecordStartBody);
     if (!parsed.ok) return parsed.res;
     const body = parsed.data;

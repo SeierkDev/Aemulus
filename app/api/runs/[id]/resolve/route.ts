@@ -5,12 +5,15 @@ import { getQuota } from "@/lib/quota";
 import { getRun } from "@/lib/runs";
 import { getSkill } from "@/lib/skills";
 import { startRun } from "@/lib/run-service";
+import { enforceRateLimit } from "@/lib/ratelimit";
 import { readJson, ResolveBody } from "@/lib/validate";
 import type { RunOverrides } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
+
+const RUNS_PER_MIN = Math.max(1, Number(process.env.AEMULUS_RUNS_PER_MIN) || 10);
 
 /**
  * Resolve a flagged step and retry. The fix (a corrected selector and/or skip)
@@ -26,6 +29,13 @@ export async function POST(
     if (!session) {
       return NextResponse.json({ error: "Not authorized" }, { status: 401 });
     }
+    const limited = enforceRateLimit(
+      `run:${session.pubkey}`,
+      RUNS_PER_MIN,
+      60_000,
+      `Too many runs (limit ${RUNS_PER_MIN}/min)`,
+    );
+    if (limited) return limited;
     const { id } = await params;
     const original = await getRun(id);
     if (!original || original.owner !== session.pubkey) {

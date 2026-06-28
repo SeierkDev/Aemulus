@@ -1,8 +1,11 @@
+import { NextResponse } from "next/server";
+
 /**
  * Tiny in-memory sliding-window rate limiter, keyed by an arbitrary string
- * (e.g. a wallet pubkey). Used to cap expensive actions like generalize so a
- * signed-in user can't spam Claude calls. Per-process (fine for single-instance;
- * a multi-instance deploy would move this to a shared store).
+ * (e.g. a wallet pubkey). Caps expensive/abusable actions (generalize, runs,
+ * recording, ratings) per signed-in wallet. Per-process (fine for
+ * single-instance; a multi-instance deploy would move this to a shared store —
+ * see E11 shared-state residual).
  */
 declare global {
   var __aemRateHits: Map<string, number[]> | undefined;
@@ -31,4 +34,26 @@ export function rateLimit(
   recent.push(now);
   hits.set(key, recent);
   return { ok: true, remaining: max - recent.length, retryAfterMs: 0 };
+}
+
+function humanWait(ms: number): string {
+  return ms >= 60_000 ? `${Math.ceil(ms / 60_000)} min` : `${Math.ceil(ms / 1000)}s`;
+}
+
+/**
+ * Apply a limit and, if exceeded, return a ready-to-send 429 (else null).
+ * Keeps route handlers terse: `const limited = enforceRateLimit(...); if (limited) return limited;`
+ */
+export function enforceRateLimit(
+  key: string,
+  max: number,
+  windowMs: number,
+  label: string,
+): NextResponse | null {
+  const rl = rateLimit(key, max, windowMs);
+  if (rl.ok) return null;
+  return NextResponse.json(
+    { error: `${label} — try again in ${humanWait(rl.retryAfterMs)}.` },
+    { status: 429 },
+  );
 }

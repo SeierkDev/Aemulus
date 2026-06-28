@@ -4,11 +4,14 @@ import { logError } from "@/lib/log";
 import { getQuota } from "@/lib/quota";
 import { getSkill } from "@/lib/skills";
 import { startRun } from "@/lib/run-service";
+import { enforceRateLimit } from "@/lib/ratelimit";
 import { readJson, RunBody } from "@/lib/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
+
+const RUNS_PER_MIN = Math.max(1, Number(process.env.AEMULUS_RUNS_PER_MIN) || 10);
 
 export async function POST(req: Request) {
   try {
@@ -16,6 +19,13 @@ export async function POST(req: Request) {
     if (!session) {
       return NextResponse.json({ error: "Not authorized" }, { status: 401 });
     }
+    const limited = enforceRateLimit(
+      `run:${session.pubkey}`,
+      RUNS_PER_MIN,
+      60_000,
+      `Too many runs (limit ${RUNS_PER_MIN}/min)`,
+    );
+    if (limited) return limited;
     const parsed = await readJson(req, RunBody);
     if (!parsed.ok) return parsed.res;
     const { skillId, input } = parsed.data;

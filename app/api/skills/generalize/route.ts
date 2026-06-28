@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
 import { logError } from "@/lib/log";
-import { rateLimit } from "@/lib/ratelimit";
+import { enforceRateLimit } from "@/lib/ratelimit";
 import { getDemonstration } from "@/lib/demonstrations";
 import { generalizeDemonstration } from "@/lib/generalize";
 import { createSkill } from "@/lib/skills";
@@ -19,15 +19,13 @@ export async function POST(req: Request) {
     if (!session) {
       return NextResponse.json({ error: "Not authorized" }, { status: 401 });
     }
-    const rl = rateLimit(`gen:${session.pubkey}`, PER_HOUR, 60 * 60 * 1000);
-    if (!rl.ok) {
-      return NextResponse.json(
-        {
-          error: `Too many generalizations — limit is ${PER_HOUR}/hour. Try again in ${Math.ceil(rl.retryAfterMs / 60000)} min.`,
-        },
-        { status: 429 },
-      );
-    }
+    const limited = enforceRateLimit(
+      `gen:${session.pubkey}`,
+      PER_HOUR,
+      60 * 60 * 1000,
+      `Too many generalizations (limit ${PER_HOUR}/hour)`,
+    );
+    if (limited) return limited;
     const parsed = await readJson(req, GeneralizeBody);
     if (!parsed.ok) return parsed.res;
     const demo = await getDemonstration(parsed.data.demonstrationId);
