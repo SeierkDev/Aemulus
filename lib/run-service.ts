@@ -1,6 +1,7 @@
 import { executeRun } from "./runner";
 import { createRun, finishRun } from "./runs";
 import { incrementRunCount } from "./skills";
+import { invalidateReputation } from "./reputation";
 import { creditEarning } from "./earnings";
 import { SOLANA } from "./solana";
 import { logError } from "./log";
@@ -41,6 +42,7 @@ async function completeRun(runId: string, args: RunArgs): Promise<void> {
       args.overrides ?? {},
     );
     await incrementRunCount(args.skill.id);
+    invalidateReputation(args.skill.id); // success-rate aggregate changed
     if (args.skill.owner && args.skill.owner !== args.runner) {
       await creditEarning({
         owner: args.skill.owner,

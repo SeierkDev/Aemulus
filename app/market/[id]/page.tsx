@@ -6,6 +6,7 @@ import { RunPanel } from "@/components/RunPanel";
 import { Stars } from "@/components/Stars";
 import { RatingWidget } from "@/components/RatingWidget";
 import { getSkill, skillTargets } from "@/lib/skills";
+import { hasRunSkill } from "@/lib/runs";
 import { getSession } from "@/lib/auth";
 import {
   getSkillReputation,
@@ -30,11 +31,15 @@ export default async function MarketSkillPage({
   // Owners running their own skill don't need the trust ack.
   const isOwner = session?.pubkey === skill.owner;
   const domains = skillTargets(skill.plan);
-  const [rep, reviews, myRating] = await Promise.all([
+  const [rep, reviews, myRating, hasRun] = await Promise.all([
     getSkillReputation(skill.id),
     listReviews(skill.id),
     session ? getMyRating(skill.id, session.pubkey) : Promise.resolve(null),
+    session && !isOwner
+      ? hasRunSkill(session.pubkey, skill.id)
+      : Promise.resolve(false),
   ]);
+  const canRate = !!session && !isOwner && hasRun;
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-6">
@@ -132,13 +137,19 @@ export default async function MarketSkillPage({
         <h2 className="mt-10 text-lg font-semibold tracking-tight">
           Ratings {rep.ratingCount > 0 && `(${rep.ratingCount})`}
         </h2>
-        {!isOwner && (
+        {!isOwner && session && (
           <div className="mt-4">
-            <RatingWidget
-              skillId={skill.id}
-              initialStars={myRating?.stars ?? 0}
-              initialComment={myRating?.comment ?? ""}
-            />
+            {canRate ? (
+              <RatingWidget
+                skillId={skill.id}
+                initialStars={myRating?.stars ?? 0}
+                initialComment={myRating?.comment ?? ""}
+              />
+            ) : (
+              <p className="text-sm text-ink-3">
+                Run this skill once to rate it.
+              </p>
+            )}
           </div>
         )}
         {reviews.length > 0 && (

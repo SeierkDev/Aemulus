@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
 import { getSkill } from "@/lib/skills";
 import { rateSkill } from "@/lib/reputation";
+import { hasRunSkill } from "@/lib/runs";
 import { readJson, RateBody } from "@/lib/validate";
 
 export const runtime = "nodejs";
@@ -19,6 +20,13 @@ export async function POST(
   const skill = await getSkill(id);
   if (!skill || !skill.published) {
     return NextResponse.json({ error: "Skill not found" }, { status: 404 });
+  }
+  // Only wallets that have actually run the skill may rate it (anti-gaming).
+  if (!(await hasRunSkill(session.pubkey, id))) {
+    return NextResponse.json(
+      { error: "Run this skill before rating it." },
+      { status: 403 },
+    );
   }
   const parsed = await readJson(req, RateBody);
   if (!parsed.ok) return parsed.res;

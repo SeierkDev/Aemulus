@@ -16,6 +16,17 @@ const EMPTY: SkillReputation = {
   ratingCount: 0,
 };
 
+// Short-lived aggregate cache so listings don't re-run SUM/AVG every render.
+// Invalidated when a skill's ratings or runs change (single-instance; see E11
+// for a shared store across instances).
+const CACHE_TTL_MS = 30_000;
+const cache = new Map<string, { rep: SkillReputation; exp: number }>();
+
+/** Drop cached reputation for a skill (call when its runs/ratings change). */
+export function invalidateReputation(skillId: string): void {
+  cache.delete(skillId);
+}
+
 /** Upsert a wallet's rating for a skill (one per wallet). */
 export async function rateSkill(input: {
   skillId: string;
@@ -32,31 +43,41 @@ export async function rateSkill(input: {
           DO UPDATE SET stars = excluded.stars, comment = excluded.comment, created_at = excluded.created_at`,
     args: [id("rat"), input.skillId, input.rater, stars, input.comment, Date.now()],
   });
+  invalidateReputation(input.skillId);
 }
 
-/** Reputation for many skills at once (for listings). */
+/** Reputation for many skills at once (for listings), cached per skill. */
 export async function getReputationBatch(
   skillIds: string[],
 ): Promise<Map<string, SkillReputation>> {
   const map = new Map<string, SkillReputation>();
   if (skillIds.length === 0) return map;
-  await ready();
-  const ph = skillIds.map(() => "?").join(",");
 
+  const now = Date.now();
+  const misses: string[] = [];
+  for (const sid of skillIds) {
+    const c = cache.get(sid);
+    if (c && c.exp > now) map.set(sid, c.rep);
+    else misses.push(sid);
+  }
+  if (misses.length === 0) return map;
+
+  await ready();
+  const ph = misses.map(() => "?").join(",");
   const runs = await db.execute({
     sql: `SELECT skill_id,
                  COUNT(*) AS total,
                  SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) AS completed
           FROM runs WHERE skill_id IN (${ph}) GROUP BY skill_id`,
-    args: skillIds,
+    args: misses,
   });
   const rates = await db.execute({
     sql: `SELECT skill_id, AVG(stars) AS avg, COUNT(*) AS n
           FROM ratings WHERE skill_id IN (${ph}) GROUP BY skill_id`,
-    args: skillIds,
+    args: misses,
   });
 
-  for (const sid of skillIds) map.set(sid, { ...EMPTY });
+  for (const sid of misses) map.set(sid, { ...EMPTY });
   for (const r of runs.rows) {
     const total = Number(r.total);
     const completed = Number(r.completed);
@@ -70,6 +91,7 @@ export async function getReputationBatch(
     rep.avgStars = Number(r.avg) || 0;
     rep.ratingCount = Number(r.n);
   }
+  for (const sid of misses) cache.set(sid, { rep: map.get(sid)!, exp: now + CACHE_TTL_MS });
   return map;
 }
 

@@ -81,6 +81,19 @@ export async function finishRun(
   });
 }
 
+/** Has this wallet actually run this skill? (gates who may rate it.) */
+export async function hasRunSkill(
+  owner: string,
+  skillId: string,
+): Promise<boolean> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT 1 FROM runs WHERE owner = ? AND skill_id = ? LIMIT 1`,
+    args: [owner, skillId],
+  });
+  return r.rows.length > 0;
+}
+
 export async function updateReceipt(
   runId: string,
   receipt: { hash: string; sig: string | null; cluster: string | null },
