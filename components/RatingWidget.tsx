@@ -68,6 +68,7 @@ export function RatingWidget({
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder="Optional: how did it work for you?"
+            aria-label="Review comment"
             rows={2}
             className="rounded-[var(--radius-base)] border border-border-strong bg-surface-2 px-3 py-2 text-sm outline-none placeholder:text-ink-3 focus:border-ink-3"
           />

@@ -20,11 +20,11 @@ export function Brand() {
 /** Shared top bar for the app's primary surfaces. */
 export function Nav() {
   return (
-    <header className="flex items-center justify-between py-6">
+    <header className="flex flex-col gap-3 py-6 sm:flex-row sm:items-center sm:justify-between">
       <Link href="/" aria-label="Home">
         <Brand />
       </Link>
-      <nav className="flex items-center gap-1">
+      <nav className="flex flex-wrap items-center gap-1">
         <Link href="/market">
           <Button variant="ghost">Explore</Button>
         </Link>

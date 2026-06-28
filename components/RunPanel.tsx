@@ -81,6 +81,7 @@ export function RunPanel({
                 className={input}
                 value={values[f.key] ?? ""}
                 placeholder={f.example}
+                aria-label={f.label || f.key}
                 onChange={(e) =>
                   setValues((v) => ({ ...v, [f.key]: e.target.value }))
                 }

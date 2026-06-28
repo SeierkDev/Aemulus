@@ -193,6 +193,7 @@ export default function RecordPage() {
                   value={startUrl}
                   onChange={(e) => setStartUrl(e.target.value)}
                   placeholder="example.com/form"
+                  aria-label="Start URL"
                   className={input}
                 />
               </div>
@@ -202,6 +203,7 @@ export default function RecordPage() {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Enter invoice into CRM"
+                  aria-label="Task name"
                   className={input}
                 />
               </div>
