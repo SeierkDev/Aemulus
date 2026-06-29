@@ -7,6 +7,8 @@ import { startRun } from "@/lib/run-service";
 import { computeTier, getAemulusBalance } from "@/lib/solana";
 import { enforceRateLimit } from "@/lib/ratelimit";
 import { withIdempotency } from "@/lib/idempotency";
+import { listRunsPage } from "@/lib/runs";
+import { decodeCursor, parseLimit } from "@/lib/pagination";
 import { readJson, RunBody } from "@/lib/validate";
 import type { Session } from "@/lib/siws";
 
@@ -14,6 +16,32 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const RUNS_PER_MIN = Math.max(1, Number(process.env.AEMULUS_RUNS_PER_MIN) || 10);
+
+/** Public API: list the caller's runs (newest first). Cursor-paginated. */
+export async function GET(req: Request) {
+  const owner = await apiKeyOwner(req);
+  if (!owner) {
+    return NextResponse.json(
+      { error: "Invalid or missing API key" },
+      { status: 401 },
+    );
+  }
+  const url = new URL(req.url);
+  const limit = parseLimit(url.searchParams.get("limit"));
+  const cursor = decodeCursor(url.searchParams.get("cursor"));
+  const { items, nextCursor } = await listRunsPage(owner, limit, cursor);
+  return NextResponse.json({
+    runs: items.map((r) => ({
+      id: r.id,
+      skillId: r.skillId,
+      status: r.status,
+      output: r.output,
+      receiptHash: r.receiptHash,
+      createdAt: r.createdAt,
+    })),
+    nextCursor,
+  });
+}
 
 /** Public API: run a skill. Auth: `Authorization: Bearer aem_live_…`. */
 export async function POST(req: Request) {

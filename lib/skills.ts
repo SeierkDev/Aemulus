@@ -1,5 +1,6 @@
 import { db, ready } from "./db";
 import { id } from "./ids";
+import { keysetClause, toPage, type Page } from "./pagination";
 import type {
   GeneralizedSkill,
   Skill,
@@ -114,6 +115,25 @@ export async function listPublishedSkills(limit = 50): Promise<Skill[]> {
     args: [limit],
   });
   return r.rows.map(rowToSkill);
+}
+
+/** Published skills, cursor-paginated (newest first) for the public API. */
+export async function listPublishedSkillsPage(
+  limit: number,
+  cursor: { createdAt: number; id: string } | null,
+): Promise<Page<Skill>> {
+  await ready();
+  const { clause, args } = keysetClause(cursor);
+  const where = `published = 1${clause ? ` AND ${clause}` : ""}`;
+  const r = await db.execute({
+    sql: `SELECT * FROM skills WHERE ${where}
+          ORDER BY created_at DESC, id DESC LIMIT ?`,
+    args: [...args, limit + 1],
+  });
+  return toPage(r.rows.map(rowToSkill), limit, (s) => ({
+    createdAt: s.createdAt,
+    id: s.id,
+  }));
 }
 
 /** Apply user edits from the review screen. */

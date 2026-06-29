@@ -77,6 +77,15 @@ export class AemulusError extends Error {
 
 const TERMINAL: RunStatus[] = ["completed", "needs_review", "failed"];
 
+/** Build a `?limit&cursor` query string (empty when no opts given). */
+function query(opts: { limit?: number; cursor?: string }): string {
+  const qs = new URLSearchParams();
+  if (opts.limit != null) qs.set("limit", String(opts.limit));
+  if (opts.cursor) qs.set("cursor", opts.cursor);
+  const s = qs.toString();
+  return s ? `?${s}` : "";
+}
+
 export class Aemulus {
   private readonly apiKey: string;
   private readonly baseUrl: string;
@@ -143,10 +152,31 @@ export class Aemulus {
     return this.call<Run>(`/api/v1/runs/${id}`);
   }
 
-  /** The published skill catalog. */
-  async listSkills(): Promise<SkillSummary[]> {
-    const { skills } = await this.call<{ skills: SkillSummary[] }>("/api/v1/skills");
-    return skills;
+  /** One page of the published skill catalog. Pass `cursor` (from a prior
+   *  `nextCursor`) to page; `nextCursor` is null on the last page. */
+  listSkills(
+    opts: { limit?: number; cursor?: string } = {},
+  ): Promise<{ skills: SkillSummary[]; nextCursor: string | null }> {
+    return this.call(`/api/v1/skills${query(opts)}`);
+  }
+
+  /** One page of your runs (newest first), cursor-paginated. */
+  listRuns(
+    opts: { limit?: number; cursor?: string } = {},
+  ): Promise<{ runs: Run[]; nextCursor: string | null }> {
+    return this.call(`/api/v1/runs${query(opts)}`);
+  }
+
+  /** Walk every page of the skill catalog (auto-follows cursors). */
+  async allSkills(pageSize = 100): Promise<SkillSummary[]> {
+    const out: SkillSummary[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await this.listSkills({ limit: pageSize, cursor });
+      out.push(...page.skills);
+      cursor = page.nextCursor ?? undefined;
+    } while (cursor);
+    return out;
   }
 
   /** Verify a run's receipt — public, no API key required. */

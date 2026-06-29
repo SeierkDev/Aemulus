@@ -36,9 +36,21 @@ describe("Aemulus SDK", () => {
     });
   });
 
-  it("listSkills() unwraps the catalog", async () => {
-    mockFetch(() => ({ body: { skills: [{ id: "a" }, { id: "b" }] } }));
-    expect((await client.listSkills()).map((s) => s.id)).toEqual(["a", "b"]);
+  it("listSkills() returns a page { skills, nextCursor }", async () => {
+    mockFetch(() => ({ body: { skills: [{ id: "a" }, { id: "b" }], nextCursor: "c1" } }));
+    const page = await client.listSkills();
+    expect(page.skills.map((s) => s.id)).toEqual(["a", "b"]);
+    expect(page.nextCursor).toBe("c1");
+  });
+
+  it("allSkills() follows cursors across pages", async () => {
+    let call = 0;
+    mockFetch(() =>
+      call++ === 0
+        ? { body: { skills: [{ id: "a" }], nextCursor: "c1" } }
+        : { body: { skills: [{ id: "b" }], nextCursor: null } },
+    );
+    expect((await client.allSkills()).map((s) => s.id)).toEqual(["a", "b"]);
   });
 
   it("verify() hits the public endpoint with NO auth header", async () => {

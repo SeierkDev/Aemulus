@@ -22,6 +22,24 @@ const json = (schema: unknown) => ({
 });
 const ERR = { 401: { description: "Missing/invalid API key", ...json(ref("Error")) } };
 
+// Shared cursor-pagination query params (?limit=&cursor=).
+const PAGE_PARAMS = [
+  {
+    name: "limit",
+    in: "query",
+    required: false,
+    schema: { type: "integer", minimum: 1, maximum: 100, default: 25 },
+    description: "Page size (max 100).",
+  },
+  {
+    name: "cursor",
+    in: "query",
+    required: false,
+    schema: { type: "string" },
+    description: "Opaque cursor from a prior response's nextCursor.",
+  },
+];
+
 export const OPENAPI: OpenApiDoc = {
   openapi: "3.0.3",
   info: {
@@ -175,6 +193,24 @@ export const OPENAPI: OpenApiDoc = {
           ...ERR,
         },
       },
+      get: {
+        summary: "List your runs",
+        description: "Your runs, newest first. Cursor-paginated.",
+        parameters: PAGE_PARAMS,
+        responses: {
+          200: {
+            description: "A page of runs",
+            ...json({
+              type: "object",
+              properties: {
+                runs: { type: "array", items: ref("Run") },
+                nextCursor: { type: "string", nullable: true },
+              },
+            }),
+          },
+          ...ERR,
+        },
+      },
     },
     "/api/v1/runs/{id}": {
       get: {
@@ -192,12 +228,17 @@ export const OPENAPI: OpenApiDoc = {
     "/api/v1/skills": {
       get: {
         summary: "List published skills",
+        description: "The published catalog, newest first. Cursor-paginated.",
+        parameters: PAGE_PARAMS,
         responses: {
           200: {
-            description: "Catalog",
+            description: "A page of the catalog",
             ...json({
               type: "object",
-              properties: { skills: { type: "array", items: ref("SkillSummary") } },
+              properties: {
+                skills: { type: "array", items: ref("SkillSummary") },
+                nextCursor: { type: "string", nullable: true },
+              },
             }),
           },
           ...ERR,

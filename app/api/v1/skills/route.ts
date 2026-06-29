@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { apiKeyOwner } from "@/lib/api-keys";
-import { listPublishedSkills, categorize } from "@/lib/skills";
+import { listPublishedSkillsPage, categorize } from "@/lib/skills";
+import { decodeCursor, parseLimit } from "@/lib/pagination";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Public API: the published skill catalog. */
+/** Public API: the published skill catalog. Cursor-paginated: ?limit&cursor. */
 export async function GET(req: Request) {
   const owner = await apiKeyOwner(req);
   if (!owner) {
@@ -14,9 +15,12 @@ export async function GET(req: Request) {
       { status: 401 },
     );
   }
-  const skills = await listPublishedSkills(100);
+  const url = new URL(req.url);
+  const limit = parseLimit(url.searchParams.get("limit"));
+  const cursor = decodeCursor(url.searchParams.get("cursor"));
+  const { items, nextCursor } = await listPublishedSkillsPage(limit, cursor);
   return NextResponse.json({
-    skills: skills.map((s) => ({
+    skills: items.map((s) => ({
       id: s.id,
       name: s.name,
       description: s.description,
@@ -25,5 +29,6 @@ export async function GET(req: Request) {
       runCount: s.runCount,
       inputs: s.inputSchema.fields.map((f) => ({ key: f.key, label: f.label })),
     })),
+    nextCursor,
   });
 }

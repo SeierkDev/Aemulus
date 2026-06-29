@@ -1,6 +1,7 @@
 import { db, ready } from "./db";
 import { id } from "./ids";
 import { decryptJSON, encryptJSON } from "./encrypt";
+import { keysetClause, toPage, type Page } from "./pagination";
 import type {
   BulkRun,
   ReceiptBatch,
@@ -264,6 +265,27 @@ export async function listRuns(owner: string): Promise<Run[]> {
     args: [owner],
   });
   return r.rows.map((row) => rowToRun(row, []));
+}
+
+/** A caller's runs, cursor-paginated (newest first) for the public API. */
+export async function listRunsPage(
+  owner: string,
+  limit: number,
+  cursor: { createdAt: number; id: string } | null,
+): Promise<Page<Run>> {
+  await ready();
+  const { clause, args } = keysetClause(cursor);
+  const where = `owner = ?${clause ? ` AND ${clause}` : ""}`;
+  const r = await db.execute({
+    sql: `SELECT * FROM runs WHERE ${where}
+          ORDER BY created_at DESC, id DESC LIMIT ?`,
+    args: [owner, ...args, limit + 1],
+  });
+  return toPage(
+    r.rows.map((row) => rowToRun(row, [])),
+    limit,
+    (run) => ({ createdAt: run.createdAt, id: run.id }),
+  );
 }
 
 function rowToRun(row: Record<string, unknown>, steps: RunStepRecord[]): Run {
