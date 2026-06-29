@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Card, Label } from "@/components/ui";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ResolveForm } from "@/components/ResolveForm";
+import { RetryButton } from "@/components/RetryButton";
 import { RunLive } from "@/components/RunLive";
 import { getRun } from "@/lib/runs";
 import { getSkill } from "@/lib/skills";
@@ -27,6 +28,7 @@ export default async function RunPage({
   if (!run || run.owner !== session?.pubkey) notFound();
   const skill = await getSkill(run.skillId);
   const inputs = Object.entries(run.input);
+  const isTerminal = ["completed", "failed", "needs_review"].includes(run.status);
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-6">
@@ -35,7 +37,10 @@ export default async function RunPage({
         <Link href="/runs" className="mono text-sm font-semibold tracking-tight">
           ← runs
         </Link>
-        <StatusBadge status={run.status} />
+        <div className="flex items-center gap-3">
+          {isTerminal && <RetryButton runId={run.id} />}
+          <StatusBadge status={run.status} />
+        </div>
       </header>
 
       <div className="border-t border-border pt-8">

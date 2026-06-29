@@ -160,6 +160,11 @@ export function SkillEditor({
 
         {/* Run */}
         <div className="mt-6">
+          {!initial.published && (
+            <p className="mb-2 text-xs text-ink-3">
+              Test run — private to you and earns nothing. Publish once it works.
+            </p>
+          )}
           <RunPanel
             skillId={initial.id}
             fields={initial.inputSchema.fields}
