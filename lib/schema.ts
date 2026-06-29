@@ -37,9 +37,23 @@ CREATE TABLE IF NOT EXISTS skills (
   published      INTEGER NOT NULL DEFAULT 0,
   published_at   INTEGER,
   run_count      INTEGER NOT NULL DEFAULT 0,
+  version        INTEGER NOT NULL DEFAULT 1,
   created_at     INTEGER NOT NULL,
   updated_at     INTEGER NOT NULL
 );
+
+-- Version history for skills: a snapshot per save, for history + rollback.
+CREATE TABLE IF NOT EXISTS skill_versions (
+  id           TEXT PRIMARY KEY,
+  skill_id     TEXT NOT NULL,
+  version      INTEGER NOT NULL,
+  name         TEXT NOT NULL,
+  description  TEXT,
+  plan         TEXT NOT NULL,
+  input_schema TEXT NOT NULL,
+  created_at   INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_skill_versions ON skill_versions(skill_id, version);
 
 CREATE TABLE IF NOT EXISTS runs (
   id          TEXT PRIMARY KEY,

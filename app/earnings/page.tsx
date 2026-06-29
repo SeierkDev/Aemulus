@@ -3,6 +3,8 @@ import { Badge, Button, Card, Label } from "@/components/ui";
 import { Nav } from "@/components/Nav";
 import { getSession } from "@/lib/auth";
 import { getEarningsSummary } from "@/lib/earnings";
+import { getCreatorAnalytics } from "@/lib/analytics";
+import { MiniChart } from "@/components/MiniChart";
 import { SOLANA } from "@/lib/solana";
 import { when } from "@/lib/format";
 
@@ -11,7 +13,12 @@ export const dynamic = "force-dynamic";
 
 export default async function EarningsPage() {
   const session = await getSession();
-  const summary = session ? await getEarningsSummary(session.pubkey) : null;
+  const [summary, analytics] = session
+    ? await Promise.all([
+        getEarningsSummary(session.pubkey),
+        getCreatorAnalytics(session.pubkey),
+      ])
+    : [null, null];
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6">
@@ -54,6 +61,44 @@ export default async function EarningsPage() {
                 </p>
               </div>
             </Card>
+
+            {/* Analytics — last 14 days */}
+            {analytics && (
+              <Card className="mt-8 p-6">
+                <div className="flex flex-wrap items-end justify-between gap-4">
+                  <div>
+                    <Label>Last 14 days</Label>
+                    <div className="mt-2 flex flex-wrap gap-6">
+                      <Stat label="Runs" value={String(analytics.windowRuns)} />
+                      <Stat
+                        label="Success"
+                        value={`${Math.round(analytics.windowSuccess * 100)}%`}
+                      />
+                      <Stat
+                        label="$AEMU earned"
+                        value={analytics.windowEarnings.toLocaleString()}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-6 grid gap-6 sm:grid-cols-2">
+                  <MiniChart
+                    caption="Runs / day"
+                    values={analytics.days.map((d) => ({
+                      label: d.label,
+                      value: d.runs,
+                    }))}
+                  />
+                  <MiniChart
+                    caption="$AEMU / day"
+                    values={analytics.days.map((d) => ({
+                      label: d.label,
+                      value: d.earnings,
+                    }))}
+                  />
+                </div>
+              </Card>
+            )}
 
             {/* Per skill */}
             <div className="mt-8">
@@ -112,6 +157,15 @@ export default async function EarningsPage() {
         )}
       </div>
       <div className="py-10" />
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="mono text-2xl font-semibold tracking-tight">{value}</div>
+      <div className="mt-0.5 text-xs text-ink-3">{label}</div>
     </div>
   );
 }

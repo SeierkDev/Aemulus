@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { SkillEditor } from "@/components/SkillEditor";
-import { getSkill } from "@/lib/skills";
+import { getSkill, listSkillVersions } from "@/lib/skills";
 import { getSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -13,5 +13,6 @@ export default async function SkillPage({
   const { id } = await params;
   const [skill, session] = await Promise.all([getSkill(id), getSession()]);
   if (!skill || skill.owner !== session?.pubkey) notFound();
-  return <SkillEditor initial={skill} />;
+  const versions = await listSkillVersions(id);
+  return <SkillEditor initial={skill} versions={versions} />;
 }

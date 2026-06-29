@@ -7,7 +7,14 @@ import { RunPanel } from "@/components/RunPanel";
 import { BulkRunPanel } from "@/components/BulkRunPanel";
 import { SchedulePanel } from "@/components/SchedulePanel";
 import { PublishToggle } from "@/components/PublishToggle";
-import type { ActionType, Skill, SkillInputField, SkillStep } from "@/lib/types";
+import { VersionHistory } from "@/components/VersionHistory";
+import type {
+  ActionType,
+  Skill,
+  SkillInputField,
+  SkillStep,
+  SkillVersionMeta,
+} from "@/lib/types";
 
 const input =
   "w-full rounded-[var(--radius-base)] border border-border-strong bg-surface-2 px-3 py-2 text-sm outline-none placeholder:text-ink-3 focus:border-ink-3";
@@ -22,7 +29,13 @@ const STEP_ACTIONS: ActionType[] = [
   "extract",
 ];
 
-export function SkillEditor({ initial }: { initial: Skill }) {
+export function SkillEditor({
+  initial,
+  versions,
+}: {
+  initial: Skill;
+  versions: SkillVersionMeta[];
+}) {
   const [name, setName] = useState(initial.name);
   const [description, setDescription] = useState(initial.description);
   const [fields, setFields] = useState<SkillInputField[]>(
@@ -341,6 +354,12 @@ export function SkillEditor({ initial }: { initial: Skill }) {
             </Card>
           ))}
         </div>
+
+        <VersionHistory
+          skillId={initial.id}
+          versions={versions}
+          current={initial.version}
+        />
       </div>
 
       <div className="py-10" />

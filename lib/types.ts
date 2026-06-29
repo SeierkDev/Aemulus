@@ -101,8 +101,17 @@ export interface Skill {
   published: boolean;
   publishedAt: number | null;
   runCount: number;
+  version: number;
   createdAt: number;
   updatedAt: number;
+}
+
+/** Metadata for one entry in a skill's version history. */
+export interface SkillVersionMeta {
+  version: number;
+  name: string;
+  description: string;
+  createdAt: number;
 }
 
 /** Raw shape the generalizer model emits (before we attach idx / persist). */

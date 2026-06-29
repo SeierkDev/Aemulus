@@ -78,4 +78,24 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_runs_bulk ON runs(bulk_id);`,
     ],
   },
+
+  // 5 — Skill versioning: version counter + a snapshot table for history/rollback.
+  {
+    id: 5,
+    name: "skill_versions",
+    addColumns: [{ table: "skills", column: "version", def: "INTEGER NOT NULL DEFAULT 1" }],
+    statements: [
+      `CREATE TABLE IF NOT EXISTS skill_versions (
+         id TEXT PRIMARY KEY,
+         skill_id TEXT NOT NULL,
+         version INTEGER NOT NULL,
+         name TEXT NOT NULL,
+         description TEXT,
+         plan TEXT NOT NULL,
+         input_schema TEXT NOT NULL,
+         created_at INTEGER NOT NULL
+       );`,
+      `CREATE INDEX IF NOT EXISTS idx_skill_versions ON skill_versions(skill_id, version);`,
+    ],
+  },
 ];
