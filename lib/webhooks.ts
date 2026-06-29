@@ -4,6 +4,7 @@ import { db, ready } from "./db";
 import { id } from "./ids";
 import { assertSafeUrl } from "./safe-url";
 import { logError } from "./log";
+import { incr } from "./metrics";
 
 /**
  * Outbound webhooks for run events (run.completed / run.needs_review /
@@ -109,6 +110,7 @@ export async function dispatchRunEvent(
     } catch (e) {
       logError("webhook.deliver", e, { url });
     }
+    incr(status >= 200 && status < 300 ? "webhooks.delivered" : "webhooks.failed");
     await db
       .execute({
         sql: `UPDATE webhooks SET last_status = ?, last_at = ? WHERE id = ?`,

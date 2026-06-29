@@ -6,6 +6,7 @@ import { creditEarning, hasEarnedFrom } from "./earnings";
 import { dispatchRunEvent, eventForStatus } from "./webhooks";
 import { SOLANA } from "./solana";
 import { logError } from "./log";
+import { incr } from "./metrics";
 import type { Run, RunOverrides, Skill } from "./types";
 
 interface RunArgs {
@@ -33,6 +34,7 @@ export async function startRun(args: RunArgs): Promise<Run> {
     bulkId: args.bulkId,
     rowIndex: args.rowIndex,
   });
+  incr("runs.started");
   void completeRun(run.id, args);
   return run; // status: "running"
 }
@@ -47,6 +49,7 @@ export async function completeRun(runId: string, args: RunArgs): Promise<void> {
       args.input,
       args.overrides ?? {},
     );
+    incr(`runs.${final.status}`); // runs.completed / needs_review / failed
     await incrementRunCount(args.skill.id);
     invalidateReputation(args.skill.id); // success-rate aggregate changed
     // Pay the creator only for: a completed run, by someone other than the
@@ -75,6 +78,7 @@ export async function completeRun(runId: string, args: RunArgs): Promise<void> {
       at: final.updatedAt,
     });
   } catch (e) {
+    incr("runs.failed");
     logError("run.complete", e, { run: runId });
     await dispatchRunEvent(args.runner, "run.failed", {
       runId,

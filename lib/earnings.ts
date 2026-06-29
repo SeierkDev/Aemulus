@@ -1,6 +1,7 @@
 import { db, ready } from "./db";
 import { id } from "./ids";
 import { sendPayout } from "./payout";
+import { incr } from "./metrics";
 import type { EarningsSummary } from "./types";
 
 /**
@@ -130,6 +131,7 @@ export async function claimEarnings(
     sql: `UPDATE claims SET sig = ?, cluster = ? WHERE id = ?`,
     args: [res.sig, res.cluster, claimId],
   });
+  incr("claims.settled");
   return { claimed: amount, sig: res.sig, cluster: res.cluster };
 }
 
