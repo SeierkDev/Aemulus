@@ -26,7 +26,8 @@ export function RunPanel({
 }) {
   const router = useRouter();
   const [values, setValues] = useState<Record<string, string>>(
-    Object.fromEntries(fields.map((f) => [f.key, f.example])),
+    // Don't prefill secrets with the example — they're entered fresh each run.
+    Object.fromEntries(fields.map((f) => [f.key, f.secret ? "" : f.example])),
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,11 +77,13 @@ export function RunPanel({
         <div className="grid gap-3 sm:grid-cols-2">
           {fields.map((f) => (
             <div key={f.key} className="flex flex-col gap-1.5">
-              <Label>{f.label || f.key}</Label>
+              <Label>{f.label || f.key}{f.secret ? " 🔒" : ""}</Label>
               <input
                 className={input}
+                type={f.secret ? "password" : "text"}
+                autoComplete={f.secret ? "off" : undefined}
                 value={values[f.key] ?? ""}
-                placeholder={f.example}
+                placeholder={f.secret ? "entered fresh each run" : f.example}
                 aria-label={f.label || f.key}
                 onChange={(e) =>
                   setValues((v) => ({ ...v, [f.key]: e.target.value }))

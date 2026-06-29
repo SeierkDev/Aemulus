@@ -71,12 +71,13 @@ export function SchedulePanel({
         <div className="grid gap-3 sm:grid-cols-2">
           {fields.map((f) => (
             <div key={f.key} className="flex flex-col gap-1.5">
-              <Label>{f.label || f.key}</Label>
+              <Label>{f.label || f.key}{f.secret ? " 🔒" : ""}</Label>
               <input
                 className={input}
+                type={f.secret ? "password" : "text"}
                 value={values[f.key] ?? ""}
                 aria-label={f.label || f.key}
-                placeholder={f.example}
+                placeholder={f.secret ? "stored encrypted" : f.example}
                 onChange={(e) =>
                   setValues((v) => ({ ...v, [f.key]: e.target.value }))
                 }

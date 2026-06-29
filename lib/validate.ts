@@ -69,6 +69,7 @@ const InputFieldSchema = z.object({
   key: z.string().max(200),
   label: z.string().max(200),
   example: z.string().max(5000),
+  secret: z.boolean().optional(),
 });
 
 export const SkillUpdateBody = z.object({

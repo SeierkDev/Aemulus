@@ -232,7 +232,7 @@ export function SkillEditor({
             </Card>
           )}
           {fields.map((f, i) => (
-            <Card key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-3 p-4">
+            <Card key={i} className="grid grid-cols-[1fr_1fr_1fr_auto_auto] gap-3 p-4">
               <Field label="Key">
                 <input
                   className={input}
@@ -250,10 +250,26 @@ export function SkillEditor({
               <Field label="Example">
                 <input
                   className={input}
-                  value={f.example}
+                  value={f.secret ? "" : f.example}
+                  disabled={f.secret}
+                  placeholder={f.secret ? "(hidden)" : ""}
                   onChange={(e) => patchField(i, { example: e.target.value })}
                 />
               </Field>
+              <label className="flex flex-col items-center gap-1 self-end pb-2 text-xs text-ink-3">
+                secret
+                <input
+                  type="checkbox"
+                  checked={!!f.secret}
+                  aria-label={`Field ${f.key || i + 1} is secret`}
+                  onChange={(e) =>
+                    patchField(i, {
+                      secret: e.target.checked,
+                      ...(e.target.checked ? { example: "" } : {}),
+                    })
+                  }
+                />
+              </label>
               <button
                 onClick={() => removeField(i)}
                 className="self-end pb-2 text-xs text-ink-3 hover:text-ink"

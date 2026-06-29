@@ -70,6 +70,8 @@ export interface SkillInputField {
   key: string; // machine key, e.g. "full_name"
   label: string; // human label
   example: string; // example value drawn from the demonstration
+  /** Secret (password, one-time code…): entered per run, masked in all UI. */
+  secret?: boolean;
 }
 
 /**

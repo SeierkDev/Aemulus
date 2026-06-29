@@ -30,6 +30,9 @@ export default async function RunPage({
   if (!run || run.owner !== session?.pubkey) notFound();
   const skill = await getSkill(run.skillId);
   const inputs = Object.entries(run.input);
+  const secretKeys = new Set(
+    (skill?.inputSchema.fields ?? []).filter((f) => f.secret).map((f) => f.key),
+  );
   const isTerminal = ["completed", "failed", "needs_review"].includes(run.status);
 
   return (
@@ -93,7 +96,7 @@ export default async function RunPage({
               {inputs.map(([k, v]) => (
                 <div key={k} className="flex items-baseline gap-2 text-sm">
                   <span className="mono text-ink-3">{k}</span>
-                  <span className="text-ink">{v}</span>
+                  <span className="text-ink">{secretKeys.has(k) ? "••••••" : v}</span>
                 </div>
               ))}
             </div>
