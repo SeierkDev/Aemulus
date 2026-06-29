@@ -35,16 +35,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [signingIn, setSigningIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load any existing session on mount.
+  // Load any existing session on mount (guard against post-unmount setState).
   useEffect(() => {
+    let alive = true;
     fetch("/api/auth/session")
       .then((r) => r.json())
-      .then((d) => setSession(d.session ?? null))
-      .catch(() => setSession(null))
-      .finally(() => setLoading(false));
+      .then((d) => alive && setSession(d.session ?? null))
+      .catch(() => alive && setSession(null))
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
   }, []);
 
   const signIn = useCallback(async () => {
+    if (signingIn) return; // guard against double-submit (e.g. via the usage gate)
     setError(null);
     if (!publicKey || !signMessage) {
       setError("Connect a wallet first.");
@@ -54,11 +59,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { message } = await (await fetch("/api/auth/nonce")).json();
       const signature = await signMessage(new TextEncoder().encode(message));
+      // Re-read the active key AFTER signing — the user may have switched
+      // accounts mid-flow; sign + submit must agree on the same pubkey.
+      const active = publicKey.toBase58();
       const r = await fetch("/api/auth/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          pubkey: publicKey.toBase58(),
+          pubkey: active,
           signature: bs58.encode(signature),
         }),
       });
@@ -70,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setSigningIn(false);
     }
-  }, [publicKey, signMessage]);
+  }, [publicKey, signMessage, signingIn]);
 
   const signOut = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});

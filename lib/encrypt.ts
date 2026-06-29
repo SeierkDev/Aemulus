@@ -5,6 +5,7 @@ import {
   randomBytes,
 } from "node:crypto";
 import { env } from "./env";
+import { logError } from "./log";
 
 /**
  * Transparent at-rest encryption for sensitive JSON columns (recorded traces,
@@ -46,7 +47,11 @@ export function decryptJSON<T>(stored: string | null | undefined, fallback: T): 
     decipher.setAuthTag(tag);
     const pt = Buffer.concat([decipher.update(ct), decipher.final()]);
     return JSON.parse(pt.toString("utf8")) as T;
-  } catch {
+  } catch (e) {
+    // This value WAS encrypted (it has the prefix) but won't decrypt — almost
+    // always a rotated/changed AUTH_SECRET. Surface it loudly: silently
+    // returning the fallback makes scheduled runs execute with empty input.
+    logError("encrypt.decrypt", e, { hint: "AUTH_SECRET changed? data unreadable" });
     return fallback;
   }
 }

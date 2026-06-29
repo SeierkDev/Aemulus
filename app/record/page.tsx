@@ -59,6 +59,7 @@ export default function RecordPage() {
   // Stream screencast frames while recording.
   useEffect(() => {
     if (!recording) return;
+    let ended = false;
     const es = new EventSource("/api/record/stream");
     es.onmessage = (e) => {
       try {
@@ -68,9 +69,21 @@ export default function RecordPage() {
         /* ignore */
       }
     };
-    es.addEventListener("end", () => es.close());
-    es.onerror = () => es.close();
-    return () => es.close();
+    // 'end' is the server intentionally finishing the stream → close for good.
+    es.addEventListener("end", () => {
+      ended = true;
+      es.close();
+    });
+    // A transient drop (network blip, the 5-min serverless cap) should NOT kill
+    // the live view permanently — let EventSource auto-reconnect. Only stop
+    // reconnecting once the server has signalled a real end.
+    es.onerror = () => {
+      if (ended) es.close();
+    };
+    return () => {
+      ended = true;
+      es.close();
+    };
   }, [recording]);
 
   async function sendInput(event: unknown) {
@@ -134,11 +147,16 @@ export default function RecordPage() {
 
   async function stop() {
     setBusy(true);
+    setError(null);
     try {
       const r = await fetch("/api/record/stop", { method: "POST" });
-      const data = await r.json();
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || "Failed to stop");
       setState(data.state);
       setFrame(null);
+    } catch (e) {
+      // Don't leave the UI stuck "Recording" with no signal if stop fails.
+      setError(e instanceof Error ? e.message : "Failed to stop");
     } finally {
       setBusy(false);
     }

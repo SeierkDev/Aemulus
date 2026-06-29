@@ -37,7 +37,8 @@ export async function startRun(args: RunArgs): Promise<Run> {
   return run; // status: "running"
 }
 
-async function completeRun(runId: string, args: RunArgs): Promise<void> {
+/** Exported for tests — the await-able core that startRun fires in background. */
+export async function completeRun(runId: string, args: RunArgs): Promise<void> {
   try {
     const final = await executeRun(
       args.skill,

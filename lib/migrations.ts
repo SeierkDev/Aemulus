@@ -12,6 +12,15 @@ import { SCHEMA } from "./schema";
  *
  * To change the schema: update SCHEMA (so fresh DBs are correct) and append a
  * new migration here (so existing DBs catch up). Never edit a shipped migration.
+ *
+ * IMPORTANT — every statement MUST be idempotent and crash-safe. The runner is
+ * NOT transactional (libsql's executeMultiple does not cooperate with an
+ * explicit BEGIN/COMMIT, verified), and a migration's rows are marked applied
+ * only after all its statements succeed — so a crash mid-migration re-runs the
+ * whole migration. Use `CREATE ... IF NOT EXISTS`, `addColumns` (add-if-missing),
+ * and idempotent `DELETE`s. NEVER a bare `INSERT` backfill or `UPDATE x = x + 1`
+ * (those would double-apply on a crash+retry). If you need a non-idempotent
+ * backfill, gate it so re-running is a no-op.
  */
 export interface Migration {
   id: number;

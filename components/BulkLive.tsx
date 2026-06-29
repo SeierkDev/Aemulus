@@ -9,13 +9,19 @@ export function BulkLive({ bulkId, done, total }: { bulkId: string; done: number
   useEffect(() => {
     if (done >= total) return;
     let stop = false;
+    let lastDone = done;
     const iv = setInterval(async () => {
       if (stop) return clearInterval(iv);
       try {
         const r = await fetch(`/api/runs/bulk/${bulkId}`, { cache: "no-store" });
         if (!r.ok) return;
         const d = await r.json();
-        router.refresh();
+        // Only re-render the server component when progress actually changed —
+        // not every 2s regardless (avoids needless refetch/flicker).
+        if (d.done !== lastDone) {
+          lastDone = d.done;
+          router.refresh();
+        }
         if (d.done >= d.total) stop = true;
       } catch {
         /* transient */

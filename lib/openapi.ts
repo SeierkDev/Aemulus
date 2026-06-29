@@ -78,6 +78,17 @@ export const OPENAPI: OpenApiDoc = {
           createdAt: { type: "integer" },
         },
       },
+      RunStarted: {
+        type: "object",
+        description: "POST /runs returns only these two fields (the run starts async).",
+        properties: {
+          id: { type: "string" },
+          status: {
+            type: "string",
+            enum: ["running", "completed", "needs_review", "failed"],
+          },
+        },
+      },
       SkillSummary: {
         type: "object",
         properties: {
@@ -100,16 +111,38 @@ export const OPENAPI: OpenApiDoc = {
         type: "object",
         properties: {
           found: { type: "boolean" },
+          runId: { type: "string" },
+          status: { type: "string" },
+          steps: { type: "integer" },
+          hash: { type: "string", nullable: true },
           matches: { type: "boolean" },
           batch: {
             type: "object",
             properties: {
+              id: { type: "string" },
               root: { type: "string" },
               index: { type: "integer" },
               leafCount: { type: "integer" },
               proofValid: { type: "boolean" },
+              anchor: {
+                type: "object",
+                nullable: true,
+                properties: {
+                  sig: { type: "string" },
+                  cluster: { type: "string" },
+                  url: { type: "string" },
+                  memoMatches: { type: "boolean" },
+                },
+              },
             },
           },
+        },
+      },
+      VerificationNotFound: {
+        type: "object",
+        properties: {
+          found: { type: "boolean", enum: [false] },
+          runId: { type: "string" },
         },
       },
     },
@@ -121,8 +154,9 @@ export const OPENAPI: OpenApiDoc = {
         description: "Starts a run; returns immediately with status \"running\".",
         requestBody: { required: true, ...json(ref("RunRequest")) },
         responses: {
-          200: { description: "Run started", ...json(ref("Run")) },
+          200: { description: "Run started", ...json(ref("RunStarted")) },
           400: { description: "Invalid body", ...json(ref("Error")) },
+          403: { description: "Insufficient $AEMU balance for access", ...json(ref("Error")) },
           404: { description: "Skill not found", ...json(ref("Error")) },
           429: { description: "Daily quota reached", ...json(ref("Error")) },
           ...ERR,
@@ -166,7 +200,7 @@ export const OPENAPI: OpenApiDoc = {
         ],
         responses: {
           200: { description: "Verification result", ...json(ref("Verification")) },
-          404: { description: "No receipt", ...json(ref("Error")) },
+          404: { description: "No receipt", ...json(ref("VerificationNotFound")) },
         },
       },
     },

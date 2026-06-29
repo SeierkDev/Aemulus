@@ -76,7 +76,10 @@ export function SynthesizePanel({ demos }: { demos: DemoLite[] }) {
             />
             <span className="min-w-0">
               <span className="block truncate font-medium">{d.title}</span>
-              <span className="mt-1 block text-xs text-ink-3">
+              <span
+                className="mt-1 block text-xs text-ink-3"
+                suppressHydrationWarning
+              >
                 <span className="mono">{d.id}</span> · {d.steps} steps ·{" "}
                 {when(d.createdAt)}
               </span>

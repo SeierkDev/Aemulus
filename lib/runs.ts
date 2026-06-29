@@ -314,7 +314,7 @@ function rowToStep(row: Record<string, unknown>): RunStepRecord {
     selectorUsed: action.selectorUsed ?? "",
     value: action.value ?? "",
     screenshot: row.screenshot == null ? "" : String(row.screenshot),
-    confidence: Number(row.confidence),
+    confidence: row.confidence == null ? 0 : Number(row.confidence),
     flagged: Number(row.flagged) === 1,
     note: row.note == null ? "" : String(row.note),
     createdAt: Number(row.created_at),

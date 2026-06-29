@@ -45,8 +45,24 @@ export interface SkillSummary {
 
 export interface Verification {
   found: boolean;
+  runId?: string;
+  status?: RunStatus;
+  steps?: number;
+  hash?: string | null;
   matches?: boolean;
-  batch?: { root: string; index: number; leafCount: number; proofValid: boolean };
+  batch?: {
+    id?: string;
+    root: string;
+    index: number;
+    leafCount: number;
+    proofValid: boolean;
+    anchor?: {
+      sig: string;
+      cluster: string;
+      url: string;
+      memoMatches: boolean;
+    } | null;
+  };
 }
 
 export class AemulusError extends Error {
@@ -71,13 +87,34 @@ export class Aemulus {
     this.baseUrl = (opts.baseUrl ?? "https://aemulus.app").replace(/\/$/, "");
   }
 
-  private async call<T>(path: string, init: RequestInit = {}, auth = true): Promise<T> {
+  private async call<T>(
+    path: string,
+    init: RequestInit = {},
+    auth = true,
+    timeoutMs = 30_000,
+  ): Promise<T> {
     const headers: Record<string, string> = {
       "content-type": "application/json",
       ...(init.headers as Record<string, string>),
     };
     if (auth) headers.authorization = `Bearer ${this.apiKey}`;
-    const res = await fetch(`${this.baseUrl}${path}`, { ...init, headers });
+    let res: Response;
+    try {
+      // Bound every request so a hung connection can't block forever.
+      res = await fetch(`${this.baseUrl}${path}`, {
+        ...init,
+        headers,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "TimeoutError") {
+        throw new AemulusError(`Request timed out: ${path}`, 408);
+      }
+      throw new AemulusError(
+        e instanceof Error ? e.message : `Request failed: ${path}`,
+        0,
+      );
+    }
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       throw new AemulusError(body?.error || `Request failed (${res.status})`, res.status);
@@ -105,8 +142,16 @@ export class Aemulus {
   }
 
   /** Verify a run's receipt — public, no API key required. */
-  verify(runId: string): Promise<Verification> {
-    return this.call<Verification>(`/api/verify/${runId}`, {}, false);
+  async verify(runId: string): Promise<Verification> {
+    try {
+      return await this.call<Verification>(`/api/verify/${runId}`, {}, false);
+    } catch (e) {
+      // A missing receipt is a normal answer, not an error — surface { found: false }.
+      if (e instanceof AemulusError && e.status === 404) {
+        return { found: false, runId };
+      }
+      throw e;
+    }
   }
 
   /** Run and poll until the run reaches a terminal state (or times out). */

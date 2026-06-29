@@ -79,7 +79,7 @@ export function ApiKeysManager({ initial }: { initial: ApiKeyMeta[] }) {
             <Card key={k.id} className="flex items-center justify-between p-3.5">
               <div className="min-w-0">
                 <div className="mono truncate text-sm">{k.prefix}</div>
-                <div className="mt-0.5 text-xs text-ink-3">
+                <div className="mt-0.5 text-xs text-ink-3" suppressHydrationWarning>
                   {k.name} · created {when(k.createdAt)}
                   {k.lastUsedAt ? ` · last used ${when(k.lastUsedAt)}` : " · never used"}
                 </div>

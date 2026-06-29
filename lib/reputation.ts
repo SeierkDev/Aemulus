@@ -57,7 +57,9 @@ export async function getReputationBatch(
   const misses: string[] = [];
   for (const sid of skillIds) {
     const c = cache.get(sid);
-    if (c && c.exp > now) map.set(sid, c.rep);
+    // Return a COPY — never hand callers the cached object (a mutation would
+    // poison the shared cache entry for every later request).
+    if (c && c.exp > now) map.set(sid, { ...c.rep });
     else misses.push(sid);
   }
   if (misses.length === 0) return map;
@@ -91,7 +93,9 @@ export async function getReputationBatch(
     rep.avgStars = Number(r.avg) || 0;
     rep.ratingCount = Number(r.n);
   }
-  for (const sid of misses) cache.set(sid, { rep: map.get(sid)!, exp: now + CACHE_TTL_MS });
+  // Cache an independent copy so the returned map and the cache never alias.
+  for (const sid of misses)
+    cache.set(sid, { rep: { ...map.get(sid)! }, exp: now + CACHE_TTL_MS });
   return map;
 }
 

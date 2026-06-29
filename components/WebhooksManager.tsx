@@ -76,7 +76,7 @@ export function WebhooksManager({ initial }: { initial: WebhookMeta[] }) {
             <Card key={h.id} className="flex items-center justify-between p-3.5">
               <div className="min-w-0">
                 <div className="mono truncate text-sm">{h.url}</div>
-                <div className="mt-0.5 text-xs text-ink-3">
+                <div className="mt-0.5 text-xs text-ink-3" suppressHydrationWarning>
                   {h.lastAt
                     ? `last delivery ${h.lastStatus ?? "—"} · ${when(h.lastAt)}`
                     : "no deliveries yet"}

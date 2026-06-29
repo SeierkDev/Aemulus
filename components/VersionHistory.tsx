@@ -57,7 +57,12 @@ export function VersionHistory({
                 {v.version === current && <Label>current</Label>}
                 <span className="truncate text-ink-2">{v.name}</span>
               </div>
-              <div className="mt-0.5 text-xs text-ink-3">{when(v.createdAt)}</div>
+              <div
+                className="mt-0.5 text-xs text-ink-3"
+                suppressHydrationWarning
+              >
+                {when(v.createdAt)}
+              </div>
             </div>
             {v.version !== current && (
               <button

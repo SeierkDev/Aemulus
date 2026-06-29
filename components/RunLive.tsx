@@ -22,6 +22,7 @@ export function RunLive({
 
   useEffect(() => {
     if (TERMINAL.has(status)) return;
+    lastSteps.current = -1; // reset if this instance is reused for a new run
     let stop = false;
     const tick = async () => {
       try {
