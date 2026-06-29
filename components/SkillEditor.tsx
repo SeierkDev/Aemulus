@@ -6,8 +6,10 @@ import { Button, Card, Label, cx } from "@/components/ui";
 import { RunPanel } from "@/components/RunPanel";
 import { BulkRunPanel } from "@/components/BulkRunPanel";
 import { SchedulePanel } from "@/components/SchedulePanel";
+import { TriggerPanel } from "@/components/TriggerPanel";
 import { PublishToggle } from "@/components/PublishToggle";
 import { VersionHistory } from "@/components/VersionHistory";
+import type { TriggerMeta } from "@/lib/triggers";
 import type {
   ActionType,
   Skill,
@@ -32,9 +34,11 @@ const STEP_ACTIONS: ActionType[] = [
 export function SkillEditor({
   initial,
   versions,
+  triggers,
 }: {
   initial: Skill;
   versions: SkillVersionMeta[];
+  triggers: TriggerMeta[];
 }) {
   const [name, setName] = useState(initial.name);
   const [description, setDescription] = useState(initial.description);
@@ -211,6 +215,11 @@ export function SkillEditor({
             skillId={initial.id}
             fields={initial.inputSchema.fields}
           />
+        </div>
+
+        {/* Trigger URLs (event-driven runs) */}
+        <div className="mt-6">
+          <TriggerPanel skillId={initial.id} initial={triggers} />
         </div>
 
         {/* Inputs */}

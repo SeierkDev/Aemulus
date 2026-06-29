@@ -146,6 +146,21 @@ CREATE TABLE IF NOT EXISTS schedules (
   created_at   INTEGER NOT NULL
 );
 
+-- Inbound run triggers: a signed URL that starts a run when POSTed to (event-
+-- driven runs). The token is the secret in the URL.
+CREATE TABLE IF NOT EXISTS triggers (
+  id            TEXT PRIMARY KEY,
+  owner         TEXT NOT NULL,
+  skill_id      TEXT NOT NULL,
+  token         TEXT NOT NULL,
+  active        INTEGER NOT NULL DEFAULT 1,
+  fire_count    INTEGER NOT NULL DEFAULT 0,
+  last_fired_at INTEGER,
+  created_at    INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_triggers_token ON triggers(token);
+CREATE INDEX IF NOT EXISTS idx_triggers_owner ON triggers(owner);
+
 -- Marketplace moderation: a wallet can report a skill once; enough distinct
 -- reports auto-unpublish it (takedown).
 CREATE TABLE IF NOT EXISTS skill_reports (

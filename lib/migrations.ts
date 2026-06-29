@@ -294,4 +294,24 @@ export const MIGRATIONS: Migration[] = [
       { table: "runs", column: "outcome_reason", def: "TEXT" },
     ],
   },
+
+  // 19 - inbound run triggers (event-driven runs via a signed URL).
+  {
+    id: 19,
+    name: "triggers",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS triggers (
+         id TEXT PRIMARY KEY,
+         owner TEXT NOT NULL,
+         skill_id TEXT NOT NULL,
+         token TEXT NOT NULL,
+         active INTEGER NOT NULL DEFAULT 1,
+         fire_count INTEGER NOT NULL DEFAULT 0,
+         last_fired_at INTEGER,
+         created_at INTEGER NOT NULL
+       );`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_triggers_token ON triggers(token);`,
+      `CREATE INDEX IF NOT EXISTS idx_triggers_owner ON triggers(owner);`,
+    ],
+  },
 ];
