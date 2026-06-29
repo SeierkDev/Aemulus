@@ -210,6 +210,25 @@ CREATE INDEX IF NOT EXISTS idx_skills_pub   ON skills(published);
 CREATE INDEX IF NOT EXISTS idx_earn_owner   ON earnings(owner);
 CREATE INDEX IF NOT EXISTS idx_earn_skill_runner ON earnings(skill_id, runner);
 
+-- Durable job queue: run execution is enqueued here and processed by a worker,
+-- so runs survive restarts, retry on transient failure, and a second instance
+-- can share the load (atomic claim).
+CREATE TABLE IF NOT EXISTS jobs (
+  id         TEXT PRIMARY KEY,
+  run_id     TEXT NOT NULL,
+  runner     TEXT NOT NULL,
+  skill_id   TEXT NOT NULL,
+  input      TEXT NOT NULL DEFAULT '{}',   -- encrypted JSON
+  overrides  TEXT NOT NULL DEFAULT '{}',   -- JSON
+  status     TEXT NOT NULL DEFAULT 'queued', -- queued | running | done | failed
+  attempts   INTEGER NOT NULL DEFAULT 0,
+  run_at     INTEGER NOT NULL,             -- eligible time (backoff)
+  locked_at  INTEGER,
+  last_error TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_jobs_claimable ON jobs(status, run_at);
+
 -- Idempotency keys: at-most-once execution of mutating POSTs per (owner,scope,key).
 CREATE TABLE IF NOT EXISTS idempotency_keys (
   owner      TEXT NOT NULL,

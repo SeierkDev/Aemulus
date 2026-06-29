@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { bootAt, metricsSnapshot } from "@/lib/metrics";
+import { jobCounts } from "@/lib/jobs";
 import { gatingEnabled } from "@/lib/solana";
 
 export const runtime = "nodejs";
@@ -13,8 +14,10 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   let dbOk = true;
+  let jobs: Record<string, number> = {};
   try {
     await db.execute("SELECT 1");
+    jobs = await jobCounts();
   } catch {
     dbOk = false;
   }
@@ -23,6 +26,7 @@ export async function GET() {
     uptimeMs: Date.now() - bootAt,
     db: dbOk ? "ok" : "unreachable",
     gating: gatingEnabled(),
+    jobs, // queue depth by status
     metrics: metricsSnapshot(),
   };
   return NextResponse.json(body, { status: dbOk ? 200 : 503 });

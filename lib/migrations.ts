@@ -235,4 +235,27 @@ export const MIGRATIONS: Migration[] = [
       { table: "skills", column: "allowed_hosts", def: "TEXT NOT NULL DEFAULT '[]'" },
     ],
   },
+
+  // 15 — durable job queue for run execution.
+  {
+    id: 15,
+    name: "jobs",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS jobs (
+         id TEXT PRIMARY KEY,
+         run_id TEXT NOT NULL,
+         runner TEXT NOT NULL,
+         skill_id TEXT NOT NULL,
+         input TEXT NOT NULL DEFAULT '{}',
+         overrides TEXT NOT NULL DEFAULT '{}',
+         status TEXT NOT NULL DEFAULT 'queued',
+         attempts INTEGER NOT NULL DEFAULT 0,
+         run_at INTEGER NOT NULL,
+         locked_at INTEGER,
+         last_error TEXT,
+         created_at INTEGER NOT NULL
+       );`,
+      `CREATE INDEX IF NOT EXISTS idx_jobs_claimable ON jobs(status, run_at);`,
+    ],
+  },
 ];

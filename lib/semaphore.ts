@@ -28,6 +28,10 @@ export class Semaphore {
   get waiting(): number {
     return this.queue.length;
   }
+  /** Slots not currently in use (worker uses this to size its claim batch). */
+  get free(): number {
+    return Math.max(0, this.max - this.active);
+  }
 }
 
 const MAX = Math.max(1, Number(process.env.AEMULUS_MAX_CONCURRENT_RUNS) || 3);
