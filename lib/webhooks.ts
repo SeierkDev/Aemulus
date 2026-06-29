@@ -13,10 +13,27 @@ import { incr } from "./metrics";
  * internal services), and deliveries time out.
  */
 
+export type RunEvent =
+  | "run.completed"
+  | "run.needs_review"
+  | "run.failed"
+  | "run.output";
+
+/** All subscribable events; run.output carries a run's extracted data. */
+export const ALL_EVENTS: RunEvent[] = [
+  "run.completed",
+  "run.needs_review",
+  "run.failed",
+  "run.output",
+];
+/** Default subscription (back-compat: the status events, not run.output). */
+const DEFAULT_EVENTS: RunEvent[] = ["run.completed", "run.needs_review", "run.failed"];
+
 export interface WebhookMeta {
   id: string;
   url: string;
   active: boolean;
+  events: RunEvent[];
   lastStatus: number | null;
   lastAt: number | null;
   lastAttempts: number | null;
@@ -24,7 +41,20 @@ export interface WebhookMeta {
   createdAt: number;
 }
 
-export type RunEvent = "run.completed" | "run.needs_review" | "run.failed";
+function parseEvents(raw: unknown): RunEvent[] {
+  const parts = String(raw ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s): s is RunEvent => (ALL_EVENTS as string[]).includes(s));
+  return parts.length ? parts : DEFAULT_EVENTS;
+}
+
+function cleanEvents(events?: string[]): RunEvent[] {
+  const set = (events ?? DEFAULT_EVENTS).filter((e): e is RunEvent =>
+    (ALL_EVENTS as string[]).includes(e),
+  );
+  return set.length ? [...new Set(set)] : DEFAULT_EVENTS;
+}
 
 const MAX_ATTEMPTS = 3;
 const BACKOFF_MS = [0, 800, 2500]; // delay before attempt i
@@ -44,15 +74,16 @@ function sign(secret: string, ts: number, body: string): string {
 export async function createWebhook(
   owner: string,
   url: string,
+  events?: string[],
 ): Promise<{ id: string; secret: string }> {
   await assertSafeUrl(url);
   await ready();
   const wid = id("wh");
   const secret = `whsec_${bs58.encode(randomBytes(24))}`;
   await db.execute({
-    sql: `INSERT INTO webhooks (id, owner, url, secret, active, created_at)
-          VALUES (?, ?, ?, ?, 1, ?)`,
-    args: [wid, owner, url, secret, Date.now()],
+    sql: `INSERT INTO webhooks (id, owner, url, secret, events, active, created_at)
+          VALUES (?, ?, ?, ?, ?, 1, ?)`,
+    args: [wid, owner, url, secret, cleanEvents(events).join(","), Date.now()],
   });
   return { id: wid, secret };
 }
@@ -60,7 +91,7 @@ export async function createWebhook(
 export async function listWebhooks(owner: string): Promise<WebhookMeta[]> {
   await ready();
   const r = await db.execute({
-    sql: `SELECT id, url, active, last_status, last_at, last_attempts, last_error, created_at
+    sql: `SELECT id, url, active, events, last_status, last_at, last_attempts, last_error, created_at
           FROM webhooks WHERE owner = ? ORDER BY created_at DESC`,
     args: [owner],
   });
@@ -68,6 +99,7 @@ export async function listWebhooks(owner: string): Promise<WebhookMeta[]> {
     id: String(x.id),
     url: String(x.url),
     active: Number(x.active) === 1,
+    events: parseEvents(x.events),
     lastStatus: x.last_status == null ? null : Number(x.last_status),
     lastAt: x.last_at == null ? null : Number(x.last_at),
     lastAttempts: x.last_attempts == null ? null : Number(x.last_attempts),
@@ -96,16 +128,18 @@ export async function dispatchRunEvent(
 ): Promise<void> {
   await ready();
   const r = await db.execute({
-    sql: `SELECT id, url, secret FROM webhooks WHERE owner = ? AND active = 1`,
+    sql: `SELECT id, url, secret, events FROM webhooks WHERE owner = ? AND active = 1`,
     args: [owner],
   });
-  if (r.rows.length === 0) return;
+  // Only deliver to webhooks subscribed to this event.
+  const subscribers = r.rows.filter((w) => parseEvents(w.events).includes(event));
+  if (subscribers.length === 0) return;
   const body = JSON.stringify({ event, ...payload });
   // One timestamp/signature per delivery - reused across retries so a receiver's
   // replay window doesn't reject a legitimate retry.
   const ts = Math.floor(Date.now() / 1000);
 
-  for (const w of r.rows) {
+  for (const w of subscribers) {
     const url = String(w.url);
     const signature = sign(String(w.secret), ts, body);
     let status = 0;

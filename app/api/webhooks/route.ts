@@ -24,7 +24,11 @@ export async function POST(req: Request) {
   const parsed = await readJson(req, WebhookBody);
   if (!parsed.ok) return parsed.res;
   try {
-    const { id, secret } = await createWebhook(session.pubkey, parsed.data.url);
+    const { id, secret } = await createWebhook(
+      session.pubkey,
+      parsed.data.url,
+      parsed.data.events,
+    );
     return NextResponse.json({ id, secret });
   } catch (err) {
     // assertSafeUrl throws on unsafe/private/unreachable URLs

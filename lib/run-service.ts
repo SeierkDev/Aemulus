@@ -90,4 +90,14 @@ export async function completeRun(runId: string, args: RunArgs): Promise<void> {
     receiptHash: final.receiptHash,
     at: final.updatedAt,
   });
+  // Output destination: a data-only event, fired only when the run actually
+  // captured something — so a results endpoint isn't spammed by empty runs.
+  if (final.output && Object.keys(final.output).length > 0) {
+    await dispatchRunEvent(args.runner, "run.output", {
+      runId,
+      skillId: args.skill.id,
+      output: final.output,
+      at: final.updatedAt,
+    });
+  }
 }

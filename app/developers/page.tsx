@@ -198,11 +198,12 @@ console.log(v.batch?.proofValid);  // true`}
           Get pinged when a run finishes
         </h2>
         <p className="mt-2 max-w-2xl text-sm text-ink-2">
-          Subscribe a URL and we POST{" "}
+          Subscribe a URL to{" "}
           <span className="mono">run.completed</span>,{" "}
-          <span className="mono">run.needs_review</span>, and{" "}
-          <span className="mono">run.failed</span> events - each HMAC-signed so
-          you can trust it.
+          <span className="mono">run.needs_review</span>,{" "}
+          <span className="mono">run.failed</span>, or{" "}
+          <span className="mono">run.output</span> (extracted results, as a data
+          destination) - each HMAC-signed so you can trust it.
         </p>
         <div className="mt-6">
           <CodeBlock
@@ -241,6 +242,7 @@ const ok = timingSafeEqual(Buffer.from(sig), Buffer.from(mac));
                 ["run.completed", "A run finished successfully"],
                 ["run.needs_review", "A step needs human input"],
                 ["run.failed", "A run errored out"],
+                ["run.output", "A run captured extracted data (output destination)"],
               ].map(([ev, desc]) => (
                 <Card key={ev} className="flex items-center gap-3 p-3 text-sm">
                   <span className="mono shrink-0 text-ink">{ev}</span>

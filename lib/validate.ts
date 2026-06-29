@@ -94,7 +94,13 @@ export const ApiKeyBody = z.object({
   scopes: z.array(z.enum(["read", "run"])).max(2).optional(),
 });
 
-export const WebhookBody = z.object({ url: z.string().url().max(2000) });
+export const WebhookBody = z.object({
+  url: z.string().url().max(2000),
+  events: z
+    .array(z.enum(["run.completed", "run.needs_review", "run.failed", "run.output"]))
+    .max(4)
+    .optional(),
+});
 
 export const RunBody = z.object({
   skillId: z.string().min(1).max(64),

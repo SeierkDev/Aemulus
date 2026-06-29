@@ -15,15 +15,21 @@ export function WebhooksManager({ initial }: { initial: WebhookMeta[] }) {
   const [secret, setSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [withOutput, setWithOutput] = useState(false);
+
+  const STATUS_EVENTS = ["run.completed", "run.needs_review", "run.failed"] as const;
 
   async function add() {
     setBusy(true);
     setError(null);
+    const events = withOutput
+      ? [...STATUS_EVENTS, "run.output"]
+      : [...STATUS_EVENTS];
     try {
       const r = await fetch("/api/webhooks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, events }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Failed");
@@ -33,6 +39,7 @@ export function WebhooksManager({ initial }: { initial: WebhookMeta[] }) {
           id: d.id,
           url,
           active: true,
+          events: events as WebhookMeta["events"],
           lastStatus: null,
           lastAt: null,
           lastAttempts: null,
@@ -68,6 +75,15 @@ export function WebhooksManager({ initial }: { initial: WebhookMeta[] }) {
           {busy ? "Adding…" : "Add webhook"}
         </Button>
       </div>
+      <label className="flex items-center gap-2 text-xs text-ink-2">
+        <input
+          type="checkbox"
+          checked={withOutput}
+          onChange={(e) => setWithOutput(e.target.checked)}
+        />
+        Also send <span className="mono">run.output</span> (extracted results, as a
+        data destination)
+      </label>
       {error && <p className="text-sm text-ink-2">{error}</p>}
 
       {secret && (
@@ -85,6 +101,7 @@ export function WebhooksManager({ initial }: { initial: WebhookMeta[] }) {
             <Card key={h.id} className="flex items-center justify-between p-3.5">
               <div className="min-w-0">
                 <div className="mono truncate text-sm">{h.url}</div>
+                <div className="mt-0.5 text-xs text-ink-3">{h.events.join(", ")}</div>
                 <div className="mt-0.5 text-xs text-ink-3" suppressHydrationWarning>
                   {h.lastAt
                     ? `last delivery ${h.lastStatus || "failed"}${

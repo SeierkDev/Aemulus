@@ -314,4 +314,17 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_triggers_owner ON triggers(owner);`,
     ],
   },
+
+  // 20 - webhook event subscriptions (output destinations: run.output).
+  {
+    id: 20,
+    name: "webhook_events",
+    addColumns: [
+      {
+        table: "webhooks",
+        column: "events",
+        def: "TEXT NOT NULL DEFAULT 'run.completed,run.needs_review,run.failed'",
+      },
+    ],
+  },
 ];

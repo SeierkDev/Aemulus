@@ -215,6 +215,8 @@ CREATE TABLE IF NOT EXISTS webhooks (
   url         TEXT NOT NULL,
   secret      TEXT NOT NULL,   -- HMAC signing secret (whsec_…)
   active      INTEGER NOT NULL DEFAULT 1,
+  -- comma-sep RunEvents this hook subscribes to (run.output carries extracted data)
+  events      TEXT NOT NULL DEFAULT 'run.completed,run.needs_review,run.failed',
   last_status INTEGER,         -- last delivery HTTP status (0 = error)
   last_at     INTEGER,
   last_attempts INTEGER,       -- attempts on the last delivery (retry/backoff)
