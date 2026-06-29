@@ -9,7 +9,9 @@ import {
   setRunOutput,
   setRunOutcome,
   setRunUsage,
+  setRunCommitment,
 } from "./runs";
+import { buildCommitment, commitmentFields } from "./commitment";
 import { operatorChooseSelector } from "./operate";
 import { collectCandidates } from "./dom";
 import { assertSafeUrl, isUnsafeRequestUrl, hostInAllowlist } from "./safe-url";
@@ -285,6 +287,17 @@ export async function executeRun(
   // failed. The finalized status above is the source of truth.
   try {
     await setRunOutput(runId, outputs); // structured data from extract steps
+    // Private verifiable receipt: a hiding commitment over the run's fields,
+    // built BEFORE the receipt so its root is folded into the anchored digest.
+    try {
+      const r = await getRun(runId);
+      if (r) {
+        const c = buildCommitment(commitmentFields(r));
+        await setRunCommitment(runId, c.root, c.salts);
+      }
+    } catch (e) {
+      logError("runner.commitment", e);
+    }
     await attachReceipt(runId); // verifiable receipt (+ anchor if configured)
 
     // Vision success-verification: did the final screen show the goal was met?

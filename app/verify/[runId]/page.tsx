@@ -123,6 +123,21 @@ export default async function VerifyPage({
             )}
           </Card>
 
+          {v.commitmentRoot && (
+            <Card className="p-5">
+              <h2 className="text-sm font-semibold">Private commitment</h2>
+              <p className="mt-2 text-sm text-ink-2">
+                This run is also committed as a hiding Merkle root over its
+                fields. The owner can prove any single fact (an output, an input)
+                against this root without revealing the rest - selective
+                disclosure, verifiable by anyone.
+              </p>
+              <code className="mono mt-2 block truncate text-xs text-ink-3">
+                {v.commitmentRoot}
+              </code>
+            </Card>
+          )}
+
           <p className="text-center text-xs text-ink-3">
             Anyone can verify this receipt - no sign-in, no private data exposed.
           </p>

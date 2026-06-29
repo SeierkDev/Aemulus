@@ -43,6 +43,7 @@ export async function createRun(input: {
     tokensOut: 0,
     outcomeStatus: null,
     outcomeReason: null,
+    commitmentRoot: null,
     steps: [],
     createdAt: now,
     updatedAt: now,
@@ -227,6 +228,30 @@ export async function setRunOutput(
   });
 }
 
+/** Store a run's private-receipt commitment: public root + encrypted salts. */
+export async function setRunCommitment(
+  runId: string,
+  root: string,
+  salts: Record<string, string>,
+): Promise<void> {
+  await ready();
+  await db.execute({
+    sql: `UPDATE runs SET commitment_root = ?, commitment_salts = ? WHERE id = ?`,
+    args: [root, encryptJSON(salts), runId],
+  });
+}
+
+/** The per-field salts for a run's commitment (owner-only; for disclosures). */
+export async function getRunSalts(runId: string): Promise<Record<string, string>> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT commitment_salts FROM runs WHERE id = ?`,
+    args: [runId],
+  });
+  const raw = r.rows[0]?.commitment_salts;
+  return decryptJSON<Record<string, string>>(raw == null ? null : String(raw), {});
+}
+
 /** Record the vision success-verification verdict for a run. */
 export async function setRunOutcome(
   runId: string,
@@ -353,6 +378,7 @@ function rowToRun(row: Record<string, unknown>, steps: RunStepRecord[]): Run {
         ? null
         : (String(row.outcome_status) as "achieved" | "unconfirmed"),
     outcomeReason: row.outcome_reason == null ? null : String(row.outcome_reason),
+    commitmentRoot: row.commitment_root == null ? null : String(row.commitment_root),
     steps,
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),

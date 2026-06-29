@@ -88,6 +88,9 @@ CREATE TABLE IF NOT EXISTS runs (
   -- vision success-verification: null = unchecked, 'achieved' | 'unconfirmed'
   outcome_status TEXT,
   outcome_reason TEXT,
+  -- private verifiable receipt: hiding-commitment root + per-field salts (enc)
+  commitment_root  TEXT,
+  commitment_salts TEXT,
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL
 );

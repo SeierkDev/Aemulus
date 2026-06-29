@@ -261,6 +261,8 @@ export interface Run {
   /** Vision success-verification: null = unchecked, else achieved | unconfirmed. */
   outcomeStatus: "achieved" | "unconfirmed" | null;
   outcomeReason: string | null;
+  /** Private verifiable receipt: hiding-commitment root over the run's fields. */
+  commitmentRoot: string | null;
   steps: RunStepRecord[];
   createdAt: number;
   updatedAt: number;

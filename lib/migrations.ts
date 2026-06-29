@@ -327,4 +327,14 @@ export const MIGRATIONS: Migration[] = [
       },
     ],
   },
+
+  // 21 - private verifiable receipts: per-run hiding-commitment root + salts.
+  {
+    id: 21,
+    name: "run_commitment",
+    addColumns: [
+      { table: "runs", column: "commitment_root", def: "TEXT" },
+      { table: "runs", column: "commitment_salts", def: "TEXT" },
+    ],
+  },
 ];

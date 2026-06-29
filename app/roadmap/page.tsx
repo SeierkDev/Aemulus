@@ -34,9 +34,8 @@ const ROADMAP = [
     title: "Deeper intelligence",
     body: [
       "Vision-grounded synthesis - the model sees the page, not just the trace.",
-      "Self-healing selectors via embeddings, so skills survive bigger UI changes.",
-      "Skills that chain other skills into multi-app workflows.",
-      "Zero-knowledge proofs of execution: prove a run followed its skill without revealing inputs.",
+      "Full zk-SNARK proofs of execution - today runs already carry private, selective-disclosure receipts (prove any field without revealing the rest); next, prove a whole run followed its skill with zero knowledge.",
+      "Waiting, dependent multi-step pipelines across chained skills.",
     ],
   },
   {

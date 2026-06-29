@@ -44,12 +44,15 @@ export function receiptDigest(input: {
   owner: string;
   status: string;
   steps: ReceiptStep[];
+  /** Private-receipt commitment root, folded in so it's anchored on-chain too. */
+  commitmentRoot?: string | null;
 }): string {
   const canonical = JSON.stringify({
     run: input.runId,
     skill: input.skillId,
     owner: input.owner,
     status: input.status,
+    commit: input.commitmentRoot ?? null,
     steps: [...input.steps]
       .sort((a, b) => a.idx - b.idx)
       .map((s) => ({
@@ -122,6 +125,7 @@ async function digestForRun(run: Run): Promise<string> {
     skillId: run.skillId,
     owner: run.owner,
     status: run.status,
+    commitmentRoot: run.commitmentRoot,
     steps,
   });
 }
@@ -200,6 +204,8 @@ export interface ReceiptVerification {
   hash?: string | null;
   /** Recomputed digest equals the recorded receipt (tamper-evident). */
   matches?: boolean;
+  /** Private-receipt commitment root (selective disclosure; reveals nothing). */
+  commitmentRoot?: string | null;
   /** Merkle batch this run was anchored in, if batched. */
   batch?: {
     id: string;
@@ -261,6 +267,7 @@ export async function verifyReceipt(
     steps: run.steps.length,
     hash: run.receiptHash,
     matches: recomputed === run.receiptHash,
+    commitmentRoot: run.commitmentRoot,
   };
 
   if (run.batchId && run.merkleProof) {

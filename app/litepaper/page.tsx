@@ -17,7 +17,7 @@ const LIVE_TODAY = [
   ["Multi-demo synthesis", "Record the same task a few times and Aemulus learns what varies vs what's fixed - verified against every demo."],
   ["Calibrated autonomy", "Every step carries a confidence score; uncertain steps pause for review instead of guessing."],
   ["Proof on every run", "Each step is screenshotted, and each run gets a tamper-evident receipt."],
-  ["Verifiable receipts", "Run receipts are committed to a Merkle root - anyone can verify a run independently, no sign-in."],
+  ["Private verifiable receipts", "Run receipts are committed to a Merkle root and anchored on-chain - anyone can verify a run, and the owner can prove any single field (an output, an input) without revealing the rest."],
   ["Bulk execution", "Upload a CSV and run a skill across hundreds of rows; export the results."],
   ["Structured extraction", "Capture values off the page into typed outputs and download them as CSV."],
   ["A skill marketplace", "Publish skills, run others', with reputation from real run outcomes and verified ratings."],
