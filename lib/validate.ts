@@ -88,6 +88,12 @@ export const PublishBody = z.object({ published: z.boolean() });
 
 export const ReportBody = z.object({ reason: z.string().max(500).optional() });
 
+export const VaultBody = z.object({
+  host: z.string().min(1).max(255),
+  key: z.string().min(1).max(200),
+  value: z.string().max(5000),
+});
+
 export const RestoreBody = z.object({ version: z.number().int().positive() });
 
 export const ApiKeyBody = z.object({

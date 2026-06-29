@@ -149,6 +149,18 @@ CREATE TABLE IF NOT EXISTS schedules (
   created_at   INTEGER NOT NULL
 );
 
+-- Credential vault: a wallet's per-host secrets (encrypted), auto-filled into
+-- a run's matching input fields so you don't re-enter them each run.
+CREATE TABLE IF NOT EXISTS vault (
+  id         TEXT PRIMARY KEY,
+  owner      TEXT NOT NULL,
+  host       TEXT NOT NULL,   -- site this credential is for, e.g. example.com
+  key        TEXT NOT NULL,   -- input field key it fills, e.g. password
+  value      TEXT NOT NULL,   -- encrypted
+  created_at INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_vault_uniq ON vault(owner, host, key);
+
 -- Inbound run triggers: a signed URL that starts a run when POSTed to (event-
 -- driven runs). The token is the secret in the URL.
 CREATE TABLE IF NOT EXISTS triggers (

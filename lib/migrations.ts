@@ -337,4 +337,21 @@ export const MIGRATIONS: Migration[] = [
       { table: "runs", column: "commitment_salts", def: "TEXT" },
     ],
   },
+
+  // 22 - credential vault: per-host secrets auto-filled into runs.
+  {
+    id: 22,
+    name: "vault",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS vault (
+         id TEXT PRIMARY KEY,
+         owner TEXT NOT NULL,
+         host TEXT NOT NULL,
+         key TEXT NOT NULL,
+         value TEXT NOT NULL,
+         created_at INTEGER NOT NULL
+       );`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_vault_uniq ON vault(owner, host, key);`,
+    ],
+  },
 ];

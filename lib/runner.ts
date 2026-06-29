@@ -12,6 +12,7 @@ import {
   setRunCommitment,
 } from "./runs";
 import { buildCommitment, commitmentFields } from "./commitment";
+import { resolveCredentials, primaryHost } from "./vault";
 import { operatorChooseSelector } from "./operate";
 import { collectCandidates } from "./dom";
 import { assertSafeUrl, isUnsafeRequestUrl, hostInAllowlist } from "./safe-url";
@@ -97,13 +98,28 @@ export async function executeRun(
     page.setDefaultTimeout(STEP_TIMEOUT_MS); // per-action cap (no hanging steps)
     const deadline = Date.now() + RUN_TIMEOUT_MS; // hard wall-clock cap
 
+    // Credential vault: auto-fill the runner's stored secrets for this host into
+    // any matching input field not already provided (explicit input wins).
+    let effInput = input;
+    try {
+      const creds = await resolveCredentials(owner, primaryHost(allowedHosts, skill.plan));
+      const fieldKeys = new Set(skill.inputSchema.fields.map((f) => f.key));
+      const fill: Record<string, string> = {};
+      for (const [k, v] of Object.entries(creds)) {
+        if (fieldKeys.has(k) && !input[k]) fill[k] = v;
+      }
+      if (Object.keys(fill).length) effInput = { ...fill, ...input };
+    } catch (e) {
+      logError("runner.vault", e);
+    }
+
     for (const step of skill.plan) {
       if (Date.now() > deadline) {
         finalStatus = "failed";
         error = "Run exceeded the time limit.";
         break;
       }
-      const value = resolveValue(step, input);
+      const value = resolveValue(step, effInput);
       const override = overrides[step.idx];
       const shotFile = `step-${String(step.idx).padStart(4, "0")}.png`;
       const shotRel = path.posix.join("recordings", owner, runId, shotFile);
