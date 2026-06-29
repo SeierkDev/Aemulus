@@ -15,7 +15,7 @@ if (url.startsWith("file:")) {
 const db = createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN });
 
 await db.executeMultiple(`
-CREATE TABLE IF NOT EXISTS skills (id TEXT PRIMARY KEY, owner TEXT NOT NULL DEFAULT '', name TEXT NOT NULL, description TEXT, plan TEXT NOT NULL DEFAULT '[]', input_schema TEXT NOT NULL DEFAULT '{}', source_demo_id TEXT, published INTEGER NOT NULL DEFAULT 0, published_at INTEGER, run_count INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS skills (id TEXT PRIMARY KEY, owner TEXT NOT NULL DEFAULT '', name TEXT NOT NULL, description TEXT, plan TEXT NOT NULL DEFAULT '[]', input_schema TEXT NOT NULL DEFAULT '{}', source_demo_id TEXT, published INTEGER NOT NULL DEFAULT 0, published_at INTEGER, run_count INTEGER NOT NULL DEFAULT 0, version INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS runs (id TEXT PRIMARY KEY, owner TEXT NOT NULL DEFAULT '', skill_id TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'running', input TEXT NOT NULL DEFAULT '{}', overrides TEXT NOT NULL DEFAULT '{}', result TEXT, error TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS ratings (id TEXT PRIMARY KEY, skill_id TEXT NOT NULL, rater TEXT NOT NULL, stars INTEGER NOT NULL, comment TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ratings_uniq ON ratings(skill_id, rater);
