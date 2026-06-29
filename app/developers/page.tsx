@@ -2,8 +2,10 @@ import { Badge, Card, Label } from "@/components/ui";
 import { Nav } from "@/components/Nav";
 import { SiteFooter } from "@/components/SiteFooter";
 import { ApiKeysManager } from "@/components/ApiKeysManager";
+import { WebhooksManager } from "@/components/WebhooksManager";
 import { getSession } from "@/lib/auth";
 import { listApiKeys } from "@/lib/api-keys";
+import { listWebhooks } from "@/lib/webhooks";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +38,7 @@ const ENDPOINTS: { method: string; path: string; desc: string }[] = [
 export default async function DevelopersPage() {
   const session = await getSession();
   const keys = session ? await listApiKeys(session.pubkey) : [];
+  const webhooks = session ? await listWebhooks(session.pubkey) : [];
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-6">
@@ -175,6 +178,42 @@ console.log(v.batch?.proofValid);  // true`}
           ) : (
             <Card className="p-8 text-center text-sm text-ink-2">
               Connect your wallet (top right) to create API keys.
+            </Card>
+          )}
+        </div>
+      </section>
+
+      {/* Webhooks */}
+      <section className="border-t border-border py-12">
+        <Label>Webhooks</Label>
+        <h2 className="mt-3 text-2xl font-semibold tracking-tight">
+          Get pinged when a run finishes
+        </h2>
+        <p className="mt-2 max-w-2xl text-sm text-ink-2">
+          Subscribe a URL and we POST{" "}
+          <span className="mono">run.completed</span>,{" "}
+          <span className="mono">run.needs_review</span>, and{" "}
+          <span className="mono">run.failed</span> events — each HMAC-signed so
+          you can trust it.
+        </p>
+        <div className="mt-6">
+          <CodeBlock
+            title="Verify the signature (Node)"
+            code={`import { createHmac, timingSafeEqual } from "node:crypto";
+
+const sig = req.headers["x-aemulus-signature"];        // "sha256=…"
+const mac = "sha256=" + createHmac("sha256", WHSEC)
+  .update(rawBody).digest("hex");
+const ok = sig && timingSafeEqual(Buffer.from(sig), Buffer.from(mac));
+// body → { event, runId, status, output, receiptHash, at }`}
+          />
+        </div>
+        <div className="mt-6">
+          {session ? (
+            <WebhooksManager initial={webhooks} />
+          ) : (
+            <Card className="p-8 text-center text-sm text-ink-2">
+              Connect your wallet to register webhooks.
             </Card>
           )}
         </div>

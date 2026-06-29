@@ -3,6 +3,7 @@ import { createRun, finishRun } from "./runs";
 import { incrementRunCount } from "./skills";
 import { invalidateReputation } from "./reputation";
 import { creditEarning } from "./earnings";
+import { dispatchRunEvent, eventForStatus } from "./webhooks";
 import { SOLANA } from "./solana";
 import { logError } from "./log";
 import type { Run, RunOverrides, Skill } from "./types";
@@ -38,7 +39,7 @@ export async function startRun(args: RunArgs): Promise<Run> {
 
 async function completeRun(runId: string, args: RunArgs): Promise<void> {
   try {
-    await executeRun(
+    const final = await executeRun(
       args.skill,
       runId,
       args.runner,
@@ -56,8 +57,22 @@ async function completeRun(runId: string, args: RunArgs): Promise<void> {
         amount: SOLANA.runFee,
       });
     }
+    await dispatchRunEvent(args.runner, eventForStatus(final.status), {
+      runId,
+      skillId: args.skill.id,
+      status: final.status,
+      output: final.output,
+      receiptHash: final.receiptHash,
+      at: final.updatedAt,
+    });
   } catch (e) {
     logError("run.complete", e, { run: runId });
+    await dispatchRunEvent(args.runner, "run.failed", {
+      runId,
+      skillId: args.skill.id,
+      status: "failed",
+      at: Date.now(),
+    }).catch(() => {});
     await finishRun(runId, {
       status: "failed",
       error: e instanceof Error ? e.message : "Run failed",
