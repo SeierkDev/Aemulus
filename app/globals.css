@@ -110,6 +110,73 @@ body {
 .mono {
   font-family: var(--font-mono);
 }
+
+/* ─── Hero ambience: cursor spotlight + drifting orbs + keyword shimmer ─── */
+.aem-spotlight {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    420px circle at var(--mx, 50%) var(--my, 30%),
+    rgba(255, 255, 255, 0.18),
+    rgba(255, 255, 255, 0.05) 42%,
+    transparent 72%
+  );
+  transition: background 0.1s ease-out;
+}
+.aem-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(72px);
+}
+.aem-orb-1 {
+  width: 440px;
+  height: 440px;
+  top: -90px;
+  left: 6%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.11), transparent 70%);
+  animation: aem-drift-1 19s ease-in-out infinite;
+}
+.aem-orb-2 {
+  width: 340px;
+  height: 340px;
+  bottom: -70px;
+  right: 8%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.09), transparent 70%);
+  animation: aem-drift-2 24s ease-in-out infinite;
+}
+.aem-orb-3 {
+  width: 260px;
+  height: 260px;
+  top: 30%;
+  left: 44%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.06), transparent 70%);
+  animation: aem-drift-1 28s ease-in-out infinite reverse;
+}
+@keyframes aem-drift-1 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(46px, 34px); }
+}
+@keyframes aem-drift-2 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-38px, -28px); }
+}
+
+.aem-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--ink-3) 0%,
+    var(--ink) 50%,
+    var(--ink-3) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: aem-shimmer 6s linear infinite;
+}
+@keyframes aem-shimmer {
+  to { background-position: -200% 0; }
+}
 .kbd {
   font-family: var(--font-mono);
   font-size: 0.7rem;

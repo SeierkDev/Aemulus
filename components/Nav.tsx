@@ -37,17 +37,19 @@ export function Brand() {
 /** Shared top bar for the app's primary surfaces. */
 export function Nav() {
   return (
-    <header className="flex flex-col gap-3 py-6 sm:flex-row sm:items-center sm:justify-between">
-      <Link href="/" aria-label="Home">
+    <header className="flex flex-col gap-3 py-6 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+      <Link href="/" aria-label="Home" className="sm:justify-self-start">
         <Brand />
       </Link>
-      <nav className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:gap-x-5">
+      <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 sm:gap-x-5">
         <NavLink href="/market">Explore</NavLink>
         <NavLink href="/skills">Skills</NavLink>
         <NavLink href="/runs">Runs</NavLink>
         <NavLink href="/earnings">Earnings</NavLink>
         <NavLink href="/litepaper">Litepaper</NavLink>
         <NavLink href="/roadmap">Roadmap</NavLink>
+      </nav>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:justify-self-end">
         <a
           href={SOLANA.githubUrl}
           target="_blank"
@@ -70,7 +72,7 @@ export function Nav() {
           <Button variant="primary">Record a task</Button>
         </Link>
         <WalletStatus />
-      </nav>
+      </div>
     </header>
   );
 }
