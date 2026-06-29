@@ -226,4 +226,13 @@ export const MIGRATIONS: Migration[] = [
       { table: "api_keys", column: "scopes", def: "TEXT NOT NULL DEFAULT 'read,run'" },
     ],
   },
+
+  // 14 — per-run egress allowlist on skills (existing skills stay unrestricted).
+  {
+    id: 14,
+    name: "skill_allowed_hosts",
+    addColumns: [
+      { table: "skills", column: "allowed_hosts", def: "TEXT NOT NULL DEFAULT '[]'" },
+    ],
+  },
 ];

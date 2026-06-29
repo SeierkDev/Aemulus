@@ -4,7 +4,7 @@ import path from "node:path";
 import { id } from "./ids";
 import { addRunStep, finishRun, getRun, setRunOutput } from "./runs";
 import { operatorChooseSelector, type Candidate } from "./operate";
-import { assertSafeUrl, isUnsafeRequestUrl } from "./safe-url";
+import { assertSafeUrl, isUnsafeRequestUrl, hostInAllowlist } from "./safe-url";
 import { runSlots } from "./semaphore";
 import { attachReceipt } from "./receipt";
 import { logError } from "./log";
@@ -59,10 +59,19 @@ export async function executeRun(
       viewport: { width: 1280, height: 800 },
     });
     // Egress guardrail: block requests to internal hosts / private IPs / unknown
-    // schemes so an untrusted skill can't pull from the server's network.
+    // schemes so an untrusted skill can't pull from the server's network. Plus
+    // the per-skill allowlist — NAVIGATIONS must target a declared host (so a
+    // published skill can't be edited to quietly exfiltrate to a new domain);
+    // subresources still load so pages render. Empty allowlist = unrestricted.
+    const allowedHosts = skill.allowedHosts ?? [];
     await context.route("**/*", (route) => {
-      if (isUnsafeRequestUrl(route.request().url())) route.abort();
-      else route.continue();
+      const req = route.request();
+      const url = req.url();
+      if (isUnsafeRequestUrl(url)) return route.abort();
+      if (req.isNavigationRequest() && !hostInAllowlist(url, allowedHosts)) {
+        return route.abort();
+      }
+      route.continue();
     });
     const page = await context.newPage();
     page.setDefaultTimeout(STEP_TIMEOUT_MS); // per-action cap (no hanging steps)
@@ -90,6 +99,9 @@ export async function executeRun(
 
         if (step.action === "navigate") {
           await assertSafeUrl(step.target); // SSRF guard before any navigation
+          if (!hostInAllowlist(step.target, allowedHosts)) {
+            throw new Error(`Navigation to ${step.target} is not in the skill's allowed hosts.`);
+          }
           await page.goto(step.target, { waitUntil: "domcontentloaded" });
           await page.screenshot({ path: shotPath });
           await recordStep(runId, step, "", value, shotRel, DETERMINISTIC_CONFIDENCE, false, "");

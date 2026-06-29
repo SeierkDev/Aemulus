@@ -6,9 +6,7 @@
  * via registerLogSink / the same seam when you need durable metrics).
  */
 declare global {
-  // eslint-disable-next-line no-var
   var __aemMetrics: Record<string, number> | undefined;
-  // eslint-disable-next-line no-var
   var __aemBootAt: number | undefined;
 }
 

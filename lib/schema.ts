@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS skills (
   published_at   INTEGER,
   run_count      INTEGER NOT NULL DEFAULT 0,
   version        INTEGER NOT NULL DEFAULT 1,
+  -- JSON array of hostnames the run may navigate to ([] = unrestricted)
+  allowed_hosts  TEXT NOT NULL DEFAULT '[]',
   created_at     INTEGER NOT NULL,
   updated_at     INTEGER NOT NULL
 );

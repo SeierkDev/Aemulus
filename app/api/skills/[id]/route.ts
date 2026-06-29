@@ -28,6 +28,7 @@ export async function PUT(
     description: body.description ?? existing.description,
     plan: body.plan ?? existing.plan,
     inputSchema: body.inputSchema ?? existing.inputSchema,
+    allowedHosts: body.allowedHosts ?? existing.allowedHosts,
   });
   const updated = await getSkill(id);
   return NextResponse.json({ skill: updated });

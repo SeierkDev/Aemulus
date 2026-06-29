@@ -72,6 +72,7 @@ export const SkillUpdateBody = z.object({
   inputSchema: z
     .object({ fields: z.array(InputFieldSchema).max(50) })
     .optional(),
+  allowedHosts: z.array(z.string().max(255)).max(50).optional(),
 });
 
 export const PublishBody = z.object({ published: z.boolean() });

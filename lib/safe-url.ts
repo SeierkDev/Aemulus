@@ -58,6 +58,28 @@ export function isUnsafeRequestUrl(raw: string): boolean {
   return false;
 }
 
+/**
+ * Per-run egress allowlist check for NAVIGATIONS. A skill declares the hosts it
+ * may navigate to; an empty list means unrestricted (back-compat). A host
+ * matches an entry exactly or as a subdomain (so "example.com" allows
+ * "app.example.com"). data:/blob: are inline and always allowed.
+ */
+export function hostInAllowlist(raw: string, allowed: string[]): boolean {
+  if (allowed.length === 0) return true;
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (u.protocol === "data:" || u.protocol === "blob:") return true;
+  const host = u.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  return allowed.some((a) => {
+    const d = a.trim().toLowerCase();
+    return d !== "" && (host === d || host.endsWith(`.${d}`));
+  });
+}
+
 /** Throws if `raw` is unsafe to navigate to. data: URLs are inline (no fetch). */
 export async function assertSafeUrl(raw: string): Promise<void> {
   let u: URL;

@@ -42,6 +42,9 @@ export function SkillEditor({
     initial.inputSchema.fields,
   );
   const [steps, setSteps] = useState<SkillStep[]>(initial.plan);
+  const [allowedHosts, setAllowedHosts] = useState(
+    initial.allowedHosts.join(", "),
+  );
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -97,6 +100,10 @@ export function SkillEditor({
           description,
           plan: steps,
           inputSchema: { fields },
+          allowedHosts: allowedHosts
+            .split(/[,\s]+/)
+            .map((h) => h.trim())
+            .filter(Boolean),
         }),
       });
       if (r.ok) setSaved(true);
@@ -145,6 +152,23 @@ export function SkillEditor({
                 setSaved(false);
               }}
             />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label>Allowed domains</Label>
+            <input
+              className={input}
+              value={allowedHosts}
+              aria-label="Allowed domains"
+              placeholder="e.g. example.com, app.example.com — empty = unrestricted"
+              onChange={(e) => {
+                setAllowedHosts(e.target.value);
+                setSaved(false);
+              }}
+            />
+            <p className="text-xs text-ink-3">
+              The run may only navigate to these hosts (and subdomains). Empty
+              allows any public host.
+            </p>
           </div>
           <div className="mono text-xs text-ink-3">{initial.id}</div>
         </Card>

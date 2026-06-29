@@ -1,6 +1,7 @@
 import { db, ready } from "./db";
 import { id } from "./ids";
 import { keysetClause, toPage, type Page } from "./pagination";
+import { skillTargets } from "./skill-utils";
 import type {
   GeneralizedSkill,
   Skill,
@@ -53,6 +54,10 @@ export async function createSkill(input: {
     description: input.generalized.description,
     plan,
     inputSchema: { fields: input.generalized.inputFields },
+    // Secure-by-default: restrict navigation to the hosts the demo actually
+    // used. Owner can widen/clear it in the editor; existing skills (pre-this)
+    // stay unrestricted via the migration default.
+    allowedHosts: skillTargets(plan).filter((h) => h !== "inline page"),
     sourceDemoId: input.sourceDemoId,
     published: false,
     publishedAt: null,
@@ -62,8 +67,8 @@ export async function createSkill(input: {
     updatedAt: now,
   };
   await db.execute({
-    sql: `INSERT INTO skills (id, owner, name, description, plan, input_schema, source_demo_id, published, published_at, run_count, version, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, 0, NULL, 0, 1, ?, ?)`,
+    sql: `INSERT INTO skills (id, owner, name, description, plan, input_schema, allowed_hosts, source_demo_id, published, published_at, run_count, version, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, 0, 1, ?, ?)`,
     args: [
       skill.id,
       skill.owner,
@@ -71,6 +76,7 @@ export async function createSkill(input: {
       skill.description,
       JSON.stringify(skill.plan),
       JSON.stringify(skill.inputSchema),
+      JSON.stringify(skill.allowedHosts),
       skill.sourceDemoId,
       skill.createdAt,
       skill.updatedAt,
@@ -80,7 +86,8 @@ export async function createSkill(input: {
   return skill;
 }
 
-export { skillTargets, categorize } from "./skill-utils";
+export { categorize } from "./skill-utils";
+export { skillTargets };
 
 /** Publish or unpublish a skill to the marketplace (owner only). */
 export async function setPublished(
@@ -139,7 +146,9 @@ export async function listPublishedSkillsPage(
 /** Apply user edits from the review screen. */
 export async function updateSkill(
   skillId: string,
-  patch: Pick<Skill, "name" | "description" | "plan" | "inputSchema">,
+  patch: Pick<Skill, "name" | "description" | "plan" | "inputSchema"> & {
+    allowedHosts?: string[];
+  },
 ): Promise<void> {
   await ready();
   const cur = await getSkill(skillId);
@@ -153,14 +162,17 @@ export async function updateSkill(
     args: [skillId],
   });
   const version = Number(maxRow.rows[0]?.v ?? 0) + 1;
+  // Keep the current allowlist unless the patch explicitly sets one.
+  const allowedHosts = patch.allowedHosts ?? cur.allowedHosts;
   await db.execute({
-    sql: `UPDATE skills SET name = ?, description = ?, plan = ?, input_schema = ?, version = ?, updated_at = ?
+    sql: `UPDATE skills SET name = ?, description = ?, plan = ?, input_schema = ?, allowed_hosts = ?, version = ?, updated_at = ?
           WHERE id = ?`,
     args: [
       patch.name,
       patch.description,
       JSON.stringify(patch.plan),
       JSON.stringify(patch.inputSchema),
+      JSON.stringify(allowedHosts),
       version,
       Date.now(),
       skillId,
@@ -240,6 +252,7 @@ function rowToSkill(row: Record<string, unknown>): Skill {
     description: row.description == null ? "" : String(row.description),
     plan: JSON.parse(String(row.plan || "[]")) as SkillStep[],
     inputSchema: JSON.parse(String(row.input_schema || '{"fields":[]}')),
+    allowedHosts: JSON.parse(String(row.allowed_hosts || "[]")) as string[],
     sourceDemoId: row.source_demo_id == null ? null : String(row.source_demo_id),
     published: Number(row.published) === 1,
     publishedAt: row.published_at == null ? null : Number(row.published_at),

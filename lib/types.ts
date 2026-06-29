@@ -99,6 +99,8 @@ export interface Skill {
   description: string;
   plan: SkillStep[];
   inputSchema: { fields: SkillInputField[] };
+  /** Hostnames the run may navigate to ([] = unrestricted). */
+  allowedHosts: string[];
   sourceDemoId: string | null;
   published: boolean;
   publishedAt: number | null;
