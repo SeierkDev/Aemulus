@@ -102,6 +102,9 @@ export interface SkillStep {
   key: string;
   /** For "extract" steps: the key to store the captured value under. */
   outputKey?: string;
+  /** For "extract" steps: capture EVERY matching element into a list (in-skill
+   *  loop over the DOM), not just the first. Output is a JSON array. */
+  loop?: boolean;
   /** Optional condition - when set, the step runs only if it's satisfied. */
   condition?: StepCondition;
 }

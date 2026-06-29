@@ -353,6 +353,15 @@ export function SkillEditor({
                       }
                     />
                   </div>
+                  <label className="flex items-center gap-2 text-xs text-ink-3">
+                    <input
+                      type="checkbox"
+                      checked={!!s.loop}
+                      aria-label={`Step ${i + 1} capture all matches`}
+                      onChange={(e) => patchStep(i, { loop: e.target.checked })}
+                    />
+                    capture all matching elements (list)
+                  </label>
                 </div>
               ) : (
                 <div className="mt-3 grid grid-cols-[160px_1fr] items-center gap-3 pl-11">

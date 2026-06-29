@@ -35,6 +35,7 @@ import type { Run, RunOverrides, RunStatus, Skill, SkillStep } from "./types";
 const RUNS_DIR = path.join(process.cwd(), ".data", "recordings");
 const CONFIDENCE_FLOOR = 0.6;
 const DETERMINISTIC_CONFIDENCE = 0.99;
+const LOOP_MAX = Math.max(1, Number(process.env.AEMULUS_LOOP_MAX) || 500); // cap per-loop captures
 // Sandbox guardrails for untrusted marketplace skills.
 const RUN_TIMEOUT_MS = Math.max(
   10_000,
@@ -181,12 +182,26 @@ export async function executeRun(
         }
 
         if (step.action === "extract") {
-          // Read a value off the page into the run's structured output.
-          const captured = await captureValue(loc.locator);
           const key = step.outputKey || `value_${step.idx}`;
-          outputs[key] = captured;
-          await page.screenshot({ path: shotPath });
-          await recordStep(runId, step, selectorUsed, captured, shotRel, confidence, false, `Captured ${key} = "${captured}"`);
+          if (step.loop) {
+            // In-skill loop: capture EVERY element matching the selector (e.g.
+            // every row/price in a list) into a JSON array, not just the first.
+            const els = page.locator(selectorUsed);
+            const total = Math.min(await els.count(), LOOP_MAX);
+            const values: string[] = [];
+            for (let k = 0; k < total; k++) {
+              values.push(await captureValue(els.nth(k)));
+            }
+            outputs[key] = JSON.stringify(values);
+            await page.screenshot({ path: shotPath });
+            await recordStep(runId, step, selectorUsed, `${values.length} items`, shotRel, confidence, false, `Captured ${values.length} values into ${key}.`);
+          } else {
+            // Read a single value off the page into the run's structured output.
+            const captured = await captureValue(loc.locator);
+            outputs[key] = captured;
+            await page.screenshot({ path: shotPath });
+            await recordStep(runId, step, selectorUsed, captured, shotRel, confidence, false, `Captured ${key} = "${captured}"`);
+          }
         } else {
           await perform(page, loc.locator, step, value);
           await page.waitForTimeout(150);
