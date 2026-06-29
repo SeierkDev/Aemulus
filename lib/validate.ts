@@ -88,6 +88,12 @@ export const PublishBody = z.object({ published: z.boolean() });
 
 export const ReportBody = z.object({ reason: z.string().max(500).optional() });
 
+export const OrgCreateBody = z.object({ name: z.string().min(1).max(80) });
+export const OrgMemberBody = z.object({
+  wallet: z.string().min(32).max(64),
+  role: z.enum(["admin", "member"]).optional(),
+});
+
 export const VaultBody = z.object({
   host: z.string().min(1).max(255),
   key: z.string().min(1).max(200),

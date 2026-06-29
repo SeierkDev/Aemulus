@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import { SkillEditor } from "@/components/SkillEditor";
-import { getSkill, listSkillVersions, listSkills } from "@/lib/skills";
+import { getSkill, listSkillVersions, listSkills, skillAccess } from "@/lib/skills";
 import { listTriggers } from "@/lib/triggers";
+import { listMyOrgs } from "@/lib/orgs";
 import { getSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -13,11 +14,14 @@ export default async function SkillPage({
 }) {
   const { id } = await params;
   const [skill, session] = await Promise.all([getSkill(id), getSession()]);
-  if (!skill || skill.owner !== session?.pubkey) notFound();
-  const [versions, triggers, mine] = await Promise.all([
+  if (!skill || !session) notFound();
+  // Editor is for editors: the creator, or an admin of the org it's shared with.
+  if (!(await skillAccess(skill, session.pubkey)).edit) notFound();
+  const [versions, triggers, mine, myOrgs] = await Promise.all([
     listSkillVersions(id),
     listTriggers(session.pubkey, id),
     listSkills(session.pubkey),
+    listMyOrgs(session.pubkey),
   ]);
   // Other skills this owner can chain to (exclude self).
   const otherSkills = mine
@@ -29,6 +33,8 @@ export default async function SkillPage({
       versions={versions}
       triggers={triggers}
       otherSkills={otherSkills}
+      myOrgs={myOrgs}
+      isOwner={skill.owner === session.pubkey}
     />
   );
 }

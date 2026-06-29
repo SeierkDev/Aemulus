@@ -37,11 +37,15 @@ export function SkillEditor({
   versions,
   triggers,
   otherSkills,
+  myOrgs,
+  isOwner,
 }: {
   initial: Skill;
   versions: SkillVersionMeta[];
   triggers: TriggerMeta[];
   otherSkills: { id: string; name: string }[];
+  myOrgs: { id: string; name: string }[];
+  isOwner: boolean;
 }) {
   const [name, setName] = useState(initial.name);
   const [description, setDescription] = useState(initial.description);
@@ -52,7 +56,17 @@ export function SkillEditor({
   const [allowedHosts, setAllowedHosts] = useState(
     initial.allowedHosts.join(", "),
   );
+  const [orgId, setOrgId] = useState(initial.orgId ?? "");
   const [saved, setSaved] = useState(false);
+
+  async function share(next: string) {
+    setOrgId(next);
+    await fetch(`/api/skills/${initial.id}/share`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orgId: next || null }),
+    }).catch(() => {});
+  }
   const [busy, setBusy] = useState(false);
 
   function patchField(i: number, p: Partial<SkillInputField>) {
@@ -177,6 +191,27 @@ export function SkillEditor({
               allows any public host.
             </p>
           </div>
+          {isOwner && myOrgs.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <Label>Share with team</Label>
+              <select
+                className={input}
+                value={orgId}
+                aria-label="Share with team"
+                onChange={(e) => share(e.target.value)}
+              >
+                <option value="">Personal (not shared)</option>
+                {myOrgs.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-ink-3">
+                Team members can view and run it; admins can edit it.
+              </p>
+            </div>
+          )}
           <div className="mono text-xs text-ink-3">{initial.id}</div>
         </Card>
 

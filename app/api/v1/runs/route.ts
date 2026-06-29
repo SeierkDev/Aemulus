@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { apiKeyAuth, hasScope } from "@/lib/api-keys";
 import { logError } from "@/lib/log";
 import { getQuota } from "@/lib/quota";
-import { getSkill } from "@/lib/skills";
+import { getSkill, skillAccess } from "@/lib/skills";
 import { startRun } from "@/lib/run-service";
 import { computeTier, getAemulusBalance } from "@/lib/solana";
 import { rateLimit } from "@/lib/ratelimit";
@@ -89,7 +89,7 @@ export async function POST(req: Request) {
     const { skillId, input } = parsed.data;
 
     const skill = await getSkill(skillId);
-    if (!skill || (skill.owner !== owner && !skill.published)) {
+    if (!skill || !(await skillAccess(skill, owner)).run) {
       return NextResponse.json({ error: "Skill not found" }, { status: 404 });
     }
 

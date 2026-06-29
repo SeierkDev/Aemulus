@@ -121,6 +121,8 @@ export interface Skill {
   inputSchema: { fields: SkillInputField[] };
   /** Hostnames the run may navigate to ([] = unrestricted). */
   allowedHosts: string[];
+  /** Org this skill is shared with (null = personal). */
+  orgId: string | null;
   sourceDemoId: string | null;
   published: boolean;
   publishedAt: number | null;

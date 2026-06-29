@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
-import { getSkill, updateSkill } from "@/lib/skills";
+import { getSkill, updateSkill, skillAccess } from "@/lib/skills";
 import { readJson, SkillUpdateBody } from "@/lib/validate";
 
 export const runtime = "nodejs";
@@ -16,7 +16,7 @@ export async function PUT(
   }
   const { id } = await params;
   const existing = await getSkill(id);
-  if (!existing || existing.owner !== session.pubkey) {
+  if (!existing || !(await skillAccess(existing, session.pubkey)).edit) {
     return NextResponse.json({ error: "Skill not found" }, { status: 404 });
   }
   const parsed = await readJson(req, SkillUpdateBody);

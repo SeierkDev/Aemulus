@@ -354,4 +354,34 @@ export const MIGRATIONS: Migration[] = [
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_vault_uniq ON vault(owner, host, key);`,
     ],
   },
+
+  // 23 - teams/orgs + membership.
+  {
+    id: 23,
+    name: "orgs",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS orgs (
+         id TEXT PRIMARY KEY,
+         name TEXT NOT NULL,
+         owner TEXT NOT NULL,
+         created_at INTEGER NOT NULL
+       );`,
+      `CREATE INDEX IF NOT EXISTS idx_orgs_owner ON orgs(owner);`,
+      `CREATE TABLE IF NOT EXISTS org_members (
+         org_id TEXT NOT NULL,
+         wallet TEXT NOT NULL,
+         role TEXT NOT NULL DEFAULT 'member',
+         created_at INTEGER NOT NULL,
+         PRIMARY KEY (org_id, wallet)
+       );`,
+      `CREATE INDEX IF NOT EXISTS idx_org_members_wallet ON org_members(wallet);`,
+    ],
+  },
+
+  // 24 - skills can be shared with an org.
+  {
+    id: 24,
+    name: "skill_org",
+    addColumns: [{ table: "skills", column: "org_id", def: "TEXT" }],
+  },
 ];

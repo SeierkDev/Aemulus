@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS skills (
   version        INTEGER NOT NULL DEFAULT 1,
   -- JSON array of hostnames the run may navigate to ([] = unrestricted)
   allowed_hosts  TEXT NOT NULL DEFAULT '[]',
+  -- org this skill is shared with (null = personal)
+  org_id         TEXT,
   created_at     INTEGER NOT NULL,
   updated_at     INTEGER NOT NULL
 );
@@ -148,6 +150,24 @@ CREATE TABLE IF NOT EXISTS schedules (
   next_run_at  INTEGER NOT NULL,
   created_at   INTEGER NOT NULL
 );
+
+-- Teams/orgs: a group of wallets that share skills, with roles (admin|member).
+CREATE TABLE IF NOT EXISTS orgs (
+  id         TEXT PRIMARY KEY,
+  name       TEXT NOT NULL,
+  owner      TEXT NOT NULL,   -- creating wallet
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_orgs_owner ON orgs(owner);
+
+CREATE TABLE IF NOT EXISTS org_members (
+  org_id     TEXT NOT NULL,
+  wallet     TEXT NOT NULL,
+  role       TEXT NOT NULL DEFAULT 'member',  -- admin | member
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (org_id, wallet)
+);
+CREATE INDEX IF NOT EXISTS idx_org_members_wallet ON org_members(wallet);
 
 -- Credential vault: a wallet's per-host secrets (encrypted), auto-filled into
 -- a run's matching input fields so you don't re-enter them each run.

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
 import { logError } from "@/lib/log";
 import { getQuota } from "@/lib/quota";
-import { getSkill } from "@/lib/skills";
+import { getSkill, skillAccess } from "@/lib/skills";
 import { startRun } from "@/lib/run-service";
 import { enforceRateLimit } from "@/lib/ratelimit";
 import { readJson, RunBody } from "@/lib/validate";
@@ -30,8 +30,8 @@ export async function POST(req: Request) {
     if (!parsed.ok) return parsed.res;
     const { skillId, input } = parsed.data;
     const skill = await getSkill(skillId);
-    // Runnable if you own it, or it's published to the marketplace.
-    if (!skill || (skill.owner !== session.pubkey && !skill.published)) {
+    // Runnable if you own it, an org-mate shared it, or it's published.
+    if (!skill || !(await skillAccess(skill, session.pubkey)).run) {
       return NextResponse.json({ error: "Skill not found" }, { status: 404 });
     }
     const quota = await getQuota(session);

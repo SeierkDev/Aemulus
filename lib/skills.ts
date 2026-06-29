@@ -2,6 +2,7 @@ import { db, ready } from "./db";
 import { id } from "./ids";
 import { keysetClause, toPage, type Page } from "./pagination";
 import { skillTargets } from "./skill-utils";
+import { listMyOrgs, roleOf } from "./orgs";
 import type {
   GeneralizedSkill,
   Skill,
@@ -58,6 +59,7 @@ export async function createSkill(input: {
     // used. Owner can widen/clear it in the editor; existing skills (pre-this)
     // stay unrestricted via the migration default.
     allowedHosts: skillTargets(plan).filter((h) => h !== "inline page"),
+    orgId: null,
     sourceDemoId: input.sourceDemoId,
     published: false,
     publishedAt: null,
@@ -264,13 +266,54 @@ export async function getSkill(skillId: string): Promise<Skill | null> {
   return r.rows[0] ? rowToSkill(r.rows[0]) : null;
 }
 
+/** Skills owned by the wallet PLUS any shared with an org it belongs to. */
 export async function listSkills(owner: string): Promise<Skill[]> {
   await ready();
+  const orgs = await listMyOrgs(owner);
+  const orgIds = orgs.map((o) => o.id);
+  if (orgIds.length === 0) {
+    const r = await db.execute({
+      sql: `SELECT * FROM skills WHERE owner = ? ORDER BY updated_at DESC`,
+      args: [owner],
+    });
+    return r.rows.map(rowToSkill);
+  }
+  const ph = orgIds.map(() => "?").join(",");
   const r = await db.execute({
-    sql: `SELECT * FROM skills WHERE owner = ? ORDER BY updated_at DESC`,
-    args: [owner],
+    sql: `SELECT * FROM skills WHERE owner = ? OR org_id IN (${ph})
+          ORDER BY updated_at DESC`,
+    args: [owner, ...orgIds],
   });
   return r.rows.map(rowToSkill);
+}
+
+/** What a wallet may do with a skill (personal owner, org sharing, or public). */
+export async function skillAccess(
+  skill: Skill,
+  wallet: string,
+): Promise<{ view: boolean; run: boolean; edit: boolean }> {
+  if (skill.owner === wallet) return { view: true, run: true, edit: true };
+  const role = skill.orgId ? await roleOf(skill.orgId, wallet) : null;
+  const inOrg = role !== null;
+  return {
+    view: inOrg || skill.published,
+    run: inOrg || skill.published,
+    edit: role === "admin", // org admins can edit shared skills (creator already full)
+  };
+}
+
+/** Share a skill with an org (or unshare with null). Owner only. */
+export async function setSkillOrg(
+  skillId: string,
+  owner: string,
+  orgId: string | null,
+): Promise<boolean> {
+  await ready();
+  const r = await db.execute({
+    sql: `UPDATE skills SET org_id = ?, updated_at = ? WHERE id = ? AND owner = ?`,
+    args: [orgId, Date.now(), skillId, owner],
+  });
+  return r.rowsAffected > 0;
 }
 
 function rowToSkill(row: Record<string, unknown>): Skill {
@@ -282,6 +325,7 @@ function rowToSkill(row: Record<string, unknown>): Skill {
     plan: JSON.parse(String(row.plan || "[]")) as SkillStep[],
     inputSchema: JSON.parse(String(row.input_schema || '{"fields":[]}')),
     allowedHosts: JSON.parse(String(row.allowed_hosts || "[]")) as string[],
+    orgId: row.org_id == null ? null : String(row.org_id),
     sourceDemoId: row.source_demo_id == null ? null : String(row.source_demo_id),
     published: Number(row.published) === 1,
     publishedAt: row.published_at == null ? null : Number(row.published_at),
