@@ -6,6 +6,7 @@ import { getSkill } from "@/lib/skills";
 import { startRun } from "@/lib/run-service";
 import { computeTier, getAemulusBalance } from "@/lib/solana";
 import { enforceRateLimit } from "@/lib/ratelimit";
+import { withIdempotency } from "@/lib/idempotency";
 import { readJson, RunBody } from "@/lib/validate";
 import type { Session } from "@/lib/siws";
 
@@ -62,8 +63,18 @@ export async function POST(req: Request) {
       );
     }
 
-    const run = await startRun({ skill, input: input ?? {}, runner: owner });
-    return NextResponse.json({ id: run.id, status: run.status });
+    // Idempotent: a retry with the same Idempotency-Key returns the original
+    // run instead of starting a second one.
+    const { status, body } = await withIdempotency(
+      owner,
+      "v1/runs",
+      req.headers.get("idempotency-key"),
+      async () => {
+        const run = await startRun({ skill, input: input ?? {}, runner: owner });
+        return { status: 200, body: { id: run.id, status: run.status } };
+      },
+    );
+    return NextResponse.json(body, { status });
   } catch (err) {
     logError("api/v1/runs", err);
     return NextResponse.json(

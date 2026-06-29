@@ -151,13 +151,26 @@ export const OPENAPI: OpenApiDoc = {
     "/api/v1/runs": {
       post: {
         summary: "Run a skill",
-        description: "Starts a run; returns immediately with status \"running\".",
+        description:
+          "Starts a run; returns immediately with status \"running\". Send an " +
+          "`Idempotency-Key` header to make retries safe — the same key returns " +
+          "the original run instead of starting a new one.",
+        parameters: [
+          {
+            name: "Idempotency-Key",
+            in: "header",
+            required: false,
+            schema: { type: "string", maxLength: 255 },
+            description: "Replay-safe key; identical retries return the first response.",
+          },
+        ],
         requestBody: { required: true, ...json(ref("RunRequest")) },
         responses: {
           200: { description: "Run started", ...json(ref("RunStarted")) },
           400: { description: "Invalid body", ...json(ref("Error")) },
           403: { description: "Insufficient $AEMU balance for access", ...json(ref("Error")) },
           404: { description: "Skill not found", ...json(ref("Error")) },
+          409: { description: "An identical Idempotency-Key request is in progress", ...json(ref("Error")) },
           429: { description: "Daily quota reached", ...json(ref("Error")) },
           ...ERR,
         },

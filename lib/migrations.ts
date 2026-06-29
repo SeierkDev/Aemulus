@@ -190,4 +190,21 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_earn_skill_runner ON earnings(skill_id, runner);`,
     ],
   },
+
+  // 11 — idempotency keys for mutating POSTs (at-most-once retries).
+  {
+    id: 11,
+    name: "idempotency_keys",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS idempotency_keys (
+         owner TEXT NOT NULL,
+         scope TEXT NOT NULL,
+         key TEXT NOT NULL,
+         status INTEGER,
+         body TEXT,
+         created_at INTEGER NOT NULL,
+         PRIMARY KEY (owner, scope, key)
+       );`,
+    ],
+  },
 ];

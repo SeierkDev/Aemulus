@@ -122,10 +122,18 @@ export class Aemulus {
     return body as T;
   }
 
-  /** Start a run; returns immediately with status "running". */
-  run(skillId: string, input: Record<string, string> = {}): Promise<Run> {
+  /** Start a run; returns immediately with status "running".
+   *  Pass `idempotencyKey` so a retry returns the same run instead of a new one. */
+  run(
+    skillId: string,
+    input: Record<string, string> = {},
+    opts: { idempotencyKey?: string } = {},
+  ): Promise<Run> {
     return this.call<Run>("/api/v1/runs", {
       method: "POST",
+      headers: opts.idempotencyKey
+        ? { "idempotency-key": opts.idempotencyKey }
+        : undefined,
       body: JSON.stringify({ skillId, input }),
     });
   }
@@ -158,11 +166,13 @@ export class Aemulus {
   async runAndWait(
     skillId: string,
     input: Record<string, string> = {},
-    opts: { timeoutMs?: number; intervalMs?: number } = {},
+    opts: { timeoutMs?: number; intervalMs?: number; idempotencyKey?: string } = {},
   ): Promise<Run> {
     const timeoutMs = opts.timeoutMs ?? 120_000;
     const intervalMs = opts.intervalMs ?? 1_500;
-    const started = this.run(skillId, input);
+    const started = this.run(skillId, input, {
+      idempotencyKey: opts.idempotencyKey,
+    });
     const { id } = await started;
     const deadline = Date.now() + timeoutMs;
     for (;;) {
