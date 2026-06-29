@@ -60,7 +60,15 @@ export default async function DevelopersPage() {
 
       {/* Endpoints overview */}
       <section className="py-12">
-        <Label>Endpoints</Label>
+        <div className="flex items-center justify-between">
+          <Label>Endpoints</Label>
+          <a
+            href="/api/openapi.json"
+            className="text-xs text-ink-2 hover:text-ink"
+          >
+            OpenAPI spec ↗
+          </a>
+        </div>
         <div className="mt-4 grid gap-2">
           {ENDPOINTS.map((e) => (
             <Card
@@ -216,6 +224,51 @@ const ok = sig && timingSafeEqual(Buffer.from(sig), Buffer.from(mac));
               Connect your wallet to register webhooks.
             </Card>
           )}
+        </div>
+      </section>
+
+      {/* Reference */}
+      <section className="border-t border-border py-12">
+        <Label>Reference</Label>
+        <div className="mt-4 grid gap-6 md:grid-cols-2">
+          <div>
+            <h3 className="text-sm font-semibold">Webhook events</h3>
+            <div className="mt-3 grid gap-2">
+              {[
+                ["run.completed", "A run finished successfully"],
+                ["run.needs_review", "A step needs human input"],
+                ["run.failed", "A run errored out"],
+              ].map(([ev, desc]) => (
+                <Card key={ev} className="flex items-center gap-3 p-3 text-sm">
+                  <span className="mono shrink-0 text-ink">{ev}</span>
+                  <span className="text-xs text-ink-3">{desc}</span>
+                </Card>
+              ))}
+            </div>
+            <p className="mt-3 text-xs text-ink-3">
+              Payload:{" "}
+              <span className="mono">
+                {"{ event, runId, skillId, status, output, receiptHash, at }"}
+              </span>
+            </p>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold">Status codes</h3>
+            <div className="mt-3 grid gap-2">
+              {[
+                ["200", "OK"],
+                ["400", "Invalid request body"],
+                ["401", "Missing or invalid API key"],
+                ["404", "Skill / run / batch not found"],
+                ["429", "Rate limit or daily quota reached"],
+              ].map(([code, desc]) => (
+                <Card key={code} className="flex items-center gap-3 p-3 text-sm">
+                  <span className="mono w-10 shrink-0 text-ink">{code}</span>
+                  <span className="text-xs text-ink-3">{desc}</span>
+                </Card>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
