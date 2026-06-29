@@ -56,7 +56,7 @@ describe("Aemulus SDK", () => {
 
   it("runAndWait() polls until terminal", async () => {
     let getCalls = 0;
-    mockFetch(({ url, init }) => {
+    mockFetch(({ init }) => {
       if (init.method === "POST") return { body: { id: "run_9", status: "running" } };
       getCalls++;
       return { body: { id: "run_9", status: getCalls < 2 ? "running" : "completed", output: { x: "1" } } };

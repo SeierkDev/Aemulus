@@ -131,6 +131,36 @@ console.log(v.batch?.proofValid);  // true`}
         </div>
       </section>
 
+      {/* MCP */}
+      <section className="border-t border-border py-12">
+        <Label>MCP server</Label>
+        <h2 className="mt-3 text-2xl font-semibold tracking-tight">
+          Give your agent verifiable hands
+        </h2>
+        <p className="mt-2 max-w-2xl text-sm text-ink-2">
+          Aemulus is a Model Context Protocol server — point any MCP client
+          (Claude, your agent) at it and the marketplace becomes callable tools:{" "}
+          <span className="mono">list_skills</span>,{" "}
+          <span className="mono">run_skill</span>,{" "}
+          <span className="mono">get_run</span>,{" "}
+          <span className="mono">verify_receipt</span>. The agent runs real
+          browser tasks and gets back proof.
+        </p>
+        <div className="mt-6">
+          <CodeBlock
+            title="MCP client config"
+            code={`{
+  "mcpServers": {
+    "aemulus": {
+      "url": "https://aemulus.app/api/mcp",
+      "headers": { "Authorization": "Bearer aem_live_…" }
+    }
+  }
+}`}
+          />
+        </div>
+      </section>
+
       {/* Keys */}
       <section className="border-t border-border py-12">
         <Label>Authentication</Label>
