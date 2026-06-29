@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
 import { getSkill } from "@/lib/skills";
-import { createSchedule } from "@/lib/schedules";
+import {
+  createSchedule,
+  countActiveSchedules,
+  MAX_ACTIVE_SCHEDULES,
+} from "@/lib/schedules";
 import { readJson, ScheduleCreateBody } from "@/lib/validate";
 
 export const runtime = "nodejs";
@@ -20,6 +24,13 @@ export async function POST(req: Request) {
   const skill = await getSkill(skillId);
   if (!skill || (skill.owner !== session.pubkey && !skill.published)) {
     return NextResponse.json({ error: "Skill not found" }, { status: 404 });
+  }
+
+  if ((await countActiveSchedules(session.pubkey)) >= MAX_ACTIVE_SCHEDULES) {
+    return NextResponse.json(
+      { error: `Schedule limit reached (max ${MAX_ACTIVE_SCHEDULES}).` },
+      { status: 409 },
+    );
   }
 
   const id = await createSchedule({

@@ -16,7 +16,8 @@ export async function creditEarning(input: {
   amount: number;
 }): Promise<void> {
   await ready();
-  if (!input.owner || input.amount <= 0) return;
+  // Reject non-finite/non-positive amounts so a bad value can't poison SUM().
+  if (!input.owner || !Number.isFinite(input.amount) || input.amount <= 0) return;
   await db.execute({
     sql: `INSERT INTO earnings (id, owner, skill_id, run_id, runner, amount, created_at)
           VALUES (?, ?, ?, ?, ?, ?, ?)`,

@@ -81,6 +81,19 @@ export async function createSchedule(input: {
   return sid;
 }
 
+/** Cap on active schedules per owner — bounds scheduler load / quota churn. */
+export const MAX_ACTIVE_SCHEDULES = 25;
+
+/** How many active (running) schedules an owner currently has. */
+export async function countActiveSchedules(owner: string): Promise<number> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT COUNT(*) AS n FROM schedules WHERE owner = ? AND active = 1`,
+    args: [owner],
+  });
+  return Number(r.rows[0]?.n ?? 0);
+}
+
 export async function listSchedules(owner: string): Promise<Schedule[]> {
   await ready();
   const r = await db.execute({

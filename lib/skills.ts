@@ -186,8 +186,10 @@ export async function restoreSkillVersion(
   await updateSkill(skillId, {
     name: String(row.name),
     description: row.description == null ? "" : String(row.description),
-    plan: JSON.parse(String(row.plan)),
-    inputSchema: JSON.parse(String(row.input_schema)),
+    // Defensive fallbacks (mirror rowToSkill) so a NULL/corrupt snapshot column
+    // can't throw an uncaught 500 out of a restore.
+    plan: JSON.parse(String(row.plan || "[]")),
+    inputSchema: JSON.parse(String(row.input_schema || '{"fields":[]}')),
   });
   return true;
 }

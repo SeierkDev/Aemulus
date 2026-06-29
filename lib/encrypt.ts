@@ -34,7 +34,10 @@ export function decryptJSON<T>(stored: string | null | undefined, fallback: T): 
     // Legacy plaintext (or seeded data).
     try {
       return JSON.parse(stored) as T;
-    } catch {
+    } catch (e) {
+      // Unprefixed but unparseable — likely corrupted (or a stripped-prefix
+      // ciphertext). Don't fail silently; a scheduled run would use empty input.
+      logError("encrypt.legacy-parse", e);
       return fallback;
     }
   }

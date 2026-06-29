@@ -17,6 +17,15 @@ describe("parseCsv", () => {
       ["1", "2"],
     ]);
   });
+
+  it("strips a leading UTF-8 BOM so the first header maps (Excel CSV)", () => {
+    const { rows, missing } = csvToRows("﻿vendor,amount\nAcme,10", [
+      "vendor",
+      "amount",
+    ]);
+    expect(missing).toEqual([]);
+    expect(rows[0]).toEqual({ vendor: "Acme", amount: "10" });
+  });
 });
 
 describe("csvToRows", () => {

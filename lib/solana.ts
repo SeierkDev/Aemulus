@@ -14,14 +14,27 @@ function num(name: string, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+/** A balance threshold — clamped non-negative so a misconfigured negative
+ *  value can't grant access to a zero-balance wallet while gating is on. */
+function minNum(name: string, fallback: number): number {
+  return Math.max(0, num(name, fallback));
+}
+
+/** The run fee accrues to a ledger summed across runs — must be a
+ *  non-negative integer to stay exact through claim → base-unit payout. */
+function intNum(name: string, fallback: number): number {
+  const n = num(name, fallback);
+  return Number.isInteger(n) && n >= 0 ? n : fallback;
+}
+
 export const SOLANA = {
   /** The $AEMU SPL mint. Empty until the pump.fun launch. */
   mint: process.env.AEMULUS_MINT ?? "",
   rpcUrl: process.env.SOLANA_RPC_URL ?? "https://api.mainnet-beta.solana.com",
   /** Minimum balance for access, and the higher tier cutoffs (tunable). */
-  holderMin: num("AEMULUS_MIN_BALANCE", 1),
-  proMin: num("AEMULUS_PRO_BALANCE", 1_000_000),
-  whaleMin: num("AEMULUS_WHALE_BALANCE", 10_000_000),
+  holderMin: minNum("AEMULUS_MIN_BALANCE", 1),
+  proMin: minNum("AEMULUS_PRO_BALANCE", 1_000_000),
+  whaleMin: minNum("AEMULUS_WHALE_BALANCE", 10_000_000),
   /** Public pump.fun link shown on the gated screen (set after launch). */
   pumpUrl: process.env.AEMULUS_PUMP_URL ?? "https://pump.fun",
   /** Social links for the footer (set when live). */
@@ -32,7 +45,7 @@ export const SOLANA = {
   quotaPro: num("AEMULUS_QUOTA_PRO", 50),
   quotaWhale: num("AEMULUS_QUOTA_WHALE", -1),
   /** $AEMU credited to a creator each time someone else runs their skill. */
-  runFee: num("AEMULUS_RUN_FEE", 10),
+  runFee: intNum("AEMULUS_RUN_FEE", 10),
 };
 
 /** Daily run limit for an access level (Whale/Open = level 3). <0 = unlimited. */

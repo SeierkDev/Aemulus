@@ -60,7 +60,7 @@ export interface Verification {
       sig: string;
       cluster: string;
       url: string;
-      memoMatches: boolean;
+      memoMatches: boolean | null; // null = chain unreachable (unknown), not "no match"
     } | null;
   };
 }

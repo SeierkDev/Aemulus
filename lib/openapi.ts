@@ -131,7 +131,7 @@ export const OPENAPI: OpenApiDoc = {
                   sig: { type: "string" },
                   cluster: { type: "string" },
                   url: { type: "string" },
-                  memoMatches: { type: "boolean" },
+                  memoMatches: { type: "boolean", nullable: true },
                 },
               },
             },

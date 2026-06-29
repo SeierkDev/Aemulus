@@ -228,9 +228,12 @@ async function checkOnChainMemo(
     const rpc =
       process.env.AEMULUS_RECEIPT_RPC || clusterApiUrl(cluster as never);
     const conn = new Connection(rpc, "confirmed");
-    const tx = await conn.getParsedTransaction(sig, {
-      maxSupportedTransactionVersion: 0,
-    });
+    // Bound the RPC round-trip — this runs in the public verify page's render
+    // path; a slow/unreachable RPC must degrade to "unknown" (null), not hang.
+    const tx = await Promise.race([
+      conn.getParsedTransaction(sig, { maxSupportedTransactionVersion: 0 }),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
+    ]);
     if (!tx) return null;
     const logs = tx.meta?.logMessages ?? [];
     return logs.some((l) => l.includes(hash));
