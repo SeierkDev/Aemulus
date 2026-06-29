@@ -4,7 +4,7 @@ import { Nav } from "@/components/Nav";
 import { Dashboard } from "@/components/home/Dashboard";
 import { PopularSkills } from "@/components/home/PopularSkills";
 import { Marketing } from "@/components/home/Marketing";
-import { HeroBackdrop } from "@/components/home/HeroBackdrop";
+import { CodeBackdrop } from "@/components/CodeBackdrop";
 import { listSkills, listPublishedSkills } from "@/lib/skills";
 import { listRuns } from "@/lib/runs";
 import { getReputationBatch } from "@/lib/reputation";
@@ -23,19 +23,20 @@ export default async function Home() {
   const popularRep = await getReputationBatch(popular.map((s) => s.id));
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6">
-      <Nav />
+    <>
+      <CodeBackdrop />
+      <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col px-6">
+        <Nav />
 
       {/* Hero */}
-      <section className="relative isolate flex flex-col items-center gap-6 overflow-hidden border-t border-border pt-24 pb-20 text-center">
-        <HeroBackdrop />
+      <section className="flex flex-col items-center gap-6 border-t border-border pt-24 pb-20 text-center">
         <Badge>
           <span className="h-1.5 w-1.5 rounded-full bg-ink" />
           Show it once. It does the rest.
         </Badge>
         <h1 className="mx-auto max-w-3xl text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
           Automate any browser task by{" "}
-          <span className="aem-shimmer">demonstrating</span> it — not coding it.
+          <span className="text-ink-2">demonstrating</span> it — not coding it.
         </h1>
         <p className="mx-auto max-w-xl text-lg leading-relaxed text-ink-2">
           Aemulus watches you do a repetitive task once, learns the intent, and
@@ -54,9 +55,10 @@ export default async function Home() {
         </div>
       </section>
 
-      {hasData && <Dashboard skills={skills} runs={runs} />}
-      <PopularSkills skills={popular} rep={popularRep} />
-      <Marketing />
-    </div>
+        {hasData && <Dashboard skills={skills} runs={runs} />}
+        <PopularSkills skills={popular} rep={popularRep} />
+        <Marketing />
+      </div>
+    </>
   );
 }
