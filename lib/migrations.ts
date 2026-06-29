@@ -217,4 +217,13 @@ export const MIGRATIONS: Migration[] = [
       { table: "webhooks", column: "last_error", def: "TEXT" },
     ],
   },
+
+  // 13 — API-key scopes (read | run). Existing keys default to full access.
+  {
+    id: 13,
+    name: "api_key_scopes",
+    addColumns: [
+      { table: "api_keys", column: "scopes", def: "TEXT NOT NULL DEFAULT 'read,run'" },
+    ],
+  },
 ];

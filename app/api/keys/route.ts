@@ -28,6 +28,7 @@ export async function POST(req: Request) {
     const { key, meta } = await createApiKey(
       session.pubkey,
       parsed.data.name ?? "API key",
+      parsed.data.scopes,
     );
     return NextResponse.json({ key, meta });
   } catch (err) {

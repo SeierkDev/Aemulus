@@ -166,6 +166,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
   name         TEXT NOT NULL,
   key_hash     TEXT NOT NULL,   -- sha256 of the raw key (raw shown once)
   prefix       TEXT NOT NULL,   -- display hint, e.g. "aem_live_AbCd…"
+  scopes       TEXT NOT NULL DEFAULT 'read,run',  -- comma-sep: read | run
   created_at   INTEGER NOT NULL,
   last_used_at INTEGER,
   revoked      INTEGER NOT NULL DEFAULT 0

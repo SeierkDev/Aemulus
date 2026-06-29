@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { apiKeyOwner } from "@/lib/api-keys";
+import { apiKeyAuth, hasScope } from "@/lib/api-keys";
 import { listPublishedSkillsPage, categorize } from "@/lib/skills";
 import { decodeCursor, parseLimit } from "@/lib/pagination";
 
@@ -8,12 +8,15 @@ export const dynamic = "force-dynamic";
 
 /** Public API: the published skill catalog. Cursor-paginated: ?limit&cursor. */
 export async function GET(req: Request) {
-  const owner = await apiKeyOwner(req);
-  if (!owner) {
+  const auth = await apiKeyAuth(req);
+  if (!auth) {
     return NextResponse.json(
       { error: "Invalid or missing API key" },
       { status: 401 },
     );
+  }
+  if (!hasScope(auth.scopes, "read")) {
+    return NextResponse.json({ error: "API key lacks 'read' scope" }, { status: 403 });
   }
   const url = new URL(req.url);
   const limit = parseLimit(url.searchParams.get("limit"));

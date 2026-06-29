@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { apiKeyOwner } from "@/lib/api-keys";
+import { apiKeyAuth, hasScope } from "@/lib/api-keys";
 import { logError } from "@/lib/log";
 import { getQuota } from "@/lib/quota";
 import { getSkill } from "@/lib/skills";
 import { startRun } from "@/lib/run-service";
 import { computeTier, getAemulusBalance } from "@/lib/solana";
-import { enforceRateLimit } from "@/lib/ratelimit";
+import { rateLimit } from "@/lib/ratelimit";
 import { withIdempotency } from "@/lib/idempotency";
 import { listRunsPage } from "@/lib/runs";
 import { decodeCursor, parseLimit } from "@/lib/pagination";
@@ -19,13 +19,17 @@ const RUNS_PER_MIN = Math.max(1, Number(process.env.AEMULUS_RUNS_PER_MIN) || 10)
 
 /** Public API: list the caller's runs (newest first). Cursor-paginated. */
 export async function GET(req: Request) {
-  const owner = await apiKeyOwner(req);
-  if (!owner) {
+  const auth = await apiKeyAuth(req);
+  if (!auth) {
     return NextResponse.json(
       { error: "Invalid or missing API key" },
       { status: 401 },
     );
   }
+  if (!hasScope(auth.scopes, "read")) {
+    return NextResponse.json({ error: "API key lacks 'read' scope" }, { status: 403 });
+  }
+  const owner = auth.owner;
   const url = new URL(req.url);
   const limit = parseLimit(url.searchParams.get("limit"));
   const cursor = decodeCursor(url.searchParams.get("cursor"));
@@ -46,20 +50,39 @@ export async function GET(req: Request) {
 /** Public API: run a skill. Auth: `Authorization: Bearer aem_live_…`. */
 export async function POST(req: Request) {
   try {
-    const owner = await apiKeyOwner(req);
-    if (!owner) {
+    const auth = await apiKeyAuth(req);
+    if (!auth) {
       return NextResponse.json(
         { error: "Invalid or missing API key" },
         { status: 401 },
       );
     }
-    const limited = enforceRateLimit(
-      `run:${owner}`,
-      RUNS_PER_MIN,
-      60_000,
-      `Too many runs (limit ${RUNS_PER_MIN}/min)`,
-    );
-    if (limited) return limited;
+    const owner = auth.owner;
+    if (!hasScope(auth.scopes, "run")) {
+      return NextResponse.json({ error: "API key lacks 'run' scope" }, { status: 403 });
+    }
+
+    // Rate limit + advertise the budget via standard headers.
+    const rl = rateLimit(`run:${owner}`, RUNS_PER_MIN, 60_000);
+    const rlHeaders: Record<string, string> = {
+      "X-RateLimit-Limit": String(RUNS_PER_MIN),
+      "X-RateLimit-Remaining": String(rl.remaining),
+      "X-RateLimit-Reset": String(
+        Math.ceil((Date.now() + (rl.ok ? 60_000 : rl.retryAfterMs)) / 1000),
+      ),
+    };
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: `Too many runs (limit ${RUNS_PER_MIN}/min)` },
+        {
+          status: 429,
+          headers: {
+            ...rlHeaders,
+            "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)),
+          },
+        },
+      );
+    }
 
     const parsed = await readJson(req, RunBody);
     if (!parsed.ok) return parsed.res;
@@ -87,7 +110,7 @@ export async function POST(req: Request) {
     if (!quota.ok) {
       return NextResponse.json(
         { error: `Daily run limit reached (${quota.limit}/24h on ${quota.tier}).` },
-        { status: 429 },
+        { status: 429, headers: rlHeaders },
       );
     }
 
@@ -102,7 +125,7 @@ export async function POST(req: Request) {
         return { status: 200, body: { id: run.id, status: run.status } };
       },
     );
-    return NextResponse.json(body, { status });
+    return NextResponse.json(body, { status, headers: rlHeaders });
   } catch (err) {
     logError("api/v1/runs", err);
     return NextResponse.json(

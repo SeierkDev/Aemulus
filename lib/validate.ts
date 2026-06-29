@@ -78,7 +78,10 @@ export const PublishBody = z.object({ published: z.boolean() });
 
 export const RestoreBody = z.object({ version: z.number().int().positive() });
 
-export const ApiKeyBody = z.object({ name: z.string().max(80).optional() });
+export const ApiKeyBody = z.object({
+  name: z.string().max(80).optional(),
+  scopes: z.array(z.enum(["read", "run"])).max(2).optional(),
+});
 
 export const WebhookBody = z.object({ url: z.string().url().max(2000) });
 

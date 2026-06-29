@@ -6,6 +6,7 @@ import {
   revokeApiKey,
   authApiKey,
   apiKeyOwner,
+  hasScope,
 } from "../../lib/api-keys";
 
 const OWNER = "WALLET_API";
@@ -19,11 +20,12 @@ describe("api keys", () => {
     const { key, meta } = await createApiKey(OWNER, "ci");
     expect(key.startsWith("aem_live_")).toBe(true);
     expect(meta.prefix.endsWith("…")).toBe(true);
+    expect(meta.scopes).toEqual(["read", "run"]); // default full access
 
     const keys = await listApiKeys(OWNER);
     expect(keys.find((k) => k.id === meta.id)).toBeTruthy();
 
-    expect(await authApiKey(key)).toBe(OWNER);
+    expect((await authApiKey(key))?.owner).toBe(OWNER);
     // via a Bearer request header
     const req = new Request("http://x", {
       headers: { authorization: `Bearer ${key}` },
@@ -39,7 +41,7 @@ describe("api keys", () => {
 
   it("revoked keys stop authenticating and leave the list", async () => {
     const { key, meta } = await createApiKey(OWNER, "temp");
-    expect(await authApiKey(key)).toBe(OWNER);
+    expect((await authApiKey(key))?.owner).toBe(OWNER);
     expect(await revokeApiKey(meta.id, OWNER)).toBe(true);
     expect(await authApiKey(key)).toBeNull();
     expect((await listApiKeys(OWNER)).find((k) => k.id === meta.id)).toBeUndefined();
@@ -48,6 +50,19 @@ describe("api keys", () => {
   it("won't revoke another wallet's key", async () => {
     const { key, meta } = await createApiKey(OWNER, "mine");
     expect(await revokeApiKey(meta.id, "SOMEONE_ELSE")).toBe(false);
-    expect(await authApiKey(key)).toBe(OWNER); // still valid
+    expect((await authApiKey(key))?.owner).toBe(OWNER); // still valid
+  });
+
+  it("honors scopes: read-only key can't run; 'run' implies 'read'", async () => {
+    const ro = await createApiKey(OWNER, "ro", ["read"]);
+    expect(ro.meta.scopes).toEqual(["read"]);
+    const auth = await authApiKey(ro.key);
+    expect(hasScope(auth!.scopes, "read")).toBe(true);
+    expect(hasScope(auth!.scopes, "run")).toBe(false);
+
+    // requesting only "run" still grants "read" (run implies read)
+    const runOnly = await createApiKey(OWNER, "run", ["run"]);
+    expect(runOnly.meta.scopes).toEqual(["read", "run"]);
+    expect(hasScope(runOnly.meta.scopes, "read")).toBe(true);
   });
 });

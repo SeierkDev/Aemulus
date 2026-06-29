@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { apiKeyOwner } from "@/lib/api-keys";
+import { apiKeyAuth } from "@/lib/api-keys";
 import { handleMcp } from "@/lib/mcp";
 import { logError } from "@/lib/log";
 
@@ -12,13 +12,14 @@ export const maxDuration = 60;
  * 202 for notifications). Auth: Authorization: Bearer aem_live_…
  */
 export async function POST(req: Request) {
-  const owner = await apiKeyOwner(req);
-  if (!owner) {
+  const auth = await apiKeyAuth(req);
+  if (!auth) {
     return NextResponse.json(
       { jsonrpc: "2.0", id: null, error: { code: -32001, message: "Unauthorized" } },
       { status: 401 },
     );
   }
+  const { owner, scopes } = auth;
   try {
     const body = await req.json();
     if (Array.isArray(body)) {
@@ -28,12 +29,12 @@ export async function POST(req: Request) {
           { status: 400 },
         );
       }
-      const out = (await Promise.all(body.map((m) => handleMcp(owner, m)))).filter(
-        Boolean,
-      );
+      const out = (
+        await Promise.all(body.map((m) => handleMcp(owner, m, scopes)))
+      ).filter(Boolean);
       return out.length ? NextResponse.json(out) : new NextResponse(null, { status: 202 });
     }
-    const res = await handleMcp(owner, body);
+    const res = await handleMcp(owner, body, scopes);
     if (!res) return new NextResponse(null, { status: 202 }); // notification
     return NextResponse.json(res);
   } catch (err) {

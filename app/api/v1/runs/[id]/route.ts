@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { apiKeyOwner } from "@/lib/api-keys";
+import { apiKeyAuth, hasScope } from "@/lib/api-keys";
 import { getRun } from "@/lib/runs";
 
 export const runtime = "nodejs";
@@ -10,13 +10,17 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const owner = await apiKeyOwner(req);
-  if (!owner) {
+  const auth = await apiKeyAuth(req);
+  if (!auth) {
     return NextResponse.json(
       { error: "Invalid or missing API key" },
       { status: 401 },
     );
   }
+  if (!hasScope(auth.scopes, "read")) {
+    return NextResponse.json({ error: "API key lacks 'read' scope" }, { status: 403 });
+  }
+  const owner = auth.owner;
   const { id } = await params;
   const run = await getRun(id);
   if (!run || run.owner !== owner) {

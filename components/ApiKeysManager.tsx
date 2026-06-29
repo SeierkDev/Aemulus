@@ -11,6 +11,7 @@ export function ApiKeysManager({ initial }: { initial: ApiKeyMeta[] }) {
   const [fresh, setFresh] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [canRun, setCanRun] = useState(true);
 
   async function create() {
     setBusy(true);
@@ -18,7 +19,10 @@ export function ApiKeysManager({ initial }: { initial: ApiKeyMeta[] }) {
       const r = await fetch("/api/keys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: "API key" }),
+        body: JSON.stringify({
+          name: "API key",
+          scopes: canRun ? ["read", "run"] : ["read"],
+        }),
       });
       const d = await r.json();
       if (r.ok) {
@@ -38,11 +42,22 @@ export function ApiKeysManager({ initial }: { initial: ApiKeyMeta[] }) {
 
   return (
     <div className="grid gap-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <Label>Your API keys</Label>
-        <Button variant="primary" onClick={create} disabled={busy}>
-          {busy ? "Creating…" : "Create key"}
-        </Button>
+        <div className="flex items-center gap-3">
+          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-ink-2">
+            <input
+              type="checkbox"
+              checked={canRun}
+              onChange={(e) => setCanRun(e.target.checked)}
+              aria-label="Allow this key to start runs"
+            />
+            can run
+          </label>
+          <Button variant="primary" onClick={create} disabled={busy}>
+            {busy ? "Creating…" : "Create key"}
+          </Button>
+        </div>
       </div>
 
       {fresh && (
@@ -80,7 +95,7 @@ export function ApiKeysManager({ initial }: { initial: ApiKeyMeta[] }) {
               <div className="min-w-0">
                 <div className="mono truncate text-sm">{k.prefix}</div>
                 <div className="mt-0.5 text-xs text-ink-3" suppressHydrationWarning>
-                  {k.name} · created {when(k.createdAt)}
+                  {k.name} · {k.scopes.join("+")} · created {when(k.createdAt)}
                   {k.lastUsedAt ? ` · last used ${when(k.lastUsedAt)}` : " · never used"}
                 </div>
               </div>

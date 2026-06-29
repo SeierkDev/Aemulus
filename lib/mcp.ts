@@ -5,6 +5,7 @@ import { getQuota } from "./quota";
 import { computeTier, getAemulusBalance } from "./solana";
 import { verifyReceipt } from "./receipt";
 import { rateLimit } from "./ratelimit";
+import { hasScope, type Scope } from "./api-keys";
 import type { Session } from "./siws";
 
 const RUNS_PER_MIN = Math.max(1, Number(process.env.AEMULUS_RUNS_PER_MIN) || 10);
@@ -85,6 +86,7 @@ async function callTool(
   owner: string,
   name: string,
   args: Record<string, unknown>,
+  scopes: Scope[],
 ): Promise<unknown> {
   switch (name) {
     case "list_skills": {
@@ -100,6 +102,9 @@ async function callTool(
       });
     }
     case "run_skill": {
+      if (!hasScope(scopes, "run")) {
+        return textResult("API key lacks 'run' scope.", true);
+      }
       const skillId = String(args.skillId ?? "");
       const input =
         args.input && typeof args.input === "object"
@@ -158,6 +163,7 @@ async function callTool(
 export async function handleMcp(
   owner: string,
   msg: JsonRpc,
+  scopes: Scope[] = ["read", "run"],
 ): Promise<object | null> {
   if (!msg || typeof msg !== "object" || typeof msg.method !== "string") {
     return rpcErr(null, -32600, "Invalid Request");
@@ -176,7 +182,7 @@ export async function handleMcp(
       const name = String(params?.name ?? "");
       const args = (params?.arguments as Record<string, unknown>) ?? {};
       try {
-        return ok(id, await callTool(owner, name, args));
+        return ok(id, await callTool(owner, name, args, scopes));
       } catch (e) {
         return ok(id, textResult(e instanceof Error ? e.message : "Tool failed", true));
       }
