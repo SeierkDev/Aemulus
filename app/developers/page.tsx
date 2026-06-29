@@ -101,6 +101,36 @@ export default async function DevelopersPage() {
         </div>
       </section>
 
+      {/* SDK */}
+      <section className="border-t border-border py-12">
+        <Label>TypeScript SDK</Label>
+        <h2 className="mt-3 text-2xl font-semibold tracking-tight">
+          Or skip the curl
+        </h2>
+        <p className="mt-2 max-w-2xl text-sm text-ink-2">
+          A tiny, dependency-free client lives in the Aemulus repo (
+          <span className="mono">sdk/</span>). Works anywhere{" "}
+          <span className="mono">fetch</span> does — Node, browsers, Deno, edge.
+        </p>
+        <div className="mt-6">
+          <CodeBlock
+            title="sdk/ — run, read output, verify"
+            code={`import { Aemulus } from "aemulus/sdk";
+
+const aemulus = new Aemulus({ apiKey: process.env.AEMULUS_KEY! });
+
+// run across one input — or loop a CSV for the next hundred
+const run = await aemulus.runAndWait("skl_…", { vendor: "Acme", amount: "1499" });
+console.log(run.status);   // "completed"
+console.log(run.output);   // { total: "$42.00" }
+
+// anyone can verify the receipt — no key
+const v = await aemulus.verify(run.id);
+console.log(v.batch?.proofValid);  // true`}
+          />
+        </div>
+      </section>
+
       {/* Keys */}
       <section className="border-t border-border py-12">
         <Label>Authentication</Label>
