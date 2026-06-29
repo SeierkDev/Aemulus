@@ -209,10 +209,13 @@ console.log(v.batch?.proofValid);  // true`}
             title="Verify the signature (Node)"
             code={`import { createHmac, timingSafeEqual } from "node:crypto";
 
-const sig = req.headers["x-aemulus-signature"];        // "sha256=…"
-const mac = "sha256=" + createHmac("sha256", WHSEC)
-  .update(rawBody).digest("hex");
-const ok = sig && timingSafeEqual(Buffer.from(sig), Buffer.from(mac));
+// header: "t=<unix>,sha256=<hex>"  — signed payload is \`\${t}.\${rawBody}\`
+const [tPart, sigPart] = req.headers["x-aemulus-signature"].split(",");
+const t = tPart.slice(2), sig = sigPart.slice(7);
+// reject stale/replayed deliveries (5-min tolerance)
+if (Math.abs(Date.now() / 1000 - Number(t)) > 300) throw new Error("stale");
+const mac = createHmac("sha256", WHSEC).update(t + "." + rawBody).digest("hex");
+const ok = timingSafeEqual(Buffer.from(sig), Buffer.from(mac));
 // body → { event, runId, status, output, receiptHash, at }`}
           />
         </div>

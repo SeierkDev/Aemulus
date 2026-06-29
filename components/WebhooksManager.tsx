@@ -29,7 +29,16 @@ export function WebhooksManager({ initial }: { initial: WebhookMeta[] }) {
       if (!r.ok) throw new Error(d.error || "Failed");
       setSecret(d.secret);
       setHooks((h) => [
-        { id: d.id, url, active: true, lastStatus: null, lastAt: null, createdAt: Date.now() },
+        {
+          id: d.id,
+          url,
+          active: true,
+          lastStatus: null,
+          lastAt: null,
+          lastAttempts: null,
+          lastError: null,
+          createdAt: Date.now(),
+        },
         ...h,
       ]);
       setUrl("");
@@ -78,7 +87,13 @@ export function WebhooksManager({ initial }: { initial: WebhookMeta[] }) {
                 <div className="mono truncate text-sm">{h.url}</div>
                 <div className="mt-0.5 text-xs text-ink-3" suppressHydrationWarning>
                   {h.lastAt
-                    ? `last delivery ${h.lastStatus ?? "—"} · ${when(h.lastAt)}`
+                    ? `last delivery ${h.lastStatus || "failed"}${
+                        h.lastAttempts && h.lastAttempts > 1
+                          ? ` (${h.lastAttempts} attempts)`
+                          : ""
+                      } · ${when(h.lastAt)}${
+                        h.lastError ? ` · ${h.lastError}` : ""
+                      }`
                     : "no deliveries yet"}
                 </div>
               </div>

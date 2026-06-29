@@ -207,4 +207,14 @@ export const MIGRATIONS: Migration[] = [
        );`,
     ],
   },
+
+  // 12 — webhook delivery visibility: attempts + last error per delivery.
+  {
+    id: 12,
+    name: "webhook_delivery_meta",
+    addColumns: [
+      { table: "webhooks", column: "last_attempts", def: "INTEGER" },
+      { table: "webhooks", column: "last_error", def: "TEXT" },
+    ],
+  },
 ];

@@ -19,13 +19,25 @@ export interface WebhookMeta {
   active: boolean;
   lastStatus: number | null;
   lastAt: number | null;
+  lastAttempts: number | null;
+  lastError: string | null;
   createdAt: number;
 }
 
 export type RunEvent = "run.completed" | "run.needs_review" | "run.failed";
 
-function sign(secret: string, body: string): string {
-  return `sha256=${createHmac("sha256", secret).update(body).digest("hex")}`;
+const MAX_ATTEMPTS = 3;
+const BACKOFF_MS = [0, 800, 2500]; // delay before attempt i
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Timestamped HMAC signature (Stripe-style): the signed payload is
+ * `${t}.${body}`, so a receiver can reject a stale/replayed delivery by checking
+ * `t` is recent before comparing the HMAC. Header: `t=<unix>,sha256=<hex>`.
+ */
+function sign(secret: string, ts: number, body: string): string {
+  const mac = createHmac("sha256", secret).update(`${ts}.${body}`).digest("hex");
+  return `t=${ts},sha256=${mac}`;
 }
 
 /** Create a webhook. Throws (via assertSafeUrl) if the URL is unsafe/private. */
@@ -48,8 +60,8 @@ export async function createWebhook(
 export async function listWebhooks(owner: string): Promise<WebhookMeta[]> {
   await ready();
   const r = await db.execute({
-    sql: `SELECT id, url, active, last_status, last_at, created_at FROM webhooks
-          WHERE owner = ? ORDER BY created_at DESC`,
+    sql: `SELECT id, url, active, last_status, last_at, last_attempts, last_error, created_at
+          FROM webhooks WHERE owner = ? ORDER BY created_at DESC`,
     args: [owner],
   });
   return r.rows.map((x) => ({
@@ -58,6 +70,8 @@ export async function listWebhooks(owner: string): Promise<WebhookMeta[]> {
     active: Number(x.active) === 1,
     lastStatus: x.last_status == null ? null : Number(x.last_status),
     lastAt: x.last_at == null ? null : Number(x.last_at),
+    lastAttempts: x.last_attempts == null ? null : Number(x.last_attempts),
+    lastError: x.last_error == null ? null : String(x.last_error),
     createdAt: Number(x.created_at),
   }));
 }
@@ -87,34 +101,50 @@ export async function dispatchRunEvent(
   });
   if (r.rows.length === 0) return;
   const body = JSON.stringify({ event, ...payload });
+  // One timestamp/signature per delivery — reused across retries so a receiver's
+  // replay window doesn't reject a legitimate retry.
+  const ts = Math.floor(Date.now() / 1000);
 
   for (const w of r.rows) {
     const url = String(w.url);
+    const signature = sign(String(w.secret), ts, body);
     let status = 0;
-    try {
-      await assertSafeUrl(url); // re-check: host could resolve private now
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-aemulus-event": event,
-          "x-aemulus-signature": sign(String(w.secret), body),
-        },
-        body,
-        // Never follow redirects — a 3xx to an internal host would bypass the
-        // SSRF guard, which only validated the original URL.
-        redirect: "error",
-        signal: AbortSignal.timeout(8000),
-      });
-      status = res.status;
-    } catch (e) {
-      logError("webhook.deliver", e, { url });
+    let lastError: string | null = null;
+    let attempts = 0;
+
+    for (let i = 0; i < MAX_ATTEMPTS; i++) {
+      if (BACKOFF_MS[i]) await sleep(BACKOFF_MS[i]);
+      attempts = i + 1;
+      try {
+        await assertSafeUrl(url); // re-check: host could resolve private now
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-aemulus-event": event,
+            "x-aemulus-signature": signature,
+          },
+          body,
+          // Never follow redirects — a 3xx to an internal host would bypass the
+          // SSRF guard, which only validated the original URL.
+          redirect: "error",
+          signal: AbortSignal.timeout(8000),
+        });
+        status = res.status;
+        lastError = status >= 200 && status < 300 ? null : `HTTP ${status}`;
+      } catch (e) {
+        status = 0;
+        lastError = e instanceof Error ? e.message : "delivery failed";
+        logError("webhook.deliver", e, { url, attempt: attempts });
+      }
+      if (status >= 200 && status < 300) break; // delivered — stop retrying
     }
+
     incr(status >= 200 && status < 300 ? "webhooks.delivered" : "webhooks.failed");
     await db
       .execute({
-        sql: `UPDATE webhooks SET last_status = ?, last_at = ? WHERE id = ?`,
-        args: [status, Date.now(), String(w.id)],
+        sql: `UPDATE webhooks SET last_status = ?, last_at = ?, last_attempts = ?, last_error = ? WHERE id = ?`,
+        args: [status, Date.now(), attempts, lastError, String(w.id)],
       })
       .catch(() => {});
   }

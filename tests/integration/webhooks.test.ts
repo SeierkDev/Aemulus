@@ -49,9 +49,34 @@ describe("webhooks", () => {
     expect(captured).not.toBeNull();
     const { headers, body } = captured!;
     expect(headers["x-aemulus-event"]).toBe("run.completed");
+    // Timestamped signature: "t=<unix>,sha256=<hmac over `${t}.${body}`>"
+    const sigHeader = headers["x-aemulus-signature"];
+    const [tPart, sigPart] = sigHeader.split(",");
+    expect(tPart).toMatch(/^t=\d+$/);
+    const t = tPart.slice(2);
     const expected =
-      "sha256=" + createHmac("sha256", secret).update(body).digest("hex");
-    expect(headers["x-aemulus-signature"]).toBe(expected);
+      "sha256=" +
+      createHmac("sha256", secret).update(`${t}.${body}`).digest("hex");
+    expect(sigPart).toBe(expected);
     expect(JSON.parse(body)).toMatchObject({ event: "run.completed", runId: "run_1" });
+  });
+
+  it("retries a failed delivery and records the attempt count", async () => {
+    const OWNER2 = "WALLET_WH_RETRY";
+    await createWebhook(OWNER2, PUBLIC_URL);
+    let n = 0;
+    globalThis.fetch = vi.fn(async () => {
+      n++;
+      // fail the first attempt, succeed on the retry
+      return { ok: n > 1, status: n > 1 ? 200 : 500, json: async () => ({}) } as Response;
+    }) as typeof fetch;
+
+    await dispatchRunEvent(OWNER2, "run.completed", { runId: "r2", status: "completed" });
+
+    expect(n).toBe(2); // retried once after the 500
+    const h = (await listWebhooks(OWNER2))[0];
+    expect(h.lastStatus).toBe(200);
+    expect(h.lastAttempts).toBe(2);
+    expect(h.lastError).toBeNull();
   });
 });

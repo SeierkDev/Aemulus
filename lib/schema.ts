@@ -182,6 +182,8 @@ CREATE TABLE IF NOT EXISTS webhooks (
   active      INTEGER NOT NULL DEFAULT 1,
   last_status INTEGER,         -- last delivery HTTP status (0 = error)
   last_at     INTEGER,
+  last_attempts INTEGER,       -- attempts on the last delivery (retry/backoff)
+  last_error  TEXT,            -- last delivery error (null = delivered ok)
   created_at  INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_webhooks_owner ON webhooks(owner);
