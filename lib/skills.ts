@@ -46,7 +46,7 @@ export async function createSkill(input: {
   return skill;
 }
 
-export { skillTargets } from "./skill-utils";
+export { skillTargets, categorize } from "./skill-utils";
 
 /** Publish or unpublish a skill to the marketplace (owner only). */
 export async function setPublished(

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { skillTargets } from "../lib/skill-utils";
+import { skillTargets, categorize } from "../lib/skill-utils";
 import type { SkillStep } from "../lib/types";
 
 function nav(target: string): SkillStep {
@@ -38,5 +38,19 @@ describe("skillTargets", () => {
 
   it("skips unparseable targets", () => {
     expect(skillTargets([nav("not a url")])).toEqual([]);
+  });
+});
+
+describe("categorize", () => {
+  it("maps skills to a category by keyword", () => {
+    expect(categorize("Add invoice to QuickBooks", "")).toBe("Finance");
+    expect(categorize("Add lead to HubSpot", "create a contact")).toBe("CRM");
+    expect(categorize("Log support ticket to Zendesk", "")).toBe("Support");
+    expect(categorize("Post job to LinkedIn", "")).toBe("Hiring");
+    expect(categorize("Create Shopify product", "")).toBe("Commerce");
+  });
+
+  it("falls back to Other", () => {
+    expect(categorize("Do a thing", "somewhere")).toBe("Other");
   });
 });
