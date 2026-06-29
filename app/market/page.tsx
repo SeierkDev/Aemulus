@@ -3,6 +3,7 @@ import { Nav } from "@/components/Nav";
 import { MarketBrowser, type MarketItem } from "@/components/MarketBrowser";
 import { listPublishedSkills, categorize } from "@/lib/skills";
 import { getReputationBatch } from "@/lib/reputation";
+import { isVerified } from "@/lib/moderation";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ export default async function MarketPage() {
       ratingCount: r?.ratingCount ?? 0,
       successRate: r?.successRate ?? 0,
       runs: r?.runs ?? 0,
+      verified: isVerified(s.owner),
     };
   });
 

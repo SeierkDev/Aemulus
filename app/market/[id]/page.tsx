@@ -6,6 +6,7 @@ import { RunPanel } from "@/components/RunPanel";
 import { BulkRunPanel } from "@/components/BulkRunPanel";
 import { Stars } from "@/components/Stars";
 import { RatingWidget } from "@/components/RatingWidget";
+import { ReportButton } from "@/components/ReportButton";
 import {
   getSkill,
   skillTargets,
@@ -15,6 +16,7 @@ import {
 import { hasRunSkill } from "@/lib/runs";
 import { getSession } from "@/lib/auth";
 import { SOLANA } from "@/lib/solana";
+import { isVerified } from "@/lib/moderation";
 import { short, ago } from "@/lib/format";
 import {
   getSkillReputation,
@@ -109,7 +111,10 @@ export default async function MarketSkillPage({
               )}
             </div>
           </div>
-          <Badge>Published</Badge>
+          <div className="flex shrink-0 items-center gap-2">
+            {isVerified(skill.owner) && <Badge>✓ Verified</Badge>}
+            <Badge>Published</Badge>
+          </div>
         </div>
 
         {/* Run it */}
@@ -225,6 +230,13 @@ export default async function MarketSkillPage({
         )}
         {related.length > 0 && (
           <SkillStrip title={`More in ${category}`} skills={related} />
+        )}
+
+        {session && !isOwner && (
+          <div className="mt-8 flex items-center gap-2 border-t border-border pt-4 text-xs text-ink-3">
+            <span>Something wrong with this skill?</span>
+            <ReportButton skillId={skill.id} />
+          </div>
         )}
       </div>
       <div className="py-10" />

@@ -268,4 +268,20 @@ export const MIGRATIONS: Migration[] = [
       { table: "runs", column: "tokens_out", def: "INTEGER NOT NULL DEFAULT 0" },
     ],
   },
+
+  // 17 — marketplace moderation: skill reports (auto-takedown).
+  {
+    id: 17,
+    name: "skill_reports",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS skill_reports (
+         id TEXT PRIMARY KEY,
+         skill_id TEXT NOT NULL,
+         reporter TEXT NOT NULL,
+         reason TEXT NOT NULL DEFAULT '',
+         created_at INTEGER NOT NULL
+       );`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_skill_reports_uniq ON skill_reports(skill_id, reporter);`,
+    ],
+  },
 ];

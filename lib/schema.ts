@@ -143,6 +143,17 @@ CREATE TABLE IF NOT EXISTS schedules (
   created_at   INTEGER NOT NULL
 );
 
+-- Marketplace moderation: a wallet can report a skill once; enough distinct
+-- reports auto-unpublish it (takedown).
+CREATE TABLE IF NOT EXISTS skill_reports (
+  id         TEXT PRIMARY KEY,
+  skill_id   TEXT NOT NULL,
+  reporter   TEXT NOT NULL,
+  reason     TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_skill_reports_uniq ON skill_reports(skill_id, reporter);
+
 -- User star ratings/reviews for published skills (one per wallet per skill).
 CREATE TABLE IF NOT EXISTS ratings (
   id          TEXT PRIMARY KEY,

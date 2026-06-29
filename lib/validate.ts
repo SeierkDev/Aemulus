@@ -77,6 +77,8 @@ export const SkillUpdateBody = z.object({
 
 export const PublishBody = z.object({ published: z.boolean() });
 
+export const ReportBody = z.object({ reason: z.string().max(500).optional() });
+
 export const RestoreBody = z.object({ version: z.number().int().positive() });
 
 export const ApiKeyBody = z.object({

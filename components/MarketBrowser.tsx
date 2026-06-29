@@ -17,6 +17,7 @@ export interface MarketItem {
   ratingCount: number;
   successRate: number;
   runs: number;
+  verified: boolean;
 }
 
 const inputCls =
@@ -82,7 +83,12 @@ export function MarketBrowser({ items }: { items: MarketItem[] }) {
           <Link key={it.id} href={`/market/${it.id}`}>
             <Card className="flex h-full flex-col p-5 transition-colors hover:bg-surface-2">
               <div className="flex items-start justify-between gap-3">
-                <h3 className="font-medium tracking-tight">{it.name}</h3>
+                <h3 className="font-medium tracking-tight">
+                  {it.name}
+                  {it.verified && (
+                    <span className="ml-1.5 align-middle text-xs text-ink-3">✓</span>
+                  )}
+                </h3>
                 {it.ratingCount > 0 && (
                   <span className="shrink-0 text-xs">
                     <Stars value={it.avgStars} />{" "}
