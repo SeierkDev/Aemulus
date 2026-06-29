@@ -82,6 +82,9 @@ CREATE TABLE IF NOT EXISTS runs (
   bulk_id     TEXT,
   row_index   INTEGER,
   output      TEXT,   -- JSON: { outputKey: capturedValue }
+  -- cost transparency: operator (Claude) tokens spent on this run
+  tokens_in   INTEGER NOT NULL DEFAULT 0,
+  tokens_out  INTEGER NOT NULL DEFAULT 0,
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL
 );

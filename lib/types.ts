@@ -235,6 +235,9 @@ export interface Run {
   bulkId: string | null;
   rowIndex: number | null;
   output: Record<string, string> | null;
+  /** Operator (Claude) tokens spent on this run — cost transparency. */
+  tokensIn: number;
+  tokensOut: number;
   steps: RunStepRecord[];
   createdAt: number;
   updatedAt: number;

@@ -258,4 +258,14 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_jobs_claimable ON jobs(status, run_at);`,
     ],
   },
+
+  // 16 — cost transparency: operator token usage per run.
+  {
+    id: 16,
+    name: "run_token_usage",
+    addColumns: [
+      { table: "runs", column: "tokens_in", def: "INTEGER NOT NULL DEFAULT 0" },
+      { table: "runs", column: "tokens_out", def: "INTEGER NOT NULL DEFAULT 0" },
+    ],
+  },
 ];

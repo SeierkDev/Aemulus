@@ -39,6 +39,8 @@ export async function createRun(input: {
     bulkId: input.bulkId ?? null,
     rowIndex: input.rowIndex ?? null,
     output: null,
+    tokensIn: 0,
+    tokensOut: 0,
     steps: [],
     createdAt: now,
     updatedAt: now,
@@ -223,6 +225,20 @@ export async function setRunOutput(
   });
 }
 
+/** Record operator (Claude) token usage for a run — cost transparency. */
+export async function setRunUsage(
+  runId: string,
+  tokensIn: number,
+  tokensOut: number,
+): Promise<void> {
+  if (tokensIn === 0 && tokensOut === 0) return;
+  await ready();
+  await db.execute({
+    sql: `UPDATE runs SET tokens_in = ?, tokens_out = ? WHERE id = ?`,
+    args: [tokensIn, tokensOut, runId],
+  });
+}
+
 export async function updateReceipt(
   runId: string,
   receipt: { hash: string; sig: string | null; cluster: string | null },
@@ -315,6 +331,8 @@ function rowToRun(row: Record<string, unknown>, steps: RunStepRecord[]): Run {
       row.output == null
         ? null
         : decryptJSON<Record<string, string>>(String(row.output), {}),
+    tokensIn: Number(row.tokens_in ?? 0),
+    tokensOut: Number(row.tokens_out ?? 0),
     steps,
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),

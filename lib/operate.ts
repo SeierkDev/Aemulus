@@ -20,6 +20,8 @@ export interface OperatorDecision {
   selector: string; // "" when the operator can't find a suitable element
   confidence: number; // 0..1
   reasoning: string;
+  tokensIn: number;
+  tokensOut: number;
 }
 
 const DECISION_TOOL: Anthropic.Tool = {
@@ -81,14 +83,18 @@ ${list}`;
     ],
   });
 
+  const tokensIn = res.usage?.input_tokens ?? 0;
+  const tokensOut = res.usage?.output_tokens ?? 0;
   const block = res.content.find((b) => b.type === "tool_use");
   if (!block || block.type !== "tool_use") {
-    return { selector: "", confidence: 0, reasoning: "no decision" };
+    return { selector: "", confidence: 0, reasoning: "no decision", tokensIn, tokensOut };
   }
   const out = block.input as Partial<OperatorDecision>;
   return {
     selector: typeof out.selector === "string" ? out.selector : "",
     confidence: typeof out.confidence === "number" ? out.confidence : 0,
     reasoning: typeof out.reasoning === "string" ? out.reasoning : "",
+    tokensIn,
+    tokensOut,
   };
 }

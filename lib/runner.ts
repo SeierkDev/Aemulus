@@ -2,7 +2,7 @@ import { chromium, type Browser, type Locator, type Page } from "playwright";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { id } from "./ids";
-import { addRunStep, finishRun, getRun, setRunOutput } from "./runs";
+import { addRunStep, finishRun, getRun, setRunOutput, setRunUsage } from "./runs";
 import { operatorChooseSelector, type Candidate } from "./operate";
 import { assertSafeUrl, isUnsafeRequestUrl, hostInAllowlist } from "./safe-url";
 import { runSlots } from "./semaphore";
@@ -48,6 +48,8 @@ export async function executeRun(
   let finalStatus: RunStatus = "completed";
   let error: string | null = null;
   const outputs: Record<string, string> = {}; // values captured by extract steps
+  let tokensIn = 0; // operator (Claude) tokens spent this run
+  let tokensOut = 0;
 
   // Bound concurrent Chromium launches; excess runs queue here.
   await runSlots.acquire();
@@ -120,6 +122,8 @@ export async function executeRun(
 
         if (!loc) {
           const decision = await tryOperator(page, step, value);
+          tokensIn += decision.tokensIn;
+          tokensOut += decision.tokensOut;
           confidence = decision.confidence;
           note = decision.reasoning;
           if (decision.selector && decision.confidence >= CONFIDENCE_FLOOR) {
@@ -192,6 +196,7 @@ export async function executeRun(
   // failed. The finalized status above is the source of truth.
   try {
     await setRunOutput(runId, outputs); // structured data from extract steps
+    await setRunUsage(runId, tokensIn, tokensOut); // cost transparency
     await attachReceipt(runId); // verifiable receipt (+ anchor if configured)
   } catch (e) {
     logError("runner.finalize", e);
@@ -278,6 +283,8 @@ async function tryOperator(page: Page, step: SkillStep, value: string) {
         err instanceof Error
           ? `Operator unavailable: ${err.message}`
           : "Operator unavailable.",
+      tokensIn: 0,
+      tokensOut: 0,
     };
   }
 }

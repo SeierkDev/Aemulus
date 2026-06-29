@@ -9,6 +9,8 @@ import { getRun } from "@/lib/runs";
 import { getSkill } from "@/lib/skills";
 import { getSession } from "@/lib/auth";
 import { explorerUrl } from "@/lib/receipt";
+import { estimateRunCostUsd, formatUsd } from "@/lib/cost";
+import { SOLANA } from "@/lib/solana";
 import type { RunStepRecord } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -62,6 +64,27 @@ export default async function RunPage({
             </>
           )}
         </div>
+
+        {/* Cost transparency */}
+        <Card className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-1 p-4 text-sm">
+          <div>
+            <span className="text-ink-3">AI cost</span>{" "}
+            {run.tokensIn + run.tokensOut > 0 ? (
+              <span>
+                {(run.tokensIn + run.tokensOut).toLocaleString()} operator tokens ·{" "}
+                ~{formatUsd(estimateRunCostUsd(run.tokensIn, run.tokensOut))}
+              </span>
+            ) : (
+              <span>no AI calls (deterministic)</span>
+            )}
+          </div>
+          {skill && skill.owner !== run.owner && (
+            <div>
+              <span className="text-ink-3">Creator fee</span>{" "}
+              <span>{SOLANA.runFee} $AEMU</span>
+            </div>
+          )}
+        </Card>
 
         {inputs.length > 0 && (
           <Card className="mt-6 p-4">

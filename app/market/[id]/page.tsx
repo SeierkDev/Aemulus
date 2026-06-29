@@ -14,6 +14,7 @@ import {
 } from "@/lib/skills";
 import { hasRunSkill } from "@/lib/runs";
 import { getSession } from "@/lib/auth";
+import { SOLANA } from "@/lib/solana";
 import { short, ago } from "@/lib/format";
 import {
   getSkillReputation,
@@ -113,6 +114,12 @@ export default async function MarketSkillPage({
 
         {/* Run it */}
         <div className="mt-6">
+          {!isOwner && (
+            <p className="mb-2 text-xs text-ink-3">
+              Each run credits the creator {SOLANA.runFee} $AEMU. AI cost applies
+              only if a step needs the operator.
+            </p>
+          )}
           <RunPanel
             skillId={skill.id}
             fields={skill.inputSchema.fields}
