@@ -106,8 +106,21 @@ CREATE TABLE IF NOT EXISTS earnings (
   run_id      TEXT NOT NULL,
   runner      TEXT NOT NULL,        -- who ran it
   amount      REAL NOT NULL,        -- $AEMU accrued
+  claim_id    TEXT,                 -- set when settled by a claim (else unclaimed)
   created_at  INTEGER NOT NULL
 );
+
+-- Creator payouts: a claim settles all of a creator's unclaimed earnings.
+CREATE TABLE IF NOT EXISTS claims (
+  id         TEXT PRIMARY KEY,
+  owner      TEXT NOT NULL,
+  amount     REAL NOT NULL,
+  sig        TEXT,                  -- Solana tx that paid it out (null = pending)
+  cluster    TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_claims_owner ON claims(owner);
+CREATE INDEX IF NOT EXISTS idx_earnings_unclaimed ON earnings(owner, claim_id);
 
 -- Scheduled autonomous runs: a skill runs itself on a cadence.
 CREATE TABLE IF NOT EXISTS schedules (

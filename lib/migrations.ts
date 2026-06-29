@@ -137,4 +137,23 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_webhooks_owner ON webhooks(owner);`,
     ],
   },
+
+  // 8 — Creator payout claims: earnings.claim_id + claims table.
+  {
+    id: 8,
+    name: "claims",
+    addColumns: [{ table: "earnings", column: "claim_id", def: "TEXT" }],
+    statements: [
+      `CREATE TABLE IF NOT EXISTS claims (
+         id TEXT PRIMARY KEY,
+         owner TEXT NOT NULL,
+         amount REAL NOT NULL,
+         sig TEXT,
+         cluster TEXT,
+         created_at INTEGER NOT NULL
+       );`,
+      `CREATE INDEX IF NOT EXISTS idx_claims_owner ON claims(owner);`,
+      `CREATE INDEX IF NOT EXISTS idx_earnings_unclaimed ON earnings(owner, claim_id);`,
+    ],
+  },
 ];
