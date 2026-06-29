@@ -137,7 +137,7 @@ export async function apiKeyAuth(req: Request): Promise<ApiKeyAuth | null> {
   return authApiKey(m[1].trim());
 }
 
-/** Owner-only convenience (back-compat) — scopes ignored. */
+/** Owner-only convenience (back-compat) - scopes ignored. */
 export async function apiKeyOwner(req: Request): Promise<string | null> {
   return (await apiKeyAuth(req))?.owner ?? null;
 }

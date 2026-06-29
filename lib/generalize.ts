@@ -113,7 +113,7 @@ The demonstration is one example of a repetitive task (e.g. entering data into a
    - Fixed dropdown choices, canned text, or UI toggles that would be identical every run → constants.
 2. Produce an ordered step plan that reproduces the task. Preserve the trace's selectors (best-first). Keep navigation, clicks, key presses, and submits as steps with valueSource "none".
 3. For each value-bearing step (input/select), set valueSource to "input" and inputKey to the matching field key, OR "constant" with the literal value.
-   - Any step whose value is shown as <secret> (a password or sensitive field) MUST be an inputField with valueSource "input" — NEVER a constant. Its example must be "".
+   - Any step whose value is shown as <secret> (a password or sensitive field) MUST be an inputField with valueSource "input" - NEVER a constant. Its example must be "".
 
 Be conservative and faithful to the trace. Use clear snake_case keys. Always call emit_skill exactly once.`;
 

@@ -4,7 +4,7 @@ import net from "node:net";
 /**
  * SSRF guard. Aemulus navigates a server-side browser to user/skill-supplied
  * URLs (record start + the runner's navigate steps), so we must refuse any URL
- * that resolves to a private, loopback, link-local, or cloud-metadata address —
+ * that resolves to a private, loopback, link-local, or cloud-metadata address -
  * otherwise a crafted skill could make the server hit internal services or the
  * instance metadata endpoint and screenshot the result.
  */
@@ -39,7 +39,7 @@ function isPrivateIp(ip: string): boolean {
 /**
  * Fast, synchronous request filter for per-request egress control during a run.
  * Blocks non-http(s) schemes, known-internal hostnames, and literal private IPs
- * — no DNS (kept cheap for every subresource). Top-level navigations still get
+ * - no DNS (kept cheap for every subresource). Top-level navigations still get
  * the full DNS-resolving assertSafeUrl. data:/blob: are inline (allowed).
  */
 export function isUnsafeRequestUrl(raw: string): boolean {

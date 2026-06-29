@@ -9,7 +9,7 @@ export function parseCsv(text: string): string[][] {
   let field = "";
   let inQuotes = false;
   // Strip a leading UTF-8 BOM (Excel adds one) so the first header cell isn't
-  // "﻿name" — which would silently break that column's field mapping.
+  // "﻿name" - which would silently break that column's field mapping.
   const s = text
     .replace(/^﻿/, "")
     .replace(/\r\n/g, "\n")

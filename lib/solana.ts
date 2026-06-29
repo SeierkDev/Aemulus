@@ -3,7 +3,7 @@ import { Connection, PublicKey } from "@solana/web3.js";
 /**
  * Solana / $AEMU token-gating config and helpers (server-side).
  *
- * Key behavior: if AEMULUS_MINT is unset, gating is OFF — every signed-in wallet
+ * Key behavior: if AEMULUS_MINT is unset, gating is OFF - every signed-in wallet
  * is treated as "Open" with full access. Set AEMULUS_MINT to the pump.fun token
  * address after launch and gating activates automatically, no code change.
  */
@@ -14,13 +14,13 @@ function num(name: string, fallback: number): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-/** A balance threshold — clamped non-negative so a misconfigured negative
+/** A balance threshold - clamped non-negative so a misconfigured negative
  *  value can't grant access to a zero-balance wallet while gating is on. */
 function minNum(name: string, fallback: number): number {
   return Math.max(0, num(name, fallback));
 }
 
-/** The run fee accrues to a ledger summed across runs — must be a
+/** The run fee accrues to a ledger summed across runs - must be a
  *  non-negative integer to stay exact through claim → base-unit payout. */
 function intNum(name: string, fallback: number): number {
   const n = num(name, fallback);
@@ -53,7 +53,7 @@ export function limitForLevel(level: number): number {
   if (level >= 3) return SOLANA.quotaWhale;
   if (level === 2) return SOLANA.quotaPro;
   if (level === 1) return SOLANA.quotaHolder;
-  return 0; // locked — no runs (locked wallets never reach a run anyway)
+  return 0; // locked - no runs (locked wallets never reach a run anyway)
 }
 
 export function gatingEnabled(): boolean {

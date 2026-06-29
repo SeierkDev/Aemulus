@@ -3,11 +3,11 @@ import { db, ready } from "./db";
 /**
  * Idempotency for mutating POSTs. A client may send an `Idempotency-Key` header;
  * if it does, the same (owner, scope, key) triple executes the operation at most
- * once — a retry (network blip, double-click, SDK retry) returns the ORIGINAL
+ * once - a retry (network blip, double-click, SDK retry) returns the ORIGINAL
  * response instead of starting a second run or triggering a second payout.
  *
  * Reserve-first: we INSERT the key (PK on owner+scope+key) before running the
- * handler, so two concurrent requests with the same key can't both execute —
+ * handler, so two concurrent requests with the same key can't both execute -
  * the loser sees the reservation and returns the stored result (or 409 if the
  * winner is still in flight). On handler failure the reservation is released so
  * a genuine retry can proceed.
@@ -38,7 +38,7 @@ export async function withIdempotency(
     });
     reserved = true;
   } catch {
-    // PK conflict — a prior request already claimed this key.
+    // PK conflict - a prior request already claimed this key.
   }
 
   if (!reserved) {

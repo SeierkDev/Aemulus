@@ -7,7 +7,9 @@ import { operatorChooseSelector, type Candidate } from "./operate";
 import { assertSafeUrl, isUnsafeRequestUrl, hostInAllowlist } from "./safe-url";
 import { runSlots } from "./semaphore";
 import { attachReceipt } from "./receipt";
-import { logError } from "./log";
+import { learnSelectors } from "./skills";
+import { incr } from "./metrics";
+import { logError, logInfo } from "./log";
 import type { Run, RunOverrides, RunStatus, Skill, SkillStep } from "./types";
 
 /**
@@ -18,8 +20,8 @@ import type { Run, RunOverrides, RunStatus, Skill, SkillStep } from "./types";
  * Strategy: replay each step deterministically using the recorded selectors
  * (cheap, reliable, no LLM). When a selector no longer resolves, fall back to
  * the operator (Claude vision) to pick the right element with a confidence.
- * If confidence is below the floor — or the operator (or its API key) is
- * unavailable — flag the step and pause the run for a human (needs_review).
+ * If confidence is below the floor - or the operator (or its API key) is
+ * unavailable - flag the step and pause the run for a human (needs_review).
  */
 
 const RUNS_DIR = path.join(process.cwd(), ".data", "recordings");
@@ -48,6 +50,7 @@ export async function executeRun(
   let finalStatus: RunStatus = "completed";
   let error: string | null = null;
   const outputs: Record<string, string> = {}; // values captured by extract steps
+  const healed: Record<number, string> = {}; // step idx → operator-found selector
   let tokensIn = 0; // operator (Claude) tokens spent this run
   let tokensOut = 0;
 
@@ -62,7 +65,7 @@ export async function executeRun(
     });
     // Egress guardrail: block requests to internal hosts / private IPs / unknown
     // schemes so an untrusted skill can't pull from the server's network. Plus
-    // the per-skill allowlist — NAVIGATIONS must target a declared host (so a
+    // the per-skill allowlist - NAVIGATIONS must target a declared host (so a
     // published skill can't be edited to quietly exfiltrate to a new domain);
     // subresources still load so pages render. Empty allowlist = unrestricted.
     const allowedHosts = skill.allowedHosts ?? [];
@@ -145,6 +148,10 @@ export async function executeRun(
           if (decision.selector && decision.confidence >= CONFIDENCE_FLOOR) {
             loc = await locate(page, [decision.selector]);
             selectorUsed = loc?.selector ?? "";
+            // Self-healing: the operator found a working selector the recorded
+            // ones missed. Remember it; if the whole run completes, we write it
+            // back into the skill so next time is deterministic (no operator).
+            if (loc) healed[step.idx] = selectorUsed;
           }
         }
 
@@ -214,6 +221,19 @@ export async function executeRun(
     await setRunOutput(runId, outputs); // structured data from extract steps
     await setRunUsage(runId, tokensIn, tokensOut); // cost transparency
     await attachReceipt(runId); // verifiable receipt (+ anchor if configured)
+    // Self-healing: only on a fully-completed run, and only when the owner runs
+    // their own skill (never let a third party's run mutate a published skill).
+    if (
+      finalStatus === "completed" &&
+      owner === skill.owner &&
+      Object.keys(healed).length > 0
+    ) {
+      const n = await learnSelectors(skill.id, healed);
+      if (n > 0) {
+        incr("skills.selfHealed", n);
+        logInfo("runner.selfHeal", `healed ${n} selector(s)`, { skill: skill.id });
+      }
+    }
   } catch (e) {
     logError("runner.finalize", e);
   }
@@ -250,7 +270,7 @@ async function locate(
       const locator = page.locator(sel).first();
       if ((await locator.count()) > 0) return { locator, selector: sel };
     } catch {
-      // invalid selector — skip
+      // invalid selector - skip
     }
   }
   return null;

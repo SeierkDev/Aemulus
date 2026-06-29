@@ -1,6 +1,6 @@
 import { Label } from "./ui";
 
-/** Tiny monochrome bar chart — no deps, server-renderable. */
+/** Tiny monochrome bar chart - no deps, server-renderable. */
 export function MiniChart({
   caption,
   values,

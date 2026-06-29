@@ -9,7 +9,7 @@ export function skillTargets(plan: SkillStep[]): string[] {
         const u = new URL(s.target);
         hosts.add(u.protocol === "data:" ? "inline page" : u.hostname);
       } catch {
-        /* not a URL — skip */
+        /* not a URL - skip */
       }
     }
   }

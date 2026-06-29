@@ -16,7 +16,7 @@ import type { Demonstration, GeneralizedSkill } from "./types";
  * (an input), a value IDENTICAL across all demos is part of the workflow (a
  * constant). A deterministic verifier checks the proposed skill against that
  * ground truth (variance per value slot), and any contradictions are fed back
- * to the model to repair — looping until the skill is consistent with every
+ * to the model to repair - looping until the skill is consistent with every
  * demonstration. This is dramatically more robust than single-shot generalize.
  */
 
@@ -29,7 +29,7 @@ export interface SynthesisResult {
   verified: boolean;
 }
 
-/** Typed values (input/select), in order — the task's variable surface. */
+/** Typed values (input/select), in order - the task's variable surface. */
 function valueSlots(demo: Demonstration): string[] {
   return demo.trace
     .filter((a) => a.type === "input" || a.type === "select")
@@ -59,11 +59,11 @@ export function varianceIssues(
   const k = Math.min(...counts);
   // Per-slot variance only lines up when the plan's value-steps map 1:1 to the
   // demos' typed values. If the counts differ, ordinal comparison would be
-  // misaligned and produce bogus "Value #n" messages — flag the structural
+  // misaligned and produce bogus "Value #n" messages - flag the structural
   // mismatch and stop rather than emit misleading issues.
   if (new Set(counts).size === 1 && planValueSteps.length !== k) {
     issues.push(
-      `The plan has ${planValueSteps.length} value-steps but each demo has ${k} typed values — make them line up 1:1 (one input/constant step per typed value).`,
+      `The plan has ${planValueSteps.length} value-steps but each demo has ${k} typed values - make them line up 1:1 (one input/constant step per typed value).`,
     );
     return issues;
   }

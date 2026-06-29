@@ -38,7 +38,7 @@ export function PublishToggle({
         <p className="mt-1 text-sm text-ink-2">
           {published ? (
             <>
-              Public — anyone can run it.{" "}
+              Public - anyone can run it.{" "}
               <Link href={`/market/${skillId}`} className="text-ink underline">
                 View listing
               </Link>

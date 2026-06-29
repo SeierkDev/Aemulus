@@ -33,7 +33,7 @@ export function SiteFooter() {
       </div>
       <div className="mt-4 border-t border-border pt-4">
         <span className="mono text-xs text-ink-3">
-          $AEMU CA: {SOLANA.mint || "TBA — launching on pump.fun"}
+          $AEMU CA: {SOLANA.mint || "TBA - launching on pump.fun"}
         </span>
       </div>
     </footer>

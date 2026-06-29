@@ -181,6 +181,35 @@ export async function updateSkill(
   await snapshotVersion({ id: skillId, version, ...patch });
 }
 
+/**
+ * Self-healing: write operator-found selectors back into a skill's plan as the
+ * new best-first option per step (deduped, capped). A lightweight plan update —
+ * no version bump (heals can happen every scheduled run; we don't want version
+ * spam). Returns how many steps actually changed.
+ */
+export async function learnSelectors(
+  skillId: string,
+  healed: Record<number, string>,
+): Promise<number> {
+  await ready();
+  const cur = await getSkill(skillId);
+  if (!cur) return 0;
+  let changed = 0;
+  const plan = cur.plan.map((s) => {
+    const sel = healed[s.idx];
+    if (!sel || s.selectors[0] === sel) return s; // nothing new for this step
+    changed++;
+    const selectors = [sel, ...s.selectors.filter((x) => x !== sel)].slice(0, 8);
+    return { ...s, selectors };
+  });
+  if (changed === 0) return 0;
+  await db.execute({
+    sql: `UPDATE skills SET plan = ?, updated_at = ? WHERE id = ?`,
+    args: [JSON.stringify(plan), Date.now(), skillId],
+  });
+  return changed;
+}
+
 /** Version history (newest first) for a skill. */
 export async function listSkillVersions(
   skillId: string,

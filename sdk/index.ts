@@ -1,5 +1,5 @@
 /**
- * Aemulus SDK — a tiny, dependency-free TypeScript client for the public
+ * Aemulus SDK - a tiny, dependency-free TypeScript client for the public
  * Aemulus protocol (/api/v1). Lives in the Aemulus monorepo (sdk/); import it
  * directly. Works anywhere `fetch` exists (Node 18+, browsers, Deno, edge).
  *
@@ -7,7 +7,7 @@
  *   const aemulus = new Aemulus({ apiKey: process.env.AEMULUS_KEY! });
  *   const run = await aemulus.runAndWait("skl_…", { vendor: "Acme" });
  *   console.log(run.output);        // { total: "$42.00" }
- *   await aemulus.verify(run.id);    // anyone can — no key needed
+ *   await aemulus.verify(run.id);    // anyone can - no key needed
  */
 
 export interface AemulusOptions {
@@ -179,12 +179,12 @@ export class Aemulus {
     return out;
   }
 
-  /** Verify a run's receipt — public, no API key required. */
+  /** Verify a run's receipt - public, no API key required. */
   async verify(runId: string): Promise<Verification> {
     try {
       return await this.call<Verification>(`/api/verify/${runId}`, {}, false);
     } catch (e) {
-      // A missing receipt is a normal answer, not an error — surface { found: false }.
+      // A missing receipt is a normal answer, not an error - surface { found: false }.
       if (e instanceof AemulusError && e.status === 404) {
         return { found: false, runId };
       }

@@ -1,6 +1,6 @@
 /**
  * In-page recorder script. Injected into every top frame via Playwright's
- * addInitScript, so it MUST be fully self-contained — it may not reference
+ * addInitScript, so it MUST be fully self-contained - it may not reference
  * anything outside its own body (it gets serialized and runs in the browser).
  *
  * It reports each meaningful user interaction to window.__aemRecord, which
@@ -112,7 +112,7 @@ export function recorderInitScript() {
         send({ type: "select", ...base(el), value: el.value });
       } else {
         const type = (el as HTMLInputElement).type;
-        // Never capture secrets — record an empty, flagged value so the
+        // Never capture secrets - record an empty, flagged value so the
         // generalizer turns it into a required per-run input (never a baked-in
         // constant, and never the raw/masked password text).
         if (type === "password") {

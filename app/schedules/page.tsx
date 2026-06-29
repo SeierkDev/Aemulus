@@ -21,7 +21,7 @@ export default async function SchedulesPage() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Schedules</h1>
             <p className="mt-1.5 max-w-2xl text-sm text-ink-2">
-              Skills that run themselves on a cadence — no clicks. Results land
+              Skills that run themselves on a cadence - no clicks. Results land
               in{" "}
               <Link href="/runs" className="text-ink underline">
                 Runs

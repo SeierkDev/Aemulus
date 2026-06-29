@@ -19,7 +19,7 @@ function GitHubIcon() {
   );
 }
 
-/** The Aemulus mark — two nested squares (the original and its copy). */
+/** The Aemulus mark - two nested squares (the original and its copy). */
 export function Brand() {
   return (
     <span className="flex items-center gap-2.5">

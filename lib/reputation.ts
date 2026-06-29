@@ -57,7 +57,7 @@ export async function getReputationBatch(
   const misses: string[] = [];
   for (const sid of skillIds) {
     const c = cache.get(sid);
-    // Return a COPY — never hand callers the cached object (a mutation would
+    // Return a COPY - never hand callers the cached object (a mutation would
     // poison the shared cache entry for every later request).
     if (c && c.exp > now) map.set(sid, { ...c.rep });
     else misses.push(sid);

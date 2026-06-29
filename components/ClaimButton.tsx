@@ -36,7 +36,7 @@ export function ClaimButton({
       const r = await fetch("/api/earnings/claim", { method: "POST" });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Claim failed");
-      setMsg(d.sig ? `Paid — ${String(d.sig).slice(0, 10)}…` : "Claimed");
+      setMsg(d.sig ? `Paid - ${String(d.sig).slice(0, 10)}…` : "Claimed");
       router.refresh();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Claim failed");

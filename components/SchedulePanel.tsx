@@ -9,7 +9,7 @@ import type { Cadence, SkillInputField } from "@/lib/types";
 const input =
   "w-full rounded-[var(--radius-base)] border border-border-strong bg-surface-2 px-3 py-2 text-sm outline-none placeholder:text-ink-3 focus:border-ink-3";
 
-/** Set a skill to run itself on a cadence — the autonomous, self-running half. */
+/** Set a skill to run itself on a cadence - the autonomous, self-running half. */
 export function SchedulePanel({
   skillId,
   fields,
@@ -63,7 +63,7 @@ export function SchedulePanel({
           <option value="every6h">Every 6 hours</option>
           <option value="every12h">Every 12 hours</option>
           <option value="daily">Every day</option>
-          <option value="weekdays">Weekdays (Mon–Fri)</option>
+          <option value="weekdays">Weekdays (Mon-Fri)</option>
           <option value="weekly">Every week</option>
         </select>
       </div>

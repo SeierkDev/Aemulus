@@ -1,7 +1,7 @@
 import * as React from "react";
 
 /**
- * Tiny monochrome UI kit. Grayscale only — the single "accent" is pure white.
+ * Tiny monochrome UI kit. Grayscale only - the single "accent" is pure white.
  * Kept deliberately small; components compose with Tailwind classes.
  */
 
@@ -62,7 +62,7 @@ export function Badge({
   );
 }
 
-/** Section label — small uppercase mono caption used throughout the app. */
+/** Section label - small uppercase mono caption used throughout the app. */
 export function Label({ children }: { children: React.ReactNode }) {
   return (
     <div className="mono text-[0.68rem] uppercase tracking-[0.18em] text-ink-3">

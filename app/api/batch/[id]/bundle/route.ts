@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Public, downloadable proof bundle for a Merkle batch — self-contained and
+ * Public, downloadable proof bundle for a Merkle batch - self-contained and
  * content-addressed (bundleHash). No private data; verifiable offline.
  */
 export async function GET(

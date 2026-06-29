@@ -16,7 +16,7 @@ export function BulkLive({ bulkId, done, total }: { bulkId: string; done: number
         const r = await fetch(`/api/runs/bulk/${bulkId}`, { cache: "no-store" });
         if (!r.ok) return;
         const d = await r.json();
-        // Only re-render the server component when progress actually changed —
+        // Only re-render the server component when progress actually changed -
         // not every 2s regardless (avoids needless refetch/flicker).
         if (d.done !== lastDone) {
           lastDone = d.done;

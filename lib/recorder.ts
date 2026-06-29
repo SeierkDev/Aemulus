@@ -14,7 +14,7 @@ import type { RecordedAction, RecorderState } from "./types";
 /**
  * Server-side recorder. Launches a HEADLESS Chromium, streams its screen to the
  * browser via CDP screencast, and forwards the user's mouse/keyboard back via
- * Playwright (which dispatches trusted DOM events) — so it works for a remote
+ * Playwright (which dispatches trusted DOM events) - so it works for a remote
  * user on a hosted deploy, not just on localhost. The injected script still
  * reports each interaction, building the trace exactly as before.
  *
@@ -72,7 +72,7 @@ class RecorderSession {
 
     await mkdir(path.join(RECORDINGS_DIR, owner, sid), { recursive: true });
 
-    // Headless — the user drives it remotely via the streamed view.
+    // Headless - the user drives it remotely via the streamed view.
     // AEMULUS_RECORD_HEADED=1 opens a real window for local debugging.
     this.browser = await chromium.launch({
       headless: process.env.AEMULUS_RECORD_HEADED !== "1",
@@ -244,7 +244,7 @@ function safeUrl(page: Page): string {
 
 /**
  * Per-wallet recorder registry (globalThis-cached, HMR-safe). Each user gets
- * their own session, so many people can record at once — no global lock.
+ * their own session, so many people can record at once - no global lock.
  */
 declare global {
   var __aemRecorders: Map<string, RecorderSession> | undefined;

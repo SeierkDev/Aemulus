@@ -19,7 +19,7 @@ function required(name: string): string {
 }
 
 export const env = {
-  /** Anthropic API key — required for any Claude call. */
+  /** Anthropic API key - required for any Claude call. */
   get anthropicApiKey(): string {
     return required("ANTHROPIC_API_KEY");
   },
@@ -37,7 +37,7 @@ export const env = {
 
   /**
    * Secret for signing session JWTs. A dev-only fallback is allowed locally,
-   * but in production an unset/default secret is fatal — otherwise anyone could
+   * but in production an unset/default secret is fatal - otherwise anyone could
    * forge a session JWT for any wallet.
    */
   get authSecret(): string {

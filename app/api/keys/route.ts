@@ -16,7 +16,7 @@ export async function GET() {
   return NextResponse.json({ keys: await listApiKeys(session.pubkey) });
 }
 
-/** Mint a new API key — the raw key is returned ONCE. */
+/** Mint a new API key - the raw key is returned ONCE. */
 export async function POST(req: Request) {
   try {
     const session = await requireAccess();

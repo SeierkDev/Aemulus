@@ -36,7 +36,7 @@ export async function creditEarning(input: {
 
 /**
  * Has this runner ever earned the creator a credit for this skill? Used to
- * credit only the FIRST run per distinct (skill, runner) — anti-Sybil: farming
+ * credit only the FIRST run per distinct (skill, runner) - anti-Sybil: farming
  * a creator's own skill from one burner wallet yields a single credit, and N
  * credits would require N separately-funded wallets (each gated on a min $AEMU
  * balance post-launch), making self-farming uneconomical.
@@ -74,7 +74,7 @@ type Sender = typeof sendPayout;
 
 /**
  * Settle a creator's unclaimed earnings. Marks the exact rows as claimed,
- * records a claim, then pays out — rolling the marks back if the payout fails
+ * records a claim, then pays out - rolling the marks back if the payout fails
  * (so funds are never lost or double-marked). `send` is injectable for tests.
  */
 export async function claimEarnings(
@@ -87,7 +87,7 @@ export async function claimEarnings(
 
   // Atomically claim ALL of this owner's currently-unclaimed earnings. SQLite
   // serializes writes, so a concurrent claim sees 0 unclaimed rows and pays
-  // nothing — no double-pay. We then read back exactly what we claimed.
+  // nothing - no double-pay. We then read back exactly what we claimed.
   await db.execute({
     sql: `UPDATE earnings SET claim_id = ? WHERE owner = ? AND claim_id IS NULL`,
     args: [claimId, owner],
@@ -110,12 +110,12 @@ export async function claimEarnings(
     res = await send(owner, amount);
   } catch (e) {
     // The transfer may already have broadcast (e.g. confirm timed out). Do NOT
-    // un-claim — that could cause a double payout. Leave the claim pending
+    // un-claim - that could cause a double payout. Leave the claim pending
     // (sig null) for reconciliation.
     throw new Error(
       e instanceof Error
-        ? `Payout unconfirmed — claim left pending: ${e.message}`
-        : "Payout unconfirmed — claim left pending.",
+        ? `Payout unconfirmed - claim left pending: ${e.message}`
+        : "Payout unconfirmed - claim left pending.",
     );
   }
   if (!res) {

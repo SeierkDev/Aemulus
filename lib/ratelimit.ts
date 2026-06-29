@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
  * Tiny in-memory sliding-window rate limiter, keyed by an arbitrary string
  * (e.g. a wallet pubkey). Caps expensive/abusable actions (generalize, runs,
  * recording, ratings) per signed-in wallet. Per-process (fine for
- * single-instance; a multi-instance deploy would move this to a shared store —
+ * single-instance; a multi-instance deploy would move this to a shared store -
  * see E11 shared-state residual).
  */
 declare global {
@@ -53,7 +53,7 @@ export function enforceRateLimit(
   const rl = rateLimit(key, max, windowMs);
   if (rl.ok) return null;
   return NextResponse.json(
-    { error: `${label} — try again in ${humanWait(rl.retryAfterMs)}.` },
+    { error: `${label} - try again in ${humanWait(rl.retryAfterMs)}.` },
     { status: 429 },
   );
 }

@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
- * Aemulus — monochrome design system
+ * Aemulus - monochrome design system
  * Grayscale only. No hue. The product watches, learns, and imitates;
  * the UI reads like a lab instrument: high contrast, sharp, quiet.
  */
@@ -22,7 +22,7 @@
   --ink-2: #a1a1aa; /* secondary */
   --ink-3: #6b6b73; /* muted / captions */
 
-  /* Signal (still monochrome — pure white as the only "accent") */
+  /* Signal (still monochrome - pure white as the only "accent") */
   --signal: #ffffff;
 
   --radius: 10px;
@@ -60,7 +60,7 @@ body {
   color: var(--ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
-  /* faint dotted grid — instrument backdrop */
+  /* faint dotted grid - instrument backdrop */
   background-image: radial-gradient(var(--border) 1px, transparent 1px);
   background-size: 28px 28px;
   background-position: -1px -1px;

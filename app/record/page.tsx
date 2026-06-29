@@ -75,7 +75,7 @@ export default function RecordPage() {
       es.close();
     });
     // A transient drop (network blip, the 5-min serverless cap) should NOT kill
-    // the live view permanently — let EventSource auto-reconnect. Only stop
+    // the live view permanently - let EventSource auto-reconnect. Only stop
     // reconnecting once the server has signalled a real end.
     es.onerror = () => {
       if (ended) es.close();
@@ -197,8 +197,8 @@ export default function RecordPage() {
               Record a task
             </h1>
             <p className="mt-1.5 text-sm leading-relaxed text-ink-2">
-              A live browser opens here in your screen. Do the task once — click
-              and type in the view — then stop, and we&apos;ll turn it into a
+              A live browser opens here in your screen. Do the task once - click
+              and type in the view - then stop, and we&apos;ll turn it into a
               reusable skill.
             </p>
           </div>

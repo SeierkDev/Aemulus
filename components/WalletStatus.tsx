@@ -7,7 +7,7 @@ import { short } from "@/lib/format";
 
 
 /**
- * Wallet identity in the nav. The bare "Connect wallet" button is gone —
+ * Wallet identity in the nav. The bare "Connect wallet" button is gone -
  * connecting is handled by the usage gate (e.g. Record a task). This only shows
  * once you're connected: the sign-in step, then your signed-in identity +
  * sign-out.
@@ -45,5 +45,5 @@ export function WalletStatus() {
     );
   }
 
-  return null; // not connected — the usage gate handles it
+  return null; // not connected - the usage gate handles it
 }

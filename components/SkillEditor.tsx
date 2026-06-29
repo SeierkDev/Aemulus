@@ -159,7 +159,7 @@ export function SkillEditor({
               className={input}
               value={allowedHosts}
               aria-label="Allowed domains"
-              placeholder="e.g. example.com, app.example.com — empty = unrestricted"
+              placeholder="e.g. example.com, app.example.com - empty = unrestricted"
               onChange={(e) => {
                 setAllowedHosts(e.target.value);
                 setSaved(false);
@@ -186,7 +186,7 @@ export function SkillEditor({
         <div className="mt-6">
           {!initial.published && (
             <p className="mb-2 text-xs text-ink-3">
-              Test run — private to you and earns nothing. Publish once it works.
+              Test run - private to you and earns nothing. Publish once it works.
             </p>
           )}
           <RunPanel
@@ -228,7 +228,7 @@ export function SkillEditor({
         <div className="mt-4 grid gap-3">
           {fields.length === 0 && (
             <Card className="p-5 text-sm text-ink-3">
-              No variable inputs — this skill runs the same way every time.
+              No variable inputs - this skill runs the same way every time.
             </Card>
           )}
           {fields.map((f, i) => (
@@ -379,7 +379,7 @@ export function SkillEditor({
                         patchStep(i, { inputKey: e.target.value })
                       }
                     >
-                      <option value="">— pick input —</option>
+                      <option value="">- pick input -</option>
                       {fields.map((f) => (
                         <option key={f.key} value={f.key}>
                           {f.label || f.key}

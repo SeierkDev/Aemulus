@@ -5,7 +5,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Aemulus — Roadmap",
+  title: "Aemulus - Roadmap",
   description: "Where Aemulus is going next.",
 };
 
@@ -15,7 +15,7 @@ const ROADMAP = [
     title: "Launch",
     body: [
       "$AEMU goes live on pump.fun; usage gating activates automatically.",
-      "On-chain creator payouts — escrow + claim — replace the off-chain earnings ledger.",
+      "On-chain creator payouts - escrow + claim - replace the off-chain earnings ledger.",
       "Receipt roots anchored live on Solana mainnet, with funded signing.",
     ],
   },
@@ -24,7 +24,7 @@ const ROADMAP = [
     title: "Trust at scale",
     body: [
       "Network-isolated micro-VM sandbox per run, so untrusted marketplace skills can't reach anything they shouldn't.",
-      "Permanent receipt + screenshot storage on Arweave — proofs that outlive the app.",
+      "Permanent receipt + screenshot storage on Arweave - proofs that outlive the app.",
       "Run notifications: email, webhook, and Telegram when a run finishes or needs review.",
       "Marketplace search, categories, and curated collections.",
     ],
@@ -33,7 +33,7 @@ const ROADMAP = [
     phase: "Phase 3",
     title: "Deeper intelligence",
     body: [
-      "Vision-grounded synthesis — the model sees the page, not just the trace.",
+      "Vision-grounded synthesis - the model sees the page, not just the trace.",
       "Self-healing selectors via embeddings, so skills survive bigger UI changes.",
       "Skills that chain other skills into multi-app workflows.",
       "Zero-knowledge proofs of execution: prove a run followed its skill without revealing inputs.",
@@ -56,7 +56,7 @@ const ROADMAP = [
       "Multi-chain receipt anchoring.",
       "An on-chain skill registry anyone can build on.",
       "Agents that discover and compose marketplace skills autonomously.",
-      "Capture beyond the browser — desktop and mobile.",
+      "Capture beyond the browser - desktop and mobile.",
     ],
   },
 ];

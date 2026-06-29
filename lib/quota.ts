@@ -4,8 +4,8 @@ import type { Session } from "./auth";
 
 /**
  * Tier-based daily run quotas. The window is a rolling 24h; the limit comes
- * from the wallet's access level (Holder < Pro < Whale/Open). Each run — and
- * each resolve/retry — counts against it.
+ * from the wallet's access level (Holder < Pro < Whale/Open). Each run - and
+ * each resolve/retry - counts against it.
  */
 export const QUOTA_WINDOW_MS = 24 * 60 * 60 * 1000;
 

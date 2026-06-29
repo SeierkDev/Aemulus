@@ -12,7 +12,7 @@ import { AuthProvider } from "./auth-context";
 
 const RPC =
   process.env.NEXT_PUBLIC_SOLANA_RPC ?? "https://api.mainnet-beta.solana.com";
-// Stable reference — a fresh [] each render would invalidate the wallet
+// Stable reference - a fresh [] each render would invalidate the wallet
 // adapter's internal useMemo (Phantom is detected via the Wallet Standard).
 const WALLETS: Adapter[] = [];
 

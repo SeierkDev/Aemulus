@@ -10,7 +10,7 @@ import { listWebhooks } from "@/lib/webhooks";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Aemulus — Developers",
+  title: "Aemulus - Developers",
   description: "The open Aemulus protocol: run skills and verify receipts via API.",
 };
 
@@ -105,7 +105,7 @@ export default async function DevelopersPage() {
 # → { "status":"completed", "output":{"total":"$42.00"}, "receiptHash":"…" }`}
           />
           <CodeBlock
-            title="Verify the receipt — no key, anyone can"
+            title="Verify the receipt - no key, anyone can"
             code={`curl https://aemulus.app/api/verify/run_…
 # → { "matches": true, "batch": { "proofValid": true, "root": "…" } }`}
           />
@@ -121,21 +121,21 @@ export default async function DevelopersPage() {
         <p className="mt-2 max-w-2xl text-sm text-ink-2">
           A tiny, dependency-free client lives in the Aemulus repo (
           <span className="mono">sdk/</span>). Works anywhere{" "}
-          <span className="mono">fetch</span> does — Node, browsers, Deno, edge.
+          <span className="mono">fetch</span> does - Node, browsers, Deno, edge.
         </p>
         <div className="mt-6">
           <CodeBlock
-            title="sdk/ — run, read output, verify"
+            title="sdk/ - run, read output, verify"
             code={`import { Aemulus } from "aemulus/sdk";
 
 const aemulus = new Aemulus({ apiKey: process.env.AEMULUS_KEY! });
 
-// run across one input — or loop a CSV for the next hundred
+// run across one input - or loop a CSV for the next hundred
 const run = await aemulus.runAndWait("skl_…", { vendor: "Acme", amount: "1499" });
 console.log(run.status);   // "completed"
 console.log(run.output);   // { total: "$42.00" }
 
-// anyone can verify the receipt — no key
+// anyone can verify the receipt - no key
 const v = await aemulus.verify(run.id);
 console.log(v.batch?.proofValid);  // true`}
           />
@@ -149,7 +149,7 @@ console.log(v.batch?.proofValid);  // true`}
           Give your agent verifiable hands
         </h2>
         <p className="mt-2 max-w-2xl text-sm text-ink-2">
-          Aemulus is a Model Context Protocol server — point any MCP client
+          Aemulus is a Model Context Protocol server - point any MCP client
           (Claude, your agent) at it and the marketplace becomes callable tools:{" "}
           <span className="mono">list_skills</span>,{" "}
           <span className="mono">run_skill</span>,{" "}
@@ -177,7 +177,7 @@ console.log(v.batch?.proofValid);  // true`}
         <Label>Authentication</Label>
         <h2 className="mt-3 text-2xl font-semibold tracking-tight">API keys</h2>
         <p className="mt-2 max-w-2xl text-sm text-ink-2">
-          Keys authenticate as your wallet — your skills, quota, and earnings all
+          Keys authenticate as your wallet - your skills, quota, and earnings all
           apply. Send as a Bearer token.
         </p>
         <div className="mt-6">
@@ -201,7 +201,7 @@ console.log(v.batch?.proofValid);  // true`}
           Subscribe a URL and we POST{" "}
           <span className="mono">run.completed</span>,{" "}
           <span className="mono">run.needs_review</span>, and{" "}
-          <span className="mono">run.failed</span> events — each HMAC-signed so
+          <span className="mono">run.failed</span> events - each HMAC-signed so
           you can trust it.
         </p>
         <div className="mt-6">
@@ -209,7 +209,7 @@ console.log(v.batch?.proofValid);  // true`}
             title="Verify the signature (Node)"
             code={`import { createHmac, timingSafeEqual } from "node:crypto";
 
-// header: "t=<unix>,sha256=<hex>"  — signed payload is \`\${t}.\${rawBody}\`
+// header: "t=<unix>,sha256=<hex>"  - signed payload is \`\${t}.\${rawBody}\`
 const [tPart, sigPart] = req.headers["x-aemulus-signature"].split(",");
 const t = tPart.slice(2), sig = sigPart.slice(7);
 // reject stale/replayed deliveries (5-min tolerance)

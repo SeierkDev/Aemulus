@@ -9,7 +9,7 @@ import { logError } from "./log";
 
 /**
  * Transparent at-rest encryption for sensitive JSON columns (recorded traces,
- * run inputs, step actions) — these can contain whatever the user typed. AES-
+ * run inputs, step actions) - these can contain whatever the user typed. AES-
  * 256-GCM with a key derived from AUTH_SECRET. Decryption tolerates legacy
  * plaintext rows so existing data still reads.
  */
@@ -35,7 +35,7 @@ export function decryptJSON<T>(stored: string | null | undefined, fallback: T): 
     try {
       return JSON.parse(stored) as T;
     } catch (e) {
-      // Unprefixed but unparseable — likely corrupted (or a stripped-prefix
+      // Unprefixed but unparseable - likely corrupted (or a stripped-prefix
       // ciphertext). Don't fail silently; a scheduled run would use empty input.
       logError("encrypt.legacy-parse", e);
       return fallback;
@@ -51,7 +51,7 @@ export function decryptJSON<T>(stored: string | null | undefined, fallback: T): 
     const pt = Buffer.concat([decipher.update(ct), decipher.final()]);
     return JSON.parse(pt.toString("utf8")) as T;
   } catch (e) {
-    // This value WAS encrypted (it has the prefix) but won't decrypt — almost
+    // This value WAS encrypted (it has the prefix) but won't decrypt - almost
     // always a rotated/changed AUTH_SECRET. Surface it loudly: silently
     // returning the fallback makes scheduled runs execute with empty input.
     logError("encrypt.decrypt", e, { hint: "AUTH_SECRET changed? data unreadable" });

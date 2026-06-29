@@ -72,7 +72,7 @@ export function WebhooksManager({ initial }: { initial: WebhookMeta[] }) {
 
       {secret && (
         <Card className="border-border-strong p-4">
-          <Label>Signing secret — copy it now, shown once</Label>
+          <Label>Signing secret - copy it now, shown once</Label>
           <code className="mono mt-2 block truncate rounded bg-surface-2 px-3 py-2 text-xs text-ink">
             {secret}
           </code>

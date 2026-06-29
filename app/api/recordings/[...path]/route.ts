@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 const ROOT = path.join(process.cwd(), ".data", "recordings");
 
 /**
- * Serve proof screenshots — but only your own. Screenshots are stored under
+ * Serve proof screenshots - but only your own. Screenshots are stored under
  * .data/recordings/<owner-pubkey>/<session-or-run-id>/..., so we require a
  * session and verify the first path segment is the caller's wallet. Prevents
  * cross-wallet access to another user's captured screens (IDOR).
@@ -22,7 +22,7 @@ export async function GET(
     return new Response("Unauthorized", { status: 401 });
   }
   const { path: parts } = await params;
-  // Reject traversal/separator segments BEFORE joining — otherwise
+  // Reject traversal/separator segments BEFORE joining - otherwise
   // ["me","..","victim","x.png"] passes the parts[0] check and path.join
   // collapses it into another wallet's directory (cross-wallet IDOR).
   if (

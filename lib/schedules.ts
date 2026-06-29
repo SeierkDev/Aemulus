@@ -29,7 +29,7 @@ export function cadenceLabel(c: Cadence): string {
   return CADENCE_LABEL[c] ?? c;
 }
 
-/** Next run timestamp after `from` — handles "weekdays" by skipping weekends. */
+/** Next run timestamp after `from` - handles "weekdays" by skipping weekends. */
 export function nextRunAfter(c: Cadence, from: number): number {
   if (c === "weekdays") {
     const d = new Date(from + DAY);
@@ -81,7 +81,7 @@ export async function createSchedule(input: {
   return sid;
 }
 
-/** Cap on active schedules per owner — bounds scheduler load / quota churn. */
+/** Cap on active schedules per owner - bounds scheduler load / quota churn. */
 export const MAX_ACTIVE_SCHEDULES = 25;
 
 /** How many active (running) schedules an owner currently has. */
@@ -165,7 +165,7 @@ export async function markRan(
 
 /**
  * Atomically claim a due schedule by advancing its next_run_at. Returns true
- * only for the caller that wins the race — so a restart's catch-up tick or a
+ * only for the caller that wins the race - so a restart's catch-up tick or a
  * second instance can't run the same firing twice. A claimed-but-failed run
  * (quota/error) simply waits for the next cadence, exactly like a skip.
  */

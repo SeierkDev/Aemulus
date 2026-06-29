@@ -190,7 +190,7 @@ export async function handleMcp(
     case "ping":
       return ok(id, {});
     case "notifications/initialized":
-      return null; // notification — no response
+      return null; // notification - no response
     default:
       return rpcErr(id, -32601, `Method not found: ${method}`);
   }

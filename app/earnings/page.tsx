@@ -62,7 +62,7 @@ export default async function EarningsPage() {
               <ClaimButton claimable={claimable} enabled={canClaim} />
             </Card>
 
-            {/* Analytics — last 14 days */}
+            {/* Analytics - last 14 days */}
             {analytics && (
               <Card className="mt-8 p-6">
                 <div className="flex flex-wrap items-end justify-between gap-4">
@@ -106,7 +106,7 @@ export default async function EarningsPage() {
               <div className="mt-3 grid gap-2">
                 {summary.bySkill.length === 0 && (
                   <Card className="p-6 text-sm text-ink-3">
-                    No earnings yet. Publish a skill so others can run it —{" "}
+                    No earnings yet. Publish a skill so others can run it -{" "}
                     <Link href="/skills" className="text-ink underline">
                       your skills
                     </Link>

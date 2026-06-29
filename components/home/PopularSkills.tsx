@@ -20,7 +20,7 @@ export function PopularSkills({
             Popular skills
           </h2>
           <p className="mt-1.5 text-sm text-ink-2">
-            Published by the community — run any of them on your own inputs.
+            Published by the community - run any of them on your own inputs.
           </p>
         </div>
         <Link href="/market" className="text-sm text-ink-3 hover:text-ink">

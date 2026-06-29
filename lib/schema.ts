@@ -97,7 +97,7 @@ CREATE TABLE IF NOT EXISTS run_steps (
   intent      TEXT NOT NULL,
   action      TEXT,            -- JSON of the action taken
   screenshot  TEXT,           -- path/ref to proof screenshot
-  confidence  REAL,           -- 0..1 — drives flagging
+  confidence  REAL,           -- 0..1 - drives flagging
   flagged     INTEGER NOT NULL DEFAULT 0,
   note        TEXT,
   created_at  INTEGER NOT NULL

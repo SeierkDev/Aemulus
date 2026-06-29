@@ -33,7 +33,7 @@ function TraceRow({ i, action, label }: { i: string; action: string; label: stri
   );
 }
 
-/** "See it in action" — framed mockups of the three core moments. */
+/** "See it in action" - framed mockups of the three core moments. */
 export function Showcase() {
   return (
     <section className="border-t border-border py-20">
@@ -43,7 +43,7 @@ export function Showcase() {
           Record once. Run with proof. Verify on-chain.
         </h2>
         <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-ink-2">
-          Every run captures a screenshot per step and a tamper-evident receipt —
+          Every run captures a screenshot per step and a tamper-evident receipt -
           batched into a Merkle root anyone can verify.
         </p>
       </div>
@@ -86,7 +86,7 @@ export function Showcase() {
           <div className="mt-3 space-y-2 text-xs text-ink-2">
             <p className="text-ink">Receipt verified</p>
             <p>
-              Merkle batch <span className="text-ink">✓ in batch</span> — leaf
+              Merkle batch <span className="text-ink">✓ in batch</span> - leaf
               #42 / 128
             </p>
             <div className="mono truncate text-[0.65rem] text-ink-3">

@@ -7,7 +7,7 @@ import { useAuth } from "./auth-context";
 /**
  * Usage gate. Viewing the app is open; *using* it (record / generalize / run)
  * requires a signed-in wallet. Components call this to decide whether to show
- * the real action or a connect/sign-in prompt — gating happens at action time,
+ * the real action or a connect/sign-in prompt - gating happens at action time,
  * never at page load.
  */
 export function useUsageGate() {

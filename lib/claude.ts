@@ -12,7 +12,7 @@ import { env } from "./env";
  *    the next action, judge confidence). It runs many times per task and uses
  *    vision, so it uses a fast, capable, cheaper model.
  *
- * Model IDs are centralized here — adjust in one place.
+ * Model IDs are centralized here - adjust in one place.
  */
 export const MODELS = {
   /** Demonstration → generalized skill. Deepest reasoning. */
@@ -27,7 +27,7 @@ declare global {
 
 /**
  * Lazily construct the client. Done on first use (not at import) so that
- * importing a route doesn't require ANTHROPIC_API_KEY — only actually calling
+ * importing a route doesn't require ANTHROPIC_API_KEY - only actually calling
  * Claude does. Cached on globalThis to survive HMR.
  */
 export function getClaude(): Anthropic {

@@ -38,7 +38,7 @@ export default async function MarketSkillPage({
   // Owners running their own skill don't need the trust ack.
   const isOwner = session?.pubkey === skill.owner;
   const domains = skillTargets(skill.plan);
-  // All independent of each other — fetch in one batch (incl. related skills,
+  // All independent of each other - fetch in one batch (incl. related skills,
   // which only needs `skill`, already resolved).
   const [rep, reviews, myRating, hasRun, published] = await Promise.all([
     getSkillReputation(skill.id),

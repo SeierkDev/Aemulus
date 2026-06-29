@@ -6,7 +6,7 @@ import type { BulkRun, Skill } from "./types";
 
 /**
  * Bulk runs: execute one skill across many input rows ("the next hundred,
- * automatically"). Creates a parent bulk_run and fires a child run per row —
+ * automatically"). Creates a parent bulk_run and fires a child run per row -
  * each runs in the background, bounded by the run-slot semaphore (so a 100-row
  * bulk drains a few at a time rather than launching 100 browsers at once).
  */
@@ -19,7 +19,7 @@ export async function createBulkRun(
   const bulkId = id("bulk");
   const now = Date.now();
   // Start the child runs first, then record the parent total as the number we
-  // actually started — so a mid-loop failure can't leave total > children
+  // actually started - so a mid-loop failure can't leave total > children
   // (which would make the bulk's progress never reach completion).
   let started = 0;
   for (let i = 0; i < rows.length; i++) {

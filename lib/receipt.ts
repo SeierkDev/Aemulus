@@ -18,7 +18,7 @@ import type { Run } from "./types";
 
 /**
  * Verifiable run receipts. Each run gets a deterministic sha256 over its
- * outcome + a hash of every proof screenshot — so altering any step or image
+ * outcome + a hash of every proof screenshot - so altering any step or image
  * changes the receipt. When a signer is configured the hash is anchored on
  * Solana via a Memo tx ("verifiable autonomy"); otherwise it's recorded locally
  * and anchoring activates at launch.
@@ -69,7 +69,7 @@ async function hashScreenshot(rel: string): Promise<string> {
     const buf = await readFile(path.join(DATA_ROOT, rel));
     return createHash("sha256").update(buf).digest("hex");
   } catch {
-    return ""; // missing screenshot — still part of the (different) digest
+    return ""; // missing screenshot - still part of the (different) digest
   }
 }
 
@@ -147,7 +147,7 @@ export interface BatchBundle {
   cluster: string | null;
   leafCount: number;
   createdAt: number;
-  /** sha256 over {root, leaves} — content address; pin this anywhere. */
+  /** sha256 over {root, leaves} - content address; pin this anywhere. */
   bundleHash: string;
   leaves: {
     runId: string;
@@ -161,7 +161,7 @@ export interface BatchBundle {
  * A self-contained, content-addressed proof bundle for a batch: the root, the
  * (optional) on-chain signature, and every leaf's hash + Merkle proof. It's
  * verifiable offline (recompute the root from each leaf+proof) and app-
- * independent — pin it to Arweave/IPFS and the receipts outlive this service.
+ * independent - pin it to Arweave/IPFS and the receipts outlive this service.
  */
 export async function buildBatchBundle(
   batchId: string,
@@ -228,7 +228,7 @@ async function checkOnChainMemo(
     const rpc =
       process.env.AEMULUS_RECEIPT_RPC || clusterApiUrl(cluster as never);
     const conn = new Connection(rpc, "confirmed");
-    // Bound the RPC round-trip — this runs in the public verify page's render
+    // Bound the RPC round-trip - this runs in the public verify page's render
     // path; a slow/unreachable RPC must degrade to "unknown" (null), not hang.
     const tx = await Promise.race([
       conn.getParsedTransaction(sig, { maxSupportedTransactionVersion: 0 }),
@@ -246,7 +246,7 @@ async function checkOnChainMemo(
 /**
  * Public verification: recompute the digest from stored data and compare to the
  * recorded receipt, and (if anchored) confirm the on-chain memo carries it.
- * Returns only non-sensitive fields — never inputs or screenshots.
+ * Returns only non-sensitive fields - never inputs or screenshots.
  */
 export async function verifyReceipt(
   runId: string,

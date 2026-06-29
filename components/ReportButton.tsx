@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-/** Report a published skill (one per wallet). Subtle — it's a safety valve. */
+/** Report a published skill (one per wallet). Subtle - it's a safety valve. */
 export function ReportButton({ skillId }: { skillId: string }) {
   const [state, setState] = useState<"idle" | "busy" | "done" | "error">("idle");
 
@@ -21,7 +21,7 @@ export function ReportButton({ skillId }: { skillId: string }) {
     }
   }
 
-  if (state === "done") return <span className="text-xs text-ink-3">Reported — thanks</span>;
+  if (state === "done") return <span className="text-xs text-ink-3">Reported - thanks</span>;
   return (
     <button
       onClick={report}

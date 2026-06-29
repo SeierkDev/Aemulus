@@ -1,6 +1,6 @@
 /**
  * Cursor (keyset) pagination for the public API. Cursors are opaque base64url
- * tokens encoding the last row's (created_at, id) — stable under inserts, no
+ * tokens encoding the last row's (created_at, id) - stable under inserts, no
  * OFFSET scan. Sort is always (created_at DESC, id DESC); the id breaks ties so
  * two rows with the same timestamp can't be skipped or duplicated across pages.
  */

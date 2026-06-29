@@ -14,13 +14,13 @@ import type { Session } from "./siws";
 
 /**
  * Autonomous run scheduler. Every minute it finds due schedules and runs them
- * with no human in the loop — the "self-running" half of the economy. Started
+ * with no human in the loop - the "self-running" half of the economy. Started
  * once at server boot via instrumentation.ts; cached on globalThis so HMR
  * doesn't spawn duplicate tickers.
  *
  * Durable: schedule state (next_run_at) lives in the DB, so after downtime the
  * first tick fires each schedule that came due once, then resumes one cadence
- * from now (no backfill of every missed interval — that would be a thundering
+ * from now (no backfill of every missed interval - that would be a thundering
  * herd). Each firing is claimed atomically (claimSchedule), so overlapping
  * ticks or a second instance can't double-run it. Tiers are refreshed from the
  * live balance at run time rather than trusting the snapshot stored at creation.
@@ -37,7 +37,7 @@ async function runDue(): Promise<void> {
 
   for (const s of due) {
     const next = nextRunAfter(s.cadence, Date.now());
-    // Reserve this firing before doing anything — losers (other ticks /
+    // Reserve this firing before doing anything - losers (other ticks /
     // instances) skip it. A claimed run that then fails just waits a cadence.
     if (!(await claimSchedule(s.id, now, next))) continue;
     try {
@@ -56,7 +56,7 @@ async function runDue(): Promise<void> {
         level = t.level;
         tier = t.name;
         if (!t.allowed) {
-          await deactivate(s.id); // wallet no longer holds enough — stop it
+          await deactivate(s.id); // wallet no longer holds enough - stop it
           logInfo("scheduler.skip", "no longer eligible", { schedule: s.id });
           continue;
         }

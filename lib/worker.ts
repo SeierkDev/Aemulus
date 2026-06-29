@@ -50,7 +50,7 @@ async function processJob(job: Job): Promise<void> {
     const retried = await failJob(job.id, msg, MAX_ATTEMPTS);
     incr(retried ? "jobs.retried" : "jobs.failed");
     if (!retried) {
-      // Out of retries — settle the run as failed and notify.
+      // Out of retries - settle the run as failed and notify.
       await finishRun(job.runId, {
         status: "failed",
         error: `Run failed after ${MAX_ATTEMPTS} attempts: ${msg}`,

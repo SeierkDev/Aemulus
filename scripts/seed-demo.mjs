@@ -52,7 +52,7 @@ const SKILLS = [
 
 const COMMENTS = [
   "Worked first try on a batch of 50. Huge time saver.",
-  "Flagged one weird row and let me fix it — exactly what I wanted.",
+  "Flagged one weird row and let me fix it - exactly what I wanted.",
   "Solid. Survived a layout change last week without breaking.",
   "Saves me an hour every morning.",
   "Occasionally needs a nudge but the proof screenshots make it easy.",

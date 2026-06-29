@@ -4,7 +4,7 @@ import { verifyReceipt } from "@/lib/receipt";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Public, unauthenticated receipt verification — returns no private data. */
+/** Public, unauthenticated receipt verification - returns no private data. */
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ runId: string }> },

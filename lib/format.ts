@@ -1,8 +1,8 @@
 /** Display helpers shared across pages. */
 
-/** Format a timestamp for display; "—" when null. */
+/** Format a timestamp for display; "-" when null. */
 export function when(ts: number | null): string {
-  return ts ? new Date(ts).toLocaleString() : "—";
+  return ts ? new Date(ts).toLocaleString() : "-";
 }
 
 /** Abbreviate a wallet pubkey like "ABcd…WXyz"; "anon" when empty. */

@@ -13,10 +13,10 @@ import { SCHEMA } from "./schema";
  * To change the schema: update SCHEMA (so fresh DBs are correct) and append a
  * new migration here (so existing DBs catch up). Never edit a shipped migration.
  *
- * IMPORTANT — every statement MUST be idempotent and crash-safe. The runner is
+ * IMPORTANT - every statement MUST be idempotent and crash-safe. The runner is
  * NOT transactional (libsql's executeMultiple does not cooperate with an
  * explicit BEGIN/COMMIT, verified), and a migration's rows are marked applied
- * only after all its statements succeed — so a crash mid-migration re-runs the
+ * only after all its statements succeed - so a crash mid-migration re-runs the
  * whole migration. Use `CREATE ... IF NOT EXISTS`, `addColumns` (add-if-missing),
  * and idempotent `DELETE`s. NEVER a bare `INSERT` backfill or `UPDATE x = x + 1`
  * (those would double-apply on a crash+retry). If you need a non-idempotent
@@ -30,10 +30,10 @@ export interface Migration {
 }
 
 export const MIGRATIONS: Migration[] = [
-  // 1 — full baseline schema (CREATE TABLE/INDEX IF NOT EXISTS).
+  // 1 - full baseline schema (CREATE TABLE/INDEX IF NOT EXISTS).
   { id: 1, name: "baseline", statements: [SCHEMA] },
 
-  // 2 — on-chain run receipts. Baseline already carries these columns, so this
+  // 2 - on-chain run receipts. Baseline already carries these columns, so this
   // is a no-op on fresh DBs and backfills any DB created before receipts.
   {
     id: 2,
@@ -45,7 +45,7 @@ export const MIGRATIONS: Migration[] = [
     ],
   },
 
-  // 3 — Merkle-batched receipts: per-run proof columns + the batches table.
+  // 3 - Merkle-batched receipts: per-run proof columns + the batches table.
   {
     id: 3,
     name: "merkle_batches",
@@ -67,7 +67,7 @@ export const MIGRATIONS: Migration[] = [
     ],
   },
 
-  // 4 — Bulk runs (run a skill across many rows) + extracted output.
+  // 4 - Bulk runs (run a skill across many rows) + extracted output.
   {
     id: 4,
     name: "bulk_runs",
@@ -88,7 +88,7 @@ export const MIGRATIONS: Migration[] = [
     ],
   },
 
-  // 5 — Skill versioning: version counter + a snapshot table for history/rollback.
+  // 5 - Skill versioning: version counter + a snapshot table for history/rollback.
   {
     id: 5,
     name: "skill_versions",
@@ -108,7 +108,7 @@ export const MIGRATIONS: Migration[] = [
     ],
   },
 
-  // 6 — API keys for the public /api/v1 protocol surface.
+  // 6 - API keys for the public /api/v1 protocol surface.
   {
     id: 6,
     name: "api_keys",
@@ -128,7 +128,7 @@ export const MIGRATIONS: Migration[] = [
     ],
   },
 
-  // 7 — HMAC-signed webhooks for run events.
+  // 7 - HMAC-signed webhooks for run events.
   {
     id: 7,
     name: "webhooks",
@@ -147,7 +147,7 @@ export const MIGRATIONS: Migration[] = [
     ],
   },
 
-  // 8 — Creator payout claims: earnings.claim_id + claims table.
+  // 8 - Creator payout claims: earnings.claim_id + claims table.
   {
     id: 8,
     name: "claims",
@@ -166,7 +166,7 @@ export const MIGRATIONS: Migration[] = [
     ],
   },
 
-  // 9 — enforce unique version numbers per skill (prevents duplicate snapshots).
+  // 9 - enforce unique version numbers per skill (prevents duplicate snapshots).
   // De-dup any pre-existing collisions FIRST so the UNIQUE index can't fail and
   // brick boot, then drop/recreate the single index as UNIQUE (no redundant
   // second index on fresh DBs).
@@ -182,7 +182,7 @@ export const MIGRATIONS: Migration[] = [
     ],
   },
 
-  // 10 — index for the anti-Sybil "first run per (skill, runner)" earnings check.
+  // 10 - index for the anti-Sybil "first run per (skill, runner)" earnings check.
   {
     id: 10,
     name: "earnings_skill_runner_idx",
@@ -191,7 +191,7 @@ export const MIGRATIONS: Migration[] = [
     ],
   },
 
-  // 11 — idempotency keys for mutating POSTs (at-most-once retries).
+  // 11 - idempotency keys for mutating POSTs (at-most-once retries).
   {
     id: 11,
     name: "idempotency_keys",
@@ -208,7 +208,7 @@ export const MIGRATIONS: Migration[] = [
     ],
   },
 
-  // 12 — webhook delivery visibility: attempts + last error per delivery.
+  // 12 - webhook delivery visibility: attempts + last error per delivery.
   {
     id: 12,
     name: "webhook_delivery_meta",
@@ -218,7 +218,7 @@ export const MIGRATIONS: Migration[] = [
     ],
   },
 
-  // 13 — API-key scopes (read | run). Existing keys default to full access.
+  // 13 - API-key scopes (read | run). Existing keys default to full access.
   {
     id: 13,
     name: "api_key_scopes",
@@ -227,7 +227,7 @@ export const MIGRATIONS: Migration[] = [
     ],
   },
 
-  // 14 — per-run egress allowlist on skills (existing skills stay unrestricted).
+  // 14 - per-run egress allowlist on skills (existing skills stay unrestricted).
   {
     id: 14,
     name: "skill_allowed_hosts",
@@ -236,7 +236,7 @@ export const MIGRATIONS: Migration[] = [
     ],
   },
 
-  // 15 — durable job queue for run execution.
+  // 15 - durable job queue for run execution.
   {
     id: 15,
     name: "jobs",
@@ -259,7 +259,7 @@ export const MIGRATIONS: Migration[] = [
     ],
   },
 
-  // 16 — cost transparency: operator token usage per run.
+  // 16 - cost transparency: operator token usage per run.
   {
     id: 16,
     name: "run_token_usage",
@@ -269,7 +269,7 @@ export const MIGRATIONS: Migration[] = [
     ],
   },
 
-  // 17 — marketplace moderation: skill reports (auto-takedown).
+  // 17 - marketplace moderation: skill reports (auto-takedown).
   {
     id: 17,
     name: "skill_reports",

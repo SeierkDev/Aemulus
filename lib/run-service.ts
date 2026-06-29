@@ -67,7 +67,7 @@ export async function completeRun(runId: string, args: RunArgs): Promise<void> {
   invalidateReputation(args.skill.id); // success-rate aggregate changed
   // Pay the creator only for: a completed run, by someone other than the
   // owner, who hasn't run this skill before. The "first run per distinct
-  // runner" rule is the anti-Sybil guard — see hasEarnedFrom.
+  // runner" rule is the anti-Sybil guard - see hasEarnedFrom.
   if (
     final.status === "completed" &&
     args.skill.owner &&

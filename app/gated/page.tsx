@@ -18,7 +18,7 @@ export default async function GatedPage() {
             Hold $AEMU to enter
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-ink-2">
-            Aemulus is open to $AEMU holders. Your wallet is connected — you just
+            Aemulus is open to $AEMU holders. Your wallet is connected - you just
             need at least{" "}
             <span className="text-ink">
               {SOLANA.holderMin.toLocaleString()} $AEMU

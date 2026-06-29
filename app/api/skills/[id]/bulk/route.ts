@@ -42,7 +42,7 @@ export async function POST(
     const rows = parsed.data.rows;
     if (rows.length > BULK_MAX) {
       return NextResponse.json(
-        { error: `Too many rows — max ${BULK_MAX} per bulk run.` },
+        { error: `Too many rows - max ${BULK_MAX} per bulk run.` },
         { status: 400 },
       );
     }

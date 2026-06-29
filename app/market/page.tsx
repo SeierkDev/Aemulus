@@ -39,7 +39,7 @@ export default async function MarketPage() {
             </h1>
             <p className="mt-1.5 max-w-2xl text-sm text-ink-2">
               Skills published by the community. Run any of them on your own
-              inputs — no recording required.
+              inputs - no recording required.
             </p>
           </div>
           <Badge>{skills.length} published</Badge>

@@ -2,7 +2,7 @@
  * Tiny in-process metrics. Dependency-free counters for key events (runs,
  * claims, webhook deliveries, errors) so /api/health can report what the
  * process has done since boot. Cached on globalThis so HMR doesn't reset them;
- * they reset on a real restart (fine for a liveness signal — wire a real TSDB
+ * they reset on a real restart (fine for a liveness signal - wire a real TSDB
  * via registerLogSink / the same seam when you need durable metrics).
  */
 declare global {

@@ -25,13 +25,13 @@ export async function POST(req: Request) {
   const issuedAt = Number(issuedStr);
   if (!nonce || !Number.isFinite(issuedAt)) {
     return NextResponse.json(
-      { error: "Missing nonce — request a new one." },
+      { error: "Missing nonce - request a new one." },
       { status: 400 },
     );
   }
   if (Date.now() - issuedAt > 5 * 60 * 1000) {
     return NextResponse.json(
-      { error: "Sign-in challenge expired — request a new one." },
+      { error: "Sign-in challenge expired - request a new one." },
       { status: 400 },
     );
   }

@@ -15,7 +15,7 @@ export default function NotFound() {
           404
         </div>
         <p className="max-w-sm text-ink-2">
-          That page doesn&apos;t exist — it may have been a run or skill that was
+          That page doesn&apos;t exist - it may have been a run or skill that was
           removed.
         </p>
         <Link href="/">

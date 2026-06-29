@@ -26,7 +26,7 @@ export function RunPanel({
 }) {
   const router = useRouter();
   const [values, setValues] = useState<Record<string, string>>(
-    // Don't prefill secrets with the example — they're entered fresh each run.
+    // Don't prefill secrets with the example - they're entered fresh each run.
     Object.fromEntries(fields.map((f) => [f.key, f.secret ? "" : f.example])),
   );
   const [busy, setBusy] = useState(false);
@@ -102,7 +102,7 @@ export function RunPanel({
               {domains.length ? domains.join(", ") : "an inline page"}
             </span>{" "}
             and will enter your inputs there. Only run skills from sources you
-            trust — your values are typed onto these sites.
+            trust - your values are typed onto these sites.
           </p>
           <label className="mt-3 flex items-center gap-2 text-sm text-ink-2">
             <input

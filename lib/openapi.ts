@@ -171,7 +171,7 @@ export const OPENAPI: OpenApiDoc = {
         summary: "Run a skill",
         description:
           "Starts a run; returns immediately with status \"running\". Send an " +
-          "`Idempotency-Key` header to make retries safe — the same key returns " +
+          "`Idempotency-Key` header to make retries safe - the same key returns " +
           "the original run instead of starting a new one.",
         parameters: [
           {

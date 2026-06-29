@@ -4,7 +4,7 @@ import { createClient, type Client } from "@libsql/client";
 import { env } from "./env";
 import { MIGRATIONS } from "./migrations";
 
-// For the local file fallback, libsql won't create the parent directory — do it.
+// For the local file fallback, libsql won't create the parent directory - do it.
 function ensureLocalDir(url: string) {
   if (url.startsWith("file:")) {
     const file = url.slice("file:".length);
@@ -65,7 +65,7 @@ export async function migrate(): Promise<void> {
 
   for (const m of MIGRATIONS) {
     if (applied.has(m.id)) continue;
-    // Columns first, then statements — so an index/table in the same migration
+    // Columns first, then statements - so an index/table in the same migration
     // can safely reference a column this migration adds.
     for (const c of m.addColumns ?? []) {
       await addColumnIfMissing(c.table, c.column, c.def);

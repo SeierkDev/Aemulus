@@ -92,7 +92,7 @@ export function SynthesizePanel({ demos }: { demos: DemoLite[] }) {
       {sel.size >= 2 && (
         <Card className="sticky bottom-4 flex flex-col gap-3 border-border-strong p-4 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm text-ink-2">
-            <span className="text-ink">{sel.size} demonstrations</span> selected —
+            <span className="text-ink">{sel.size} demonstrations</span> selected -
             synthesize one robust skill that learns what varies across them.
           </span>
           <div className="flex items-center gap-2">

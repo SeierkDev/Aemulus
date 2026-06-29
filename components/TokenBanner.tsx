@@ -8,7 +8,7 @@ export function TokenBanner() {
       <span className="mono mr-2 rounded-full border border-border-strong px-2 py-0.5 text-[0.65rem] uppercase tracking-wide text-ink-3">
         Pre-launch
       </span>
-      $AEMU isn&apos;t live yet — everything is free to use. The token launches
+      $AEMU isn&apos;t live yet - everything is free to use. The token launches
       soon on pump.fun.
     </div>
   );

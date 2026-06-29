@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { message } = await (await fetch("/api/auth/nonce")).json();
       const signature = await signMessage(new TextEncoder().encode(message));
-      // Re-read the active key AFTER signing — the user may have switched
+      // Re-read the active key AFTER signing - the user may have switched
       // accounts mid-flow; sign + submit must agree on the same pubkey.
       const active = publicKey.toBase58();
       const r = await fetch("/api/auth/verify", {

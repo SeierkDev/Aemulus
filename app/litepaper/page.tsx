@@ -8,16 +8,16 @@ import { SOLANA } from "@/lib/solana";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Aemulus — Litepaper",
+  title: "Aemulus - Litepaper",
   description: "What Aemulus is, how $AEMU works, and where it's going.",
 };
 
 const LIVE_TODAY = [
   ["Teach by demonstration", "Record a browser task once; Claude generalizes it into a reusable, parameterized skill."],
-  ["Multi-demo synthesis", "Record the same task a few times and Aemulus learns what varies vs what's fixed — verified against every demo."],
+  ["Multi-demo synthesis", "Record the same task a few times and Aemulus learns what varies vs what's fixed - verified against every demo."],
   ["Calibrated autonomy", "Every step carries a confidence score; uncertain steps pause for review instead of guessing."],
   ["Proof on every run", "Each step is screenshotted, and each run gets a tamper-evident receipt."],
-  ["Verifiable receipts", "Run receipts are committed to a Merkle root — anyone can verify a run independently, no sign-in."],
+  ["Verifiable receipts", "Run receipts are committed to a Merkle root - anyone can verify a run independently, no sign-in."],
   ["Bulk execution", "Upload a CSV and run a skill across hundreds of rows; export the results."],
   ["Structured extraction", "Capture values off the page into typed outputs and download them as CSV."],
   ["A skill marketplace", "Publish skills, run others', with reputation from real run outcomes and verified ratings."],
@@ -50,7 +50,7 @@ export default function LitepaperPage() {
         </h1>
         <p className="mt-4 max-w-2xl text-lg leading-relaxed text-ink-2">
           Aemulus turns a single browser demonstration into an autonomous,
-          verifiable skill — and a marketplace where those skills earn. $AEMU is
+          verifiable skill - and a marketplace where those skills earn. $AEMU is
           the usage layer that powers it.
         </p>
       </section>
@@ -59,7 +59,7 @@ export default function LitepaperPage() {
       <section className="border-t border-border py-14">
         <Label>The problem</Label>
         <h2 className="mt-3 text-2xl font-semibold tracking-tight">
-          Repetitive browser work is everywhere — and brittle to automate
+          Repetitive browser work is everywhere - and brittle to automate
         </h2>
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-2">
           Recorded macros break the moment a layout shifts. General agents
@@ -77,8 +77,8 @@ export default function LitepaperPage() {
         <div className="mt-5 grid gap-4 md:grid-cols-3">
           {[
             ["Record", "Do the task once in a controlled browser. Every action is captured with a screenshot."],
-            ["Generalize", "Claude turns the demonstration into a reusable skill — the intent, and the fields that vary."],
-            ["Run", "Point the skill at new inputs — one, or hundreds. It executes on its own and flags only what's new."],
+            ["Generalize", "Claude turns the demonstration into a reusable skill - the intent, and the fields that vary."],
+            ["Run", "Point the skill at new inputs - one, or hundreds. It executes on its own and flags only what's new."],
           ].map(([t, b], i) => (
             <Card key={t} className="p-5">
               <Label>Step 0{i + 1}</Label>
@@ -93,7 +93,7 @@ export default function LitepaperPage() {
       <section className="border-t border-border py-14">
         <Label>Live today</Label>
         <h2 className="mt-3 text-2xl font-semibold tracking-tight">
-          Already real — not a promise
+          Already real - not a promise
         </h2>
         <p className="mt-2 max-w-2xl text-sm text-ink-2">
           Everything below works in the product right now, before the token even
@@ -117,7 +117,7 @@ export default function LitepaperPage() {
           Aemulus is free to browse and learn. $AEMU is the{" "}
           <span className="text-ink">usage layer</span>: holding it unlocks
           autonomous run capacity, and it&apos;s the unit creators earn when
-          their skills are run. A fair launch on pump.fun — no presale, no
+          their skills are run. A fair launch on pump.fun - no presale, no
           insider allocation; liquidity is seeded by the bonding curve.
         </p>
         <div className="mt-6 grid gap-4 md:grid-cols-3">
@@ -132,7 +132,7 @@ export default function LitepaperPage() {
             <Label>Utility · Creator fees</Label>
             <p className="mt-2 text-sm leading-relaxed text-ink-2">
               Each external run of a published skill credits its creator{" "}
-              {SOLANA.runFee} $AEMU — settled on-chain at launch.
+              {SOLANA.runFee} $AEMU - settled on-chain at launch.
             </p>
           </Card>
           <Card className="p-5">

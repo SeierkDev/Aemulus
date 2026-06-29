@@ -5,9 +5,9 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { Reveal } from "@/components/Reveal";
 
 const STAGES = [
-  ["Record", "Do the task once in a controlled browser — Aemulus captures every action with a screenshot."],
+  ["Record", "Do the task once in a controlled browser - Aemulus captures every action with a screenshot."],
   ["Generalize", "Claude turns that one demonstration into a reusable skill: the intent, and the fields that vary."],
-  ["Run", "Point the skill at new inputs — one or hundreds — and it executes on its own, flagging only what it isn't sure about."],
+  ["Run", "Point the skill at new inputs - one or hundreds - and it executes on its own, flagging only what it isn't sure about."],
 ];
 
 /** Clean landing flow: how it works + a single CTA, then the footer. */

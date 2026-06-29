@@ -5,7 +5,7 @@ import { getClaude, imageBlock, MODELS } from "./claude";
  * Operator fallback. When a recorded selector no longer resolves on the live
  * page, the operator (Claude Sonnet, with vision) looks at the screenshot and
  * the page's interactive elements and picks the element that fulfills the
- * step's intent — reporting a confidence so the runner can decide whether to
+ * step's intent - reporting a confidence so the runner can decide whether to
  * proceed or flag for a human (calibrated autonomy).
  */
 
@@ -41,7 +41,7 @@ const DECISION_TOOL: Anthropic.Tool = {
       },
       confidence: {
         type: "number",
-        description: "0..1 — how sure you are this is the right element.",
+        description: "0..1 - how sure you are this is the right element.",
       },
       reasoning: { type: "string", description: "One short sentence." },
     },
@@ -65,7 +65,7 @@ export async function operatorChooseSelector(args: {
   const prompt = `Step intent: ${args.intent}
 Action: ${args.action}${args.value ? `  value="${args.value}"` : ""}
 
-The originally recorded selector no longer matches. Pick the element from the candidates below that best fulfills the step's intent. Return its exact selector, or "" if none fits. Be honest with confidence — low if you're guessing.
+The originally recorded selector no longer matches. Pick the element from the candidates below that best fulfills the step's intent. Return its exact selector, or "" if none fits. Be honest with confidence - low if you're guessing.
 
 Candidates:
 ${list}`;

@@ -1,6 +1,6 @@
 /**
  * Tiny async semaphore. Bounds how many runs launch Chromium concurrently so a
- * burst of requests can't exhaust server memory — excess runs queue and start
+ * burst of requests can't exhaust server memory - excess runs queue and start
  * as slots free up. Cached on globalThis so the cap is process-wide (HMR-safe).
  */
 export class Semaphore {

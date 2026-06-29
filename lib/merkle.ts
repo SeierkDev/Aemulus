@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
  * Binary Merkle tree over receipt hashes, with domain separation (leaves are
  * prefixed 0x00, internal nodes 0x01) to defeat second-preimage attacks. This
  * lets us anchor a single root on-chain for a whole batch of runs, while each
- * run keeps a compact proof that anyone can verify against that root —
+ * run keeps a compact proof that anyone can verify against that root -
  * O(log n) data per run, one transaction per thousands of runs.
  *
  * Pure and deterministic: no IO, no time, no randomness.

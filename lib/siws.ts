@@ -6,7 +6,7 @@ import { env } from "./env";
 import type { Tier } from "./solana";
 
 /**
- * Pure Sign-In With Solana crypto + session tokens — no Next.js / cookie
+ * Pure Sign-In With Solana crypto + session tokens - no Next.js / cookie
  * coupling, so it's unit-testable in isolation. The cookie-bound layer
  * (getSession / requireAccess) lives in auth.ts and re-exports these.
  */
@@ -37,7 +37,7 @@ export function buildSignInMessage(
   return [
     `${domain} wants you to sign in with your Solana account.`,
     "",
-    "Aemulus — Sign in. This is free and authorizes no transaction.",
+    "Aemulus - Sign in. This is free and authorizes no transaction.",
     "",
     `Nonce: ${nonce}`,
     `Issued At: ${issuedAt}`,

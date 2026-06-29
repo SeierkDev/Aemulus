@@ -225,7 +225,7 @@ export async function setRunOutput(
   });
 }
 
-/** Record operator (Claude) token usage for a run — cost transparency. */
+/** Record operator (Claude) token usage for a run - cost transparency. */
 export async function setRunUsage(
   runId: string,
   tokensIn: number,

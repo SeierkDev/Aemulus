@@ -10,7 +10,7 @@ export { getBatch } from "./runs";
 /**
  * Merkle-batch all pending run receipts: build one tree over their leaf hashes,
  * anchor the single root on-chain, and write each run its inclusion proof. This
- * turns "one transaction per run" into "one transaction per batch" — verifiable
+ * turns "one transaction per run" into "one transaction per batch" - verifiable
  * autonomy that scales to millions of runs for pennies. Each run can still be
  * verified independently against the on-chain root via its proof.
  */
@@ -27,7 +27,7 @@ export async function batchPendingReceipts(
   await ready();
 
   // Atomically claim a slice of unbatched receipts (concurrent-safe: a row is
-  // claimed exactly once even if two batchers run — same pattern as the
+  // claimed exactly once even if two batchers run - same pattern as the
   // scheduler). Only the rows we actually win form this batch's tree.
   const claim = await db.execute({
     sql: `UPDATE runs SET batch_id = ?

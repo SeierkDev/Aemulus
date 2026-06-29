@@ -5,7 +5,7 @@ import { incr } from "./metrics";
 
 /**
  * Marketplace moderation. Anyone can report a published skill once; once a skill
- * collects enough distinct reports it is auto-unpublished (takedown) — no admin
+ * collects enough distinct reports it is auto-unpublished (takedown) - no admin
  * needed. A configurable set of wallets is shown as "Verified".
  */
 const VERIFIED = new Set(
@@ -31,7 +31,7 @@ export async function countReports(skillId: string): Promise<number> {
 }
 
 /**
- * Record a report (one per wallet per skill — duplicates are ignored) and
+ * Record a report (one per wallet per skill - duplicates are ignored) and
  * auto-unpublish the skill once it reaches the takedown threshold.
  */
 export async function reportSkill(
@@ -48,7 +48,7 @@ export async function reportSkill(
     });
     incr("reports.filed");
   } catch {
-    // UNIQUE(skill_id, reporter) — this wallet already reported it; no-op.
+    // UNIQUE(skill_id, reporter) - this wallet already reported it; no-op.
   }
   const reports = await countReports(skillId);
   let tookDown = false;

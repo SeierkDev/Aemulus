@@ -45,7 +45,7 @@ export default async function VerifyPage({
             </div>
             <p className="mt-2 text-sm text-ink-2">
               {v.matches
-                ? "The run's stored data and proof screenshots still hash to the recorded receipt — nothing has been altered since it ran."
+                ? "The run's stored data and proof screenshots still hash to the recorded receipt - nothing has been altered since it ran."
                 : "The recomputed hash does NOT match the recorded receipt. This run's data or screenshots have changed since it ran."}
             </p>
             <div className="mt-4 grid gap-1.5 text-sm">
@@ -75,7 +75,7 @@ export default async function VerifyPage({
               <div className="mt-2 text-sm text-ink-2">
                 <p>
                   {v.batch.proofValid
-                    ? `This run is leaf #${v.batch.index} of a batch of ${v.batch.leafCount}. Its Merkle proof resolves to the batch root — independently confirmed.`
+                    ? `This run is leaf #${v.batch.index} of a batch of ${v.batch.leafCount}. Its Merkle proof resolves to the batch root - independently confirmed.`
                     : "The Merkle proof does NOT resolve to the batch root for this run's data."}
                 </p>
                 <div
@@ -96,7 +96,7 @@ export default async function VerifyPage({
                 {v.batch.anchor ? (
                   <p className="mt-2">
                     {v.batch.anchor.memoMatches === true
-                      ? "The batch root is anchored on Solana — confirmed on-chain."
+                      ? "The batch root is anchored on Solana - confirmed on-chain."
                       : v.batch.anchor.memoMatches === false
                         ? "Anchored, but the on-chain memo did not match (investigate)."
                         : "Anchored on Solana. Could not reach an RPC to read it back right now."}{" "}
@@ -117,14 +117,14 @@ export default async function VerifyPage({
               </div>
             ) : (
               <p className="mt-2 text-sm text-ink-3">
-                Awaiting the next Merkle batch — its proof appears here once
+                Awaiting the next Merkle batch - its proof appears here once
                 anchored. The integrity check above is independent of the chain.
               </p>
             )}
           </Card>
 
           <p className="text-center text-xs text-ink-3">
-            Anyone can verify this receipt — no sign-in, no private data exposed.
+            Anyone can verify this receipt - no sign-in, no private data exposed.
           </p>
         </div>
       )}

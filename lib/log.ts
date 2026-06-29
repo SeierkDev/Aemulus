@@ -3,7 +3,7 @@ import { incr } from "./metrics";
 /**
  * Minimal structured logger. Emits single-line JSON so logs are greppable and
  * ingestible by any aggregator. This is the single seam to wire a real error
- * monitor (Sentry, Datadog, etc.) — call registerLogSink() once at boot and
+ * monitor (Sentry, Datadog, etc.) - call registerLogSink() once at boot and
  * every log entry (and error) is forwarded there. No dependency is added until
  * you choose one.
  */

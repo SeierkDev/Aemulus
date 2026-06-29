@@ -17,7 +17,7 @@ const RUNS_PER_MIN = Math.max(1, Number(process.env.AEMULUS_RUNS_PER_MIN) || 10)
  * Retry a run: start a fresh run with the SAME input and any corrected
  * selectors/skips accumulated on the original (so a failed run re-runs WITH
  * your fixes carried over). Browser state can't resume mid-session, so prior
- * steps are replayed — the inherited overrides let it get past where it stuck.
+ * steps are replayed - the inherited overrides let it get past where it stuck.
  */
 export async function POST(
   _req: Request,

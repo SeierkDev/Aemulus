@@ -101,7 +101,7 @@ export async function dispatchRunEvent(
   });
   if (r.rows.length === 0) return;
   const body = JSON.stringify({ event, ...payload });
-  // One timestamp/signature per delivery — reused across retries so a receiver's
+  // One timestamp/signature per delivery - reused across retries so a receiver's
   // replay window doesn't reject a legitimate retry.
   const ts = Math.floor(Date.now() / 1000);
 
@@ -125,7 +125,7 @@ export async function dispatchRunEvent(
             "x-aemulus-signature": signature,
           },
           body,
-          // Never follow redirects — a 3xx to an internal host would bypass the
+          // Never follow redirects - a 3xx to an internal host would bypass the
           // SSRF guard, which only validated the original URL.
           redirect: "error",
           signal: AbortSignal.timeout(8000),
@@ -137,7 +137,7 @@ export async function dispatchRunEvent(
         lastError = e instanceof Error ? e.message : "delivery failed";
         logError("webhook.deliver", e, { url, attempt: attempts });
       }
-      if (status >= 200 && status < 300) break; // delivered — stop retrying
+      if (status >= 200 && status < 300) break; // delivered - stop retrying
     }
 
     incr(status >= 200 && status < 300 ? "webhooks.delivered" : "webhooks.failed");

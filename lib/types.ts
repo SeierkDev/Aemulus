@@ -25,7 +25,7 @@ export interface RecordedAction {
   text?: string;
   /** Value for inputs/selects. */
   value?: string;
-  /** Password/secret field — value is never captured; must be a per-run input. */
+  /** Password/secret field - value is never captured; must be a per-run input. */
   sensitive?: boolean;
   /** Key for key events (Enter, Tab, Escape…). */
   key?: string;
@@ -65,7 +65,7 @@ export interface Demonstration {
 
 /* ─── Generalized skills (Phase 2) ─────────────────────────────────────── */
 
-/** A field that varies between runs — the parameterized input of a skill. */
+/** A field that varies between runs - the parameterized input of a skill. */
 export interface SkillInputField {
   key: string; // machine key, e.g. "full_name"
   label: string; // human label
@@ -82,7 +82,7 @@ export interface SkillInputField {
  */
 /**
  * Optional gate on a step: run it only if a selector is present ("exists") or
- * not present ("absent") on the page — the if/then primitive (e.g. dismiss a
+ * not present ("absent") on the page - the if/then primitive (e.g. dismiss a
  * cookie banner only if it appears, or run a login flow only if logged out).
  */
 export interface StepCondition {
@@ -102,7 +102,7 @@ export interface SkillStep {
   key: string;
   /** For "extract" steps: the key to store the captured value under. */
   outputKey?: string;
-  /** Optional condition — when set, the step runs only if it's satisfied. */
+  /** Optional condition - when set, the step runs only if it's satisfied. */
   condition?: StepCondition;
 }
 
@@ -148,7 +148,7 @@ export type RunStatus =
   | "completed"
   | "failed";
 
-/** One executed step of a run — the unit of proof and calibration. */
+/** One executed step of a run - the unit of proof and calibration. */
 export interface RunStepRecord {
   id: string;
   runId: string;
@@ -249,7 +249,7 @@ export interface Run {
   bulkId: string | null;
   rowIndex: number | null;
   output: Record<string, string> | null;
-  /** Operator (Claude) tokens spent on this run — cost transparency. */
+  /** Operator (Claude) tokens spent on this run - cost transparency. */
   tokensIn: number;
   tokensOut: number;
   steps: RunStepRecord[];

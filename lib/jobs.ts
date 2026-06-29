@@ -69,7 +69,7 @@ export async function enqueueRunJob(j: {
 /**
  * Atomically claim the next eligible job (status=queued, run_at<=now). Returns
  * null if none. The UPDATE ... WHERE status='queued' makes the claim a race
- * winner — a concurrent worker that loses retries the next candidate.
+ * winner - a concurrent worker that loses retries the next candidate.
  */
 export async function claimNextJob(now: number = Date.now()): Promise<Job | null> {
   await ready();
@@ -90,7 +90,7 @@ export async function claimNextJob(now: number = Date.now()): Promise<Job | null
       const r = await db.execute({ sql: `SELECT * FROM jobs WHERE id = ?`, args: [String(cid)] });
       return rowToJob(r.rows[0]);
     }
-    // lost the race — try the next candidate
+    // lost the race - try the next candidate
   }
   return null;
 }
@@ -129,7 +129,7 @@ export async function failJob(
 }
 
 /**
- * Re-queue jobs stuck in 'running' beyond `staleMs` — their worker/process died
+ * Re-queue jobs stuck in 'running' beyond `staleMs` - their worker/process died
  * mid-run. Run on a schedule + at boot so a crash doesn't strand a run forever.
  */
 export async function recoverStuckJobs(

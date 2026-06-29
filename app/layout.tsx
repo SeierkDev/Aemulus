@@ -15,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Aemulus — show it once, it does the rest",
+  title: "Aemulus: show it once, it does the rest",
   description:
-    "Aemulus watches you do a task once, learns the intent, and runs it autonomously — flagging only the cases it isn't sure about.",
+    "Aemulus watches you do a task once, learns the intent, and runs it autonomously, flagging only the cases it isn't sure about.",
 };
 
 export default function RootLayout({

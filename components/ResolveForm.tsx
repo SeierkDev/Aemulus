@@ -9,7 +9,7 @@ const input =
 
 /**
  * Shown on a flagged step of a paused run. The reviewer supplies a corrected
- * selector (or chooses to skip), then retries — the fix is merged into the
+ * selector (or chooses to skip), then retries - the fix is merged into the
  * run's overrides and a fresh run executes.
  */
 export function ResolveForm({
