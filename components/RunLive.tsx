@@ -33,6 +33,7 @@ export function RunLive({
           lastSteps.current = d.steps;
           router.refresh();
         }
+        // Mark done so the next interval clears itself (no further fetches).
         if (TERMINAL.has(d.status)) stop = true;
       } catch {
         /* transient */

@@ -18,11 +18,12 @@ import type { Session } from "./siws";
  * once at server boot via instrumentation.ts; cached on globalThis so HMR
  * doesn't spawn duplicate tickers.
  *
- * Durable: schedule state (next_run_at) lives in the DB, so a restart's first
- * tick catches up anything that came due while down. Each firing is claimed
- * atomically (claimSchedule), so overlapping ticks or a second instance can't
- * double-run it. Tiers are refreshed from the live balance at run time rather
- * than trusting the snapshot stored at creation.
+ * Durable: schedule state (next_run_at) lives in the DB, so after downtime the
+ * first tick fires each schedule that came due once, then resumes one cadence
+ * from now (no backfill of every missed interval — that would be a thundering
+ * herd). Each firing is claimed atomically (claimSchedule), so overlapping
+ * ticks or a second instance can't double-run it. Tiers are refreshed from the
+ * live balance at run time rather than trusting the snapshot stored at creation.
  */
 async function runDue(): Promise<void> {
   const now = Date.now();

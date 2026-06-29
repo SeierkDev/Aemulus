@@ -150,8 +150,8 @@ export async function listBatchLeaves(batchId: string): Promise<
   });
   return r.rows.map((x) => ({
     runId: String(x.id),
-    leafHash: String(x.receipt_hash),
-    leafIndex: Number(x.leaf_index),
+    leafHash: x.receipt_hash == null ? "" : String(x.receipt_hash),
+    leafIndex: x.leaf_index == null ? -1 : Number(x.leaf_index),
     proof:
       x.merkle_proof == null
         ? { siblings: [] }

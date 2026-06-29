@@ -55,7 +55,9 @@ export async function sendPayout(
   const to = new PublicKey(toWallet);
   const src = ataFor(treasury.publicKey, mint);
   const dst = ataFor(to, mint);
-  const base = BigInt(Math.floor(amount * 10 ** DECIMALS));
+  // Round (not floor) to base units so the on-chain amount matches the
+  // ledgered claim; amounts are whole $AEMU in practice, well within 2^53.
+  const base = BigInt(Math.round(amount * 10 ** DECIMALS));
 
   const tx = new Transaction();
   // Create the recipient's token account if needed (idempotent; treasury pays).

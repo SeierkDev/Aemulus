@@ -127,6 +127,7 @@ export function SkillEditor({
             <input
               className={input}
               value={name}
+              aria-label="Skill name"
               onChange={(e) => {
                 setName(e.target.value);
                 setSaved(false);
@@ -138,6 +139,7 @@ export function SkillEditor({
             <input
               className={input}
               value={description}
+              aria-label="Skill description"
               onChange={(e) => {
                 setDescription(e.target.value);
                 setSaved(false);
@@ -270,6 +272,7 @@ export function SkillEditor({
                 <input
                   className={cx(input, "flex-1")}
                   value={s.intent}
+                  aria-label={`Step ${i + 1} intent`}
                   onChange={(e) => patchStep(i, { intent: e.target.value })}
                 />
                 <button
@@ -311,6 +314,7 @@ export function SkillEditor({
                   <select
                     className={input}
                     value={s.valueSource}
+                    aria-label={`Step ${i + 1} value source`}
                     onChange={(e) =>
                       patchStep(i, {
                         valueSource: e.target.value as SkillStep["valueSource"],
@@ -325,6 +329,7 @@ export function SkillEditor({
                     <select
                       className={input}
                       value={s.inputKey}
+                      aria-label={`Step ${i + 1} input field`}
                       onChange={(e) =>
                         patchStep(i, { inputKey: e.target.value })
                       }
@@ -341,6 +346,7 @@ export function SkillEditor({
                       className={input}
                       value={s.value}
                       placeholder="constant value"
+                      aria-label={`Step ${i + 1} constant value`}
                       onChange={(e) => patchStep(i, { value: e.target.value })}
                     />
                   ) : (

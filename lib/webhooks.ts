@@ -100,6 +100,9 @@ export async function dispatchRunEvent(
           "x-aemulus-signature": sign(String(w.secret), body),
         },
         body,
+        // Never follow redirects — a 3xx to an internal host would bypass the
+        // SSRF guard, which only validated the original URL.
+        redirect: "error",
         signal: AbortSignal.timeout(8000),
       });
       status = res.status;

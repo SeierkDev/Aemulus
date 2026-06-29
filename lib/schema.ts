@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS skill_versions (
   input_schema TEXT NOT NULL,
   created_at   INTEGER NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_skill_versions ON skill_versions(skill_id, version);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_skill_versions ON skill_versions(skill_id, version);
 
 CREATE TABLE IF NOT EXISTS runs (
   id          TEXT PRIMARY KEY,

@@ -55,8 +55,12 @@ export function ApiKeysManager({ initial }: { initial: ApiKeyMeta[] }) {
             <Button
               variant="default"
               onClick={() => {
-                navigator.clipboard?.writeText(fresh);
-                setCopied(true);
+                // Only show "Copied" if the write actually succeeded — otherwise
+                // the user thinks the one-time key is saved when it isn't.
+                navigator.clipboard
+                  ?.writeText(fresh)
+                  .then(() => setCopied(true))
+                  .catch(() => {});
               }}
             >
               {copied ? "Copied" : "Copy"}

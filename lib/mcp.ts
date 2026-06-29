@@ -4,7 +4,10 @@ import { getRun } from "./runs";
 import { getQuota } from "./quota";
 import { computeTier, getAemulusBalance } from "./solana";
 import { verifyReceipt } from "./receipt";
+import { rateLimit } from "./ratelimit";
 import type { Session } from "./siws";
+
+const RUNS_PER_MIN = Math.max(1, Number(process.env.AEMULUS_RUNS_PER_MIN) || 10);
 
 /**
  * Minimal MCP (Model Context Protocol) server over JSON-RPC. Exposes Aemulus
@@ -102,6 +105,9 @@ async function callTool(
         args.input && typeof args.input === "object"
           ? (args.input as Record<string, string>)
           : {};
+      if (!rateLimit(`run:${owner}`, RUNS_PER_MIN, 60_000).ok) {
+        return textResult(`Rate limit: max ${RUNS_PER_MIN} runs/min.`, true);
+      }
       const skill = await getSkill(skillId);
       if (!skill || (skill.owner !== owner && !skill.published)) {
         return textResult("Skill not found or not runnable.", true);

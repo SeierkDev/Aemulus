@@ -73,7 +73,9 @@ export async function verifySessionToken(
   token: string,
 ): Promise<Session | null> {
   try {
-    const { payload } = await jwtVerify(token, secret());
+    const { payload } = await jwtVerify(token, secret(), {
+      algorithms: ["HS256"],
+    });
     return {
       pubkey: String(payload.pubkey),
       tier: payload.tier as Tier["name"],

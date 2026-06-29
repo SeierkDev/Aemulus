@@ -57,6 +57,16 @@ export function varianceIssues(
     (s) => s.valueSource === "input" || s.valueSource === "constant",
   );
   const k = Math.min(...counts);
+  // Per-slot variance only lines up when the plan's value-steps map 1:1 to the
+  // demos' typed values. If the counts differ, ordinal comparison would be
+  // misaligned and produce bogus "Value #n" messages — flag the structural
+  // mismatch and stop rather than emit misleading issues.
+  if (new Set(counts).size === 1 && planValueSteps.length !== k) {
+    issues.push(
+      `The plan has ${planValueSteps.length} value-steps but each demo has ${k} typed values — make them line up 1:1 (one input/constant step per typed value).`,
+    );
+    return issues;
+  }
   for (let i = 0; i < k; i++) {
     const vals = slots.map((s) => s[i]);
     const varies = new Set(vals).size > 1;

@@ -72,7 +72,8 @@ export async function assertSafeUrl(raw: string): Promise<void> {
     throw new Error(`Blocked URL scheme: ${u.protocol}`);
   }
 
-  const host = u.hostname.toLowerCase();
+  // strip brackets from IPv6 literals (e.g. "[::1]") so net.isIP recognizes them
+  const host = u.hostname.replace(/^\[|\]$/g, "").toLowerCase();
   if (BLOCKED_HOSTS.has(host)) throw new Error("Blocked host.");
 
   if (net.isIP(host)) {

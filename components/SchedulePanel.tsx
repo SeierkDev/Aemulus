@@ -75,6 +75,7 @@ export function SchedulePanel({
               <input
                 className={input}
                 value={values[f.key] ?? ""}
+                aria-label={f.label || f.key}
                 placeholder={f.example}
                 onChange={(e) =>
                   setValues((v) => ({ ...v, [f.key]: e.target.value }))

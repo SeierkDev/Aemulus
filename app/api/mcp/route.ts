@@ -22,6 +22,12 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     if (Array.isArray(body)) {
+      if (body.length > 20) {
+        return NextResponse.json(
+          { jsonrpc: "2.0", id: null, error: { code: -32600, message: "Batch too large (max 20)" } },
+          { status: 400 },
+        );
+      }
       const out = (await Promise.all(body.map((m) => handleMcp(owner, m)))).filter(
         Boolean,
       );

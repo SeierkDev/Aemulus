@@ -7,11 +7,12 @@ import {
 } from "../../lib/earnings";
 
 const OWNER = "WALLET_CLAIM";
-// stub on-chain sender — exercises the bookkeeping without a real transfer
+// stub on-chain senders — exercise the bookkeeping without a real transfer
 const okSend = async () => ({ sig: "sig_test", cluster: "devnet" });
 const failSend = async () => {
   throw new Error("rpc down");
 };
+const offSend = async () => null; // payouts not configured (no broadcast)
 
 beforeAll(async () => {
   await ready();
@@ -40,13 +41,20 @@ describe("claimEarnings", () => {
     expect(await getClaimable(O)).toBe(7);
   });
 
-  it("rolls back (no funds marked claimed) when the payout fails", async () => {
+  it("leaves the claim pending (NOT reclaimable) when a broadcast may have happened", async () => {
     const O = "WALLET_CLAIM_3";
     await creditEarning({ owner: O, skillId: "a", runId: "e1", runner: "X", amount: 12 });
     await expect(claimEarnings(O, failSend)).rejects.toThrow();
-    // still fully claimable after the failed attempt
-    expect(await getClaimable(O)).toBe(12);
-    // and a retry succeeds
-    expect((await claimEarnings(O, okSend)).claimed).toBe(12);
+    // earnings stay claimed (avoid double-pay) — nothing reclaimable
+    expect(await getClaimable(O)).toBe(0);
+  });
+
+  it("fully rolls back when payouts are disabled (no broadcast)", async () => {
+    const O = "WALLET_CLAIM_4";
+    await creditEarning({ owner: O, skillId: "a", runId: "f1", runner: "X", amount: 8 });
+    await expect(claimEarnings(O, offSend)).rejects.toThrow();
+    // safe to retry — still fully claimable
+    expect(await getClaimable(O)).toBe(8);
+    expect((await claimEarnings(O, okSend)).claimed).toBe(8);
   });
 });

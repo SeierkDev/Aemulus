@@ -48,7 +48,13 @@ async function completeRun(runId: string, args: RunArgs): Promise<void> {
     );
     await incrementRunCount(args.skill.id);
     invalidateReputation(args.skill.id); // success-rate aggregate changed
-    if (args.skill.owner && args.skill.owner !== args.runner) {
+    // Only pay the creator for runs that actually completed — a failed or
+    // needs_review run shouldn't earn the run fee.
+    if (
+      final.status === "completed" &&
+      args.skill.owner &&
+      args.skill.owner !== args.runner
+    ) {
       await creditEarning({
         owner: args.skill.owner,
         skillId: args.skill.id,

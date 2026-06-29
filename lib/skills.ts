@@ -124,7 +124,15 @@ export async function updateSkill(
   await ready();
   const cur = await getSkill(skillId);
   if (!cur) return;
-  const version = cur.version + 1;
+  // Derive the next version from the snapshot table's MAX, not the cached
+  // skills.version, so it stays correct; the UNIQUE(skill_id,version) index
+  // makes a concurrent collision fail loudly (caller retries) instead of
+  // silently duplicating a version.
+  const maxRow = await db.execute({
+    sql: `SELECT COALESCE(MAX(version),0) AS v FROM skill_versions WHERE skill_id = ?`,
+    args: [skillId],
+  });
+  const version = Number(maxRow.rows[0]?.v ?? 0) + 1;
   await db.execute({
     sql: `UPDATE skills SET name = ?, description = ?, plan = ?, input_schema = ?, version = ?, updated_at = ?
           WHERE id = ?`,

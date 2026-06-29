@@ -156,4 +156,13 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_earnings_unclaimed ON earnings(owner, claim_id);`,
     ],
   },
+
+  // 9 — enforce unique version numbers per skill (prevents duplicate snapshots).
+  {
+    id: 9,
+    name: "skill_version_unique",
+    statements: [
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_skill_versions_uniq ON skill_versions(skill_id, version);`,
+    ],
+  },
 ];

@@ -49,6 +49,7 @@ export function ResolveForm({
         <input
           className={input}
           value={selector}
+          aria-label="Corrected CSS selector"
           placeholder='Corrected CSS selector, e.g. input[name="vendor"]'
           onChange={(e) => setSelector(e.target.value)}
         />
