@@ -158,11 +158,18 @@ export const MIGRATIONS: Migration[] = [
   },
 
   // 9 — enforce unique version numbers per skill (prevents duplicate snapshots).
+  // De-dup any pre-existing collisions FIRST so the UNIQUE index can't fail and
+  // brick boot, then drop/recreate the single index as UNIQUE (no redundant
+  // second index on fresh DBs).
   {
     id: 9,
     name: "skill_version_unique",
     statements: [
-      `CREATE UNIQUE INDEX IF NOT EXISTS idx_skill_versions_uniq ON skill_versions(skill_id, version);`,
+      `DELETE FROM skill_versions WHERE rowid NOT IN (
+         SELECT MIN(rowid) FROM skill_versions GROUP BY skill_id, version
+       );`,
+      `DROP INDEX IF EXISTS idx_skill_versions;`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_skill_versions ON skill_versions(skill_id, version);`,
     ],
   },
 ];

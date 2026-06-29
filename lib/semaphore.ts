@@ -19,7 +19,7 @@ export class Semaphore {
   release(): void {
     const next = this.queue.shift();
     if (next) next(); // hand the slot directly to the next waiter
-    else this.active--;
+    else this.active = Math.max(0, this.active - 1); // never go negative
   }
 
   get inUse(): number {

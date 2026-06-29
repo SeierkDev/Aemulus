@@ -7,6 +7,7 @@ import { operatorChooseSelector, type Candidate } from "./operate";
 import { assertSafeUrl, isUnsafeRequestUrl } from "./safe-url";
 import { runSlots } from "./semaphore";
 import { attachReceipt } from "./receipt";
+import { logError } from "./log";
 import type { Run, RunOverrides, RunStatus, Skill, SkillStep } from "./types";
 
 /**
@@ -174,8 +175,15 @@ export async function executeRun(
       ? `Completed ${skill.plan.length} steps.`
       : null;
   await finishRun(runId, { status: finalStatus, result, error });
-  await setRunOutput(runId, outputs); // structured data captured by extract steps
-  await attachReceipt(runId); // verifiable receipt (+ on-chain anchor if configured)
+  // Output + receipt are best-effort: a failure here must NOT throw out of
+  // executeRun, or completeRun's catch would wrongly re-mark a completed run as
+  // failed. The finalized status above is the source of truth.
+  try {
+    await setRunOutput(runId, outputs); // structured data from extract steps
+    await attachReceipt(runId); // verifiable receipt (+ anchor if configured)
+  } catch (e) {
+    logError("runner.finalize", e);
+  }
   return (await getRun(runId))!;
 }
 

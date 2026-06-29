@@ -48,6 +48,12 @@ export async function POST(req: Request) {
       level: tier.level,
       balance: 0,
     };
+    if (tier.level < 1) {
+      return NextResponse.json(
+        { error: "Insufficient $AEMU balance for access." },
+        { status: 403 },
+      );
+    }
     const quota = await getQuota(session);
     if (!quota.ok) {
       return NextResponse.json(

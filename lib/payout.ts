@@ -26,14 +26,14 @@ export function payoutsEnabled(): boolean {
   return gatingEnabled() && !!process.env.AEMULUS_TREASURY_SECRET;
 }
 
-function ataFor(owner: PublicKey, mint: PublicKey): PublicKey {
+export function ataFor(owner: PublicKey, mint: PublicKey): PublicKey {
   return PublicKey.findProgramAddressSync(
     [owner.toBuffer(), TOKEN_PROGRAM.toBuffer(), mint.toBuffer()],
     ATA_PROGRAM,
   )[0];
 }
 
-function u64le(n: bigint): Buffer {
+export function u64le(n: bigint): Buffer {
   const b = Buffer.alloc(8);
   b.writeBigUInt64LE(n);
   return b;

@@ -25,6 +25,8 @@ export interface RecordedAction {
   text?: string;
   /** Value for inputs/selects. */
   value?: string;
+  /** Password/secret field — value is never captured; must be a per-run input. */
+  sensitive?: boolean;
   /** Key for key events (Enter, Tab, Escape…). */
   key?: string;
   /** Relative path of the proof screenshot under .data/recordings. */

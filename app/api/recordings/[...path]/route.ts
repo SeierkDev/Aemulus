@@ -22,12 +22,23 @@ export async function GET(
     return new Response("Unauthorized", { status: 401 });
   }
   const { path: parts } = await params;
-  if (parts[0] !== session.pubkey) {
+  // Reject traversal/separator segments BEFORE joining — otherwise
+  // ["me","..","victim","x.png"] passes the parts[0] check and path.join
+  // collapses it into another wallet's directory (cross-wallet IDOR).
+  if (
+    parts.length === 0 ||
+    parts[0] !== session.pubkey ||
+    parts.some(
+      (p) => p === "" || p === "." || p === ".." || /[/\\]/.test(p),
+    )
+  ) {
     return new Response("Forbidden", { status: 403 });
   }
 
-  const target = path.join(ROOT, ...parts);
-  if (!target.startsWith(ROOT + path.sep)) {
+  // Containment check against the caller's OWN directory, not just ROOT.
+  const ownerRoot = path.join(ROOT, session.pubkey);
+  const target = path.resolve(ROOT, ...parts);
+  if (target !== ownerRoot && !target.startsWith(ownerRoot + path.sep)) {
     return new Response("Forbidden", { status: 403 });
   }
   try {

@@ -112,9 +112,14 @@ export function recorderInitScript() {
         send({ type: "select", ...base(el), value: el.value });
       } else {
         const type = (el as HTMLInputElement).type;
-        const value =
-          type === "password" ? "•".repeat(el.value.length) : el.value;
-        send({ type: "input", ...base(el), value });
+        // Never capture secrets — record an empty, flagged value so the
+        // generalizer turns it into a required per-run input (never a baked-in
+        // constant, and never the raw/masked password text).
+        if (type === "password") {
+          send({ type: "input", ...base(el), value: "", sensitive: true });
+        } else {
+          send({ type: "input", ...base(el), value: el.value });
+        }
       }
     },
     true,

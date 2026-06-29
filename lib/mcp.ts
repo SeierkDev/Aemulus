@@ -159,6 +159,9 @@ export async function handleMcp(
   owner: string,
   msg: JsonRpc,
 ): Promise<object | null> {
+  if (!msg || typeof msg !== "object" || typeof msg.method !== "string") {
+    return rpcErr(null, -32600, "Invalid Request");
+  }
   const { id, method, params } = msg;
   switch (method) {
     case "initialize":

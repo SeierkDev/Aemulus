@@ -1,6 +1,7 @@
 import { db, ready } from "./db";
 import { id } from "./ids";
 import { startRun } from "./run-service";
+import { logError } from "./log";
 import type { BulkRun, Skill } from "./types";
 
 /**
@@ -17,19 +18,28 @@ export async function createBulkRun(
   await ready();
   const bulkId = id("bulk");
   const now = Date.now();
+  // Start the child runs first, then record the parent total as the number we
+  // actually started — so a mid-loop failure can't leave total > children
+  // (which would make the bulk's progress never reach completion).
+  let started = 0;
+  for (let i = 0; i < rows.length; i++) {
+    try {
+      await startRun({ skill, input: rows[i], runner, bulkId, rowIndex: i });
+      started++;
+    } catch (e) {
+      logError("bulk.startRun", e);
+    }
+  }
   await db.execute({
     sql: `INSERT INTO bulk_runs (id, owner, skill_id, total, created_at)
           VALUES (?, ?, ?, ?, ?)`,
-    args: [bulkId, runner, skill.id, rows.length, now],
+    args: [bulkId, runner, skill.id, started, now],
   });
-  for (let i = 0; i < rows.length; i++) {
-    await startRun({ skill, input: rows[i], runner, bulkId, rowIndex: i });
-  }
   return {
     id: bulkId,
     owner: runner,
     skillId: skill.id,
-    total: rows.length,
+    total: started,
     createdAt: now,
   };
 }

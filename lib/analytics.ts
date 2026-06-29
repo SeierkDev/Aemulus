@@ -12,24 +12,29 @@ export interface CreatorAnalytics {
   windowEarnings: number;
 }
 
-const DAY = 24 * 60 * 60 * 1000;
 const WINDOW = 14;
 
 export async function getCreatorAnalytics(
   owner: string,
 ): Promise<CreatorAnalytics> {
   await ready();
-  const now = Date.now();
-  const start = now - (WINDOW - 1) * DAY;
-  const dayStart = new Date(start).setHours(0, 0, 0, 0);
-
-  const buckets = Array.from({ length: WINDOW }, (_, i) => ({
-    ts: dayStart + i * DAY,
-    runs: 0,
-    completed: 0,
-    earnings: 0,
-  }));
-  const idx = (ts: number) => Math.floor((ts - dayStart) / DAY);
+  // Anchor each bucket at a real LOCAL midnight (not uniform +DAY), so a DST
+  // transition inside the window can't misattribute runs or repeat/skip a label.
+  const today0 = new Date();
+  today0.setHours(0, 0, 0, 0);
+  const buckets = Array.from({ length: WINDOW }, (_, i) => {
+    const d = new Date(today0);
+    d.setDate(d.getDate() - (WINDOW - 1) + i);
+    return { ts: d.getTime(), runs: 0, completed: 0, earnings: 0 };
+  });
+  const dayStart = buckets[0].ts;
+  // Map a timestamp to its bucket by local-midnight boundaries.
+  const idx = (ts: number): number => {
+    for (let i = WINDOW - 1; i >= 0; i--) {
+      if (ts >= buckets[i].ts) return i;
+    }
+    return -1;
+  };
 
   const runs = await db.execute({
     sql: `SELECT created_at, status FROM runs
