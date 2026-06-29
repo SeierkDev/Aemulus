@@ -87,7 +87,20 @@ export default async function RunPage({
               <span>{SOLANA.runFee} $AEMU</span>
             </div>
           )}
+          {run.outcomeStatus && (
+            <div title={run.outcomeReason ?? ""}>
+              <span className="text-ink-3">Outcome</span>{" "}
+              <span>
+                {run.outcomeStatus === "achieved"
+                  ? "✓ goal verified"
+                  : "⚠ couldn't confirm"}
+              </span>
+            </div>
+          )}
         </Card>
+        {run.outcomeStatus && run.outcomeReason && (
+          <p className="mt-1.5 px-1 text-xs text-ink-3">{run.outcomeReason}</p>
+        )}
 
         {inputs.length > 0 && (
           <Card className="mt-6 p-4">

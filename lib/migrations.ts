@@ -284,4 +284,14 @@ export const MIGRATIONS: Migration[] = [
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_skill_reports_uniq ON skill_reports(skill_id, reporter);`,
     ],
   },
+
+  // 18 - vision success-verification: did the run achieve the goal?
+  {
+    id: 18,
+    name: "run_outcome",
+    addColumns: [
+      { table: "runs", column: "outcome_status", def: "TEXT" },
+      { table: "runs", column: "outcome_reason", def: "TEXT" },
+    ],
+  },
 ];

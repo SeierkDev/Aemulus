@@ -2,12 +2,20 @@ import { chromium, type Browser, type Locator, type Page } from "playwright";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { id } from "./ids";
-import { addRunStep, finishRun, getRun, setRunOutput, setRunUsage } from "./runs";
+import {
+  addRunStep,
+  finishRun,
+  getRun,
+  setRunOutput,
+  setRunOutcome,
+  setRunUsage,
+} from "./runs";
 import { operatorChooseSelector, type Candidate } from "./operate";
 import { assertSafeUrl, isUnsafeRequestUrl, hostInAllowlist } from "./safe-url";
 import { runSlots } from "./semaphore";
 import { attachReceipt } from "./receipt";
 import { learnSelectors } from "./skills";
+import { verifyOutcome } from "./verify-outcome";
 import { incr } from "./metrics";
 import { logError, logInfo } from "./log";
 import type { Run, RunOverrides, RunStatus, Skill, SkillStep } from "./types";
@@ -51,6 +59,7 @@ export async function executeRun(
   let error: string | null = null;
   const outputs: Record<string, string> = {}; // values captured by extract steps
   const healed: Record<number, string> = {}; // step idx → operator-found selector
+  let finalShot: string | null = null; // final screen (base64) for outcome check
   let tokensIn = 0; // operator (Claude) tokens spent this run
   let tokensOut = 0;
 
@@ -201,6 +210,13 @@ export async function executeRun(
         break;
       }
     }
+    // Capture the final screen for outcome verification (before the browser closes).
+    if (finalStatus === "completed") {
+      finalShot = await page
+        .screenshot()
+        .then((b) => b.toString("base64"))
+        .catch(() => null);
+    }
   } catch (err) {
     finalStatus = "failed";
     error = err instanceof Error ? err.message : "Run failed to start.";
@@ -219,8 +235,23 @@ export async function executeRun(
   // failed. The finalized status above is the source of truth.
   try {
     await setRunOutput(runId, outputs); // structured data from extract steps
-    await setRunUsage(runId, tokensIn, tokensOut); // cost transparency
     await attachReceipt(runId); // verifiable receipt (+ anchor if configured)
+
+    // Vision success-verification: did the final screen show the goal was met?
+    // Best-effort (skips silently without an API key); its tokens roll into the
+    // run's cost below.
+    if (finalStatus === "completed" && finalShot) {
+      const goal = `${skill.name}. ${skill.description}`.trim();
+      const v = await verifyOutcome(goal, finalShot);
+      if (v) {
+        tokensIn += v.tokensIn;
+        tokensOut += v.tokensOut;
+        const status = v.achieved ? "achieved" : "unconfirmed";
+        await setRunOutcome(runId, status, v.reason);
+        incr(v.achieved ? "runs.outcomeVerified" : "runs.outcomeUnconfirmed");
+      }
+    }
+
     // Self-healing: only on a fully-completed run, and only when the owner runs
     // their own skill (never let a third party's run mutate a published skill).
     if (
@@ -234,6 +265,8 @@ export async function executeRun(
         logInfo("runner.selfHeal", `healed ${n} selector(s)`, { skill: skill.id });
       }
     }
+
+    await setRunUsage(runId, tokensIn, tokensOut); // cost transparency (incl. verify)
   } catch (e) {
     logError("runner.finalize", e);
   }

@@ -252,6 +252,9 @@ export interface Run {
   /** Operator (Claude) tokens spent on this run - cost transparency. */
   tokensIn: number;
   tokensOut: number;
+  /** Vision success-verification: null = unchecked, else achieved | unconfirmed. */
+  outcomeStatus: "achieved" | "unconfirmed" | null;
+  outcomeReason: string | null;
   steps: RunStepRecord[];
   createdAt: number;
   updatedAt: number;

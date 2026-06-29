@@ -41,6 +41,8 @@ export async function createRun(input: {
     output: null,
     tokensIn: 0,
     tokensOut: 0,
+    outcomeStatus: null,
+    outcomeReason: null,
     steps: [],
     createdAt: now,
     updatedAt: now,
@@ -225,6 +227,19 @@ export async function setRunOutput(
   });
 }
 
+/** Record the vision success-verification verdict for a run. */
+export async function setRunOutcome(
+  runId: string,
+  status: "achieved" | "unconfirmed",
+  reason: string,
+): Promise<void> {
+  await ready();
+  await db.execute({
+    sql: `UPDATE runs SET outcome_status = ?, outcome_reason = ? WHERE id = ?`,
+    args: [status, reason.slice(0, 500), runId],
+  });
+}
+
 /** Record operator (Claude) token usage for a run - cost transparency. */
 export async function setRunUsage(
   runId: string,
@@ -333,6 +348,11 @@ function rowToRun(row: Record<string, unknown>, steps: RunStepRecord[]): Run {
         : decryptJSON<Record<string, string>>(String(row.output), {}),
     tokensIn: Number(row.tokens_in ?? 0),
     tokensOut: Number(row.tokens_out ?? 0),
+    outcomeStatus:
+      row.outcome_status == null
+        ? null
+        : (String(row.outcome_status) as "achieved" | "unconfirmed"),
+    outcomeReason: row.outcome_reason == null ? null : String(row.outcome_reason),
     steps,
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),
