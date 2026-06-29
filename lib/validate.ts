@@ -78,6 +78,8 @@ export const PublishBody = z.object({ published: z.boolean() });
 
 export const RestoreBody = z.object({ version: z.number().int().positive() });
 
+export const ApiKeyBody = z.object({ name: z.string().max(80).optional() });
+
 export const RunBody = z.object({
   skillId: z.string().min(1).max(64),
   input: z.record(z.string().max(200), z.string().max(5000)).optional(),

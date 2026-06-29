@@ -48,6 +48,7 @@ export function Nav() {
         <NavLink href="/earnings">Earnings</NavLink>
         <NavLink href="/litepaper">Litepaper</NavLink>
         <NavLink href="/roadmap">Roadmap</NavLink>
+        <NavLink href="/developers">Developers</NavLink>
       </nav>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:justify-self-end">
         <a
