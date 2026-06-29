@@ -33,6 +33,7 @@ import {
   deactivate,
   listSchedules,
   cadenceMs,
+  nextRunAfter,
 } from "../../lib/schedules";
 import type { GeneralizedSkill } from "../../lib/types";
 
@@ -260,6 +261,19 @@ describe("schedules", () => {
     await bumpNextRun(sid, Date.now() - 1000);
     await deactivate(sid);
     expect((await dueSchedules(Date.now())).find((s) => s.id === sid)).toBeUndefined();
+  });
+
+  it("nextRunAfter: fixed intervals + weekdays never land on a weekend", () => {
+    const t0 = 1_700_000_000_000;
+    expect(nextRunAfter("hourly", t0) - t0).toBe(cadenceMs("hourly"));
+    expect(nextRunAfter("weekly", t0) - t0).toBe(7 * 86_400_000);
+    // weekdays: scan a full week of starting points; never Sat(6)/Sun(0)
+    for (let i = 0; i < 7; i++) {
+      const next = nextRunAfter("weekdays", t0 + i * 86_400_000);
+      const day = new Date(next).getDay();
+      expect(day).not.toBe(0);
+      expect(day).not.toBe(6);
+    }
   });
 
   it("claims a firing exactly once (durable against double-run)", async () => {

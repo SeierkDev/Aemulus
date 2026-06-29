@@ -3,7 +3,7 @@ import { Badge, Card } from "@/components/ui";
 import { Nav } from "@/components/Nav";
 import { ScheduleControls } from "@/components/ScheduleControls";
 import { getSession } from "@/lib/auth";
-import { listSchedules } from "@/lib/schedules";
+import { listSchedules, cadenceLabel } from "@/lib/schedules";
 import { when } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -54,7 +54,7 @@ export default async function SchedulesPage() {
                     {s.skillName}
                   </Link>
                   <span className="rounded border border-border-strong bg-surface-2 px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wide text-ink-3">
-                    {s.cadence}
+                    {cadenceLabel(s.cadence)}
                   </span>
                   {!s.active && (
                     <span className="text-[0.65rem] uppercase tracking-wide text-ink-3">

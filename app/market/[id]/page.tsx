@@ -6,10 +6,15 @@ import { RunPanel } from "@/components/RunPanel";
 import { BulkRunPanel } from "@/components/BulkRunPanel";
 import { Stars } from "@/components/Stars";
 import { RatingWidget } from "@/components/RatingWidget";
-import { getSkill, skillTargets } from "@/lib/skills";
+import {
+  getSkill,
+  skillTargets,
+  categorize,
+  listPublishedSkills,
+} from "@/lib/skills";
 import { hasRunSkill } from "@/lib/runs";
 import { getSession } from "@/lib/auth";
-import { short } from "@/lib/format";
+import { short, ago } from "@/lib/format";
 import {
   getSkillReputation,
   getMyRating,
@@ -40,6 +45,21 @@ export default async function MarketSkillPage({
   ]);
   const canRate = !!session && !isOwner && hasRun;
 
+  // Related discovery: other published skills by this creator + same category.
+  const category = categorize(skill.name, skill.description);
+  const published = await listPublishedSkills(100);
+  const fromCreator = published
+    .filter((s) => s.owner === skill.owner && s.id !== skill.id)
+    .slice(0, 4);
+  const related = published
+    .filter(
+      (s) =>
+        s.id !== skill.id &&
+        s.owner !== skill.owner &&
+        categorize(s.name, s.description) === category,
+    )
+    .slice(0, 4);
+
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-6">
       <Nav />
@@ -56,11 +76,17 @@ export default async function MarketSkillPage({
               {skill.description}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-3">
+              <span className="rounded border border-border-strong bg-surface-2 px-1.5 py-0.5 text-[0.6rem] uppercase tracking-wide">
+                {category}
+              </span>
               <span className="mono">by {short(skill.owner)}</span>
               <span>·</span>
               <span>{skill.runCount} runs</span>
               <span>·</span>
               <span>{skill.plan.length} steps</span>
+              <span>·</span>
+              <span className="mono">v{skill.version}</span>
+              <span>· updated {ago(skill.updatedAt)}</span>
               {rep.ratingCount > 0 && (
                 <>
                   <span>·</span>
@@ -184,8 +210,42 @@ export default async function MarketSkillPage({
         {reviews.length === 0 && rep.ratingCount === 0 && (
           <p className="mt-3 text-sm text-ink-3">No ratings yet.</p>
         )}
+
+        {fromCreator.length > 0 && (
+          <SkillStrip title={`More from ${short(skill.owner)}`} skills={fromCreator} />
+        )}
+        {related.length > 0 && (
+          <SkillStrip title={`More in ${category}`} skills={related} />
+        )}
       </div>
       <div className="py-10" />
+    </div>
+  );
+}
+
+function SkillStrip({
+  title,
+  skills,
+}: {
+  title: string;
+  skills: { id: string; name: string; description: string; runCount: number }[];
+}) {
+  return (
+    <div className="mt-10">
+      <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {skills.map((s) => (
+          <Link key={s.id} href={`/market/${s.id}`}>
+            <Card className="flex h-full flex-col p-4 transition-colors hover:bg-surface-2">
+              <h3 className="text-sm font-medium tracking-tight">{s.name}</h3>
+              <p className="mt-1 line-clamp-2 flex-1 text-xs leading-relaxed text-ink-3">
+                {s.description}
+              </p>
+              <div className="mono mt-2 text-xs text-ink-3">{s.runCount} runs</div>
+            </Card>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }

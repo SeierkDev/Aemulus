@@ -60,7 +60,11 @@ export function SchedulePanel({
           onChange={(e) => setCadence(e.target.value as Cadence)}
         >
           <option value="hourly">Every hour</option>
+          <option value="every6h">Every 6 hours</option>
+          <option value="every12h">Every 12 hours</option>
           <option value="daily">Every day</option>
+          <option value="weekdays">Weekdays (Mon–Fri)</option>
+          <option value="weekly">Every week</option>
         </select>
       </div>
       {fields.length > 0 && (

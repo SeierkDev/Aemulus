@@ -1,5 +1,5 @@
 import {
-  cadenceMs,
+  nextRunAfter,
   claimSchedule,
   deactivate,
   dueSchedules,
@@ -35,7 +35,7 @@ async function runDue(): Promise<void> {
   }
 
   for (const s of due) {
-    const next = Date.now() + cadenceMs(s.cadence);
+    const next = nextRunAfter(s.cadence, Date.now());
     // Reserve this firing before doing anything — losers (other ticks /
     // instances) skip it. A claimed run that then fails just waits a cadence.
     if (!(await claimSchedule(s.id, now, next))) continue;

@@ -189,7 +189,13 @@ export interface SkillReview {
   createdAt: number;
 }
 
-export type Cadence = "hourly" | "daily";
+export type Cadence =
+  | "hourly"
+  | "every6h"
+  | "every12h"
+  | "daily"
+  | "weekdays"
+  | "weekly";
 
 export interface Schedule {
   id: string;

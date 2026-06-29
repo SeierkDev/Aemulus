@@ -3,12 +3,42 @@ import { id } from "./ids";
 import { decryptJSON, encryptJSON } from "./encrypt";
 import type { Cadence, Schedule } from "./types";
 
-const CADENCE_MS: Record<Cadence, number> = {
-  hourly: 60 * 60 * 1000,
-  daily: 24 * 60 * 60 * 1000,
+const HOUR = 60 * 60 * 1000;
+const DAY = 24 * HOUR;
+const INTERVAL: Record<string, number> = {
+  hourly: HOUR,
+  every6h: 6 * HOUR,
+  every12h: 12 * HOUR,
+  daily: DAY,
+  weekly: 7 * DAY,
 };
+/** Fixed interval for a cadence (weekdays falls back to a day for display). */
 export function cadenceMs(c: Cadence): number {
-  return CADENCE_MS[c];
+  return INTERVAL[c] ?? DAY;
+}
+
+const CADENCE_LABEL: Record<Cadence, string> = {
+  hourly: "Every hour",
+  every6h: "Every 6 hours",
+  every12h: "Every 12 hours",
+  daily: "Every day",
+  weekdays: "Weekdays",
+  weekly: "Every week",
+};
+export function cadenceLabel(c: Cadence): string {
+  return CADENCE_LABEL[c] ?? c;
+}
+
+/** Next run timestamp after `from` — handles "weekdays" by skipping weekends. */
+export function nextRunAfter(c: Cadence, from: number): number {
+  if (c === "weekdays") {
+    const d = new Date(from + DAY);
+    const day = d.getDay(); // 0 = Sun, 6 = Sat
+    if (day === 6) d.setDate(d.getDate() + 2);
+    else if (day === 0) d.setDate(d.getDate() + 1);
+    return d.getTime();
+  }
+  return from + cadenceMs(c);
 }
 
 /** Richer shape the scheduler needs to actually run a due schedule. */
@@ -44,7 +74,7 @@ export async function createSchedule(input: {
       input.cadence,
       input.level,
       input.tier,
-      now + cadenceMs(input.cadence),
+      nextRunAfter(input.cadence, now),
       now,
     ],
   });

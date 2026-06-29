@@ -91,7 +91,14 @@ export const ResolveBody = z.object({
 
 export const ScheduleCreateBody = z.object({
   skillId: z.string().min(1).max(64),
-  cadence: z.enum(["hourly", "daily"]),
+  cadence: z.enum([
+    "hourly",
+    "every6h",
+    "every12h",
+    "daily",
+    "weekdays",
+    "weekly",
+  ]),
   input: z.record(z.string().max(200), z.string().max(5000)).optional(),
 });
 
