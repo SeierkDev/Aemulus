@@ -10,12 +10,14 @@ import {
   setRunOutcome,
   setRunUsage,
 } from "./runs";
-import { operatorChooseSelector, type Candidate } from "./operate";
+import { operatorChooseSelector } from "./operate";
+import { collectCandidates } from "./dom";
 import { assertSafeUrl, isUnsafeRequestUrl, hostInAllowlist } from "./safe-url";
 import { runSlots } from "./semaphore";
 import { attachReceipt } from "./receipt";
 import { learnSelectors } from "./skills";
 import { startChainedRun } from "./chain";
+import { agenticStep, agentFallbackEnabled } from "./agent";
 import { verifyOutcome } from "./verify-outcome";
 import { incr } from "./metrics";
 import { logError, logInfo } from "./log";
@@ -185,6 +187,20 @@ export async function executeRun(
         }
 
         if (!loc || confidence < CONFIDENCE_FLOOR) {
+          // Agentic fallback (opt-in): before pausing for a human, let the agent
+          // try to accomplish the step itself. Only for action steps (extract is
+          // a read, not something the agent performs).
+          if (agentFallbackEnabled() && step.action !== "extract") {
+            const ag = await agenticStep(page, step, value);
+            tokensIn += ag.tokensIn;
+            tokensOut += ag.tokensOut;
+            if (ag.ok) {
+              await page.screenshot({ path: shotPath });
+              await recordStep(runId, step, ag.selectorUsed, value, shotRel, ag.confidence, false, ag.note);
+              continue; // the agent performed the step
+            }
+            note = ag.note || note;
+          }
           await page.screenshot({ path: shotPath });
           await recordStep(
             runId,
@@ -407,40 +423,6 @@ async function tryOperator(page: Page, step: SkillStep, value: string) {
 }
 
 /** Snapshot the page's interactive elements for the operator to choose from. */
-function collectCandidates(page: Page): Promise<Candidate[]> {
-  return page.evaluate(() => {
-    const esc = (s: string) =>
-      typeof CSS !== "undefined" && CSS.escape
-        ? CSS.escape(s)
-        : s.replace(/[^a-zA-Z0-9_-]/g, "\\$&");
-    const sel = (el: Element): string => {
-      const id = el.getAttribute("id");
-      if (id) return `#${esc(id)}`;
-      const tag = el.tagName.toLowerCase();
-      const name = el.getAttribute("name");
-      if (name) return `${tag}[name="${name}"]`;
-      const aria = el.getAttribute("aria-label");
-      if (aria) return `${tag}[aria-label="${aria}"]`;
-      return tag;
-    };
-    const nodes = Array.from(
-      document.querySelectorAll(
-        "a, button, input, select, textarea, [role='button'], [onclick]",
-      ),
-    ).slice(0, 50);
-    return nodes.map((el) => ({
-      selector: sel(el),
-      tag: el.tagName.toLowerCase(),
-      name:
-        el.getAttribute("aria-label") ||
-        el.getAttribute("name") ||
-        el.getAttribute("placeholder") ||
-        "",
-      text: ((el as HTMLElement).innerText || "").trim().slice(0, 60),
-    }));
-  });
-}
-
 async function recordStep(
   runId: string,
   step: SkillStep,
