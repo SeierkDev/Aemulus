@@ -58,6 +58,12 @@ const SkillStepSchema = z.object({
   inputKey: z.string().max(200),
   key: z.string().max(40),
   outputKey: z.string().max(200).optional(),
+  condition: z
+    .object({
+      kind: z.enum(["exists", "absent"]),
+      selector: z.string().max(2000),
+    })
+    .optional(),
 });
 const InputFieldSchema = z.object({
   key: z.string().max(200),

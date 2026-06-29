@@ -386,6 +386,43 @@ export function SkillEditor({
                   )}
                 </div>
               )}
+
+              {/* Branch condition (run only if…) */}
+              <div className="mt-3 grid grid-cols-[160px_1fr] items-center gap-3 pl-11">
+                <select
+                  className={input}
+                  value={s.condition?.kind ?? "none"}
+                  aria-label={`Step ${i + 1} run condition`}
+                  onChange={(e) =>
+                    patchStep(i, {
+                      condition:
+                        e.target.value === "none"
+                          ? undefined
+                          : {
+                              kind: e.target.value as "exists" | "absent",
+                              selector: s.condition?.selector ?? "",
+                            },
+                    })
+                  }
+                >
+                  <option value="none">always run</option>
+                  <option value="exists">run if present</option>
+                  <option value="absent">run if absent</option>
+                </select>
+                {s.condition && (
+                  <input
+                    className={input}
+                    value={s.condition.selector}
+                    placeholder="CSS selector to check"
+                    aria-label={`Step ${i + 1} condition selector`}
+                    onChange={(e) =>
+                      patchStep(i, {
+                        condition: { kind: s.condition!.kind, selector: e.target.value },
+                      })
+                    }
+                  />
+                )}
+              </div>
             </Card>
           ))}
         </div>

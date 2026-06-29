@@ -78,6 +78,16 @@ export interface SkillInputField {
  *  - "constant" → fixed `value` baked into the skill
  *  - "none"     → no value (clicks, navigation, key presses)
  */
+/**
+ * Optional gate on a step: run it only if a selector is present ("exists") or
+ * not present ("absent") on the page — the if/then primitive (e.g. dismiss a
+ * cookie banner only if it appears, or run a login flow only if logged out).
+ */
+export interface StepCondition {
+  kind: "exists" | "absent";
+  selector: string;
+}
+
 export interface SkillStep {
   idx: number;
   intent: string;
@@ -90,6 +100,8 @@ export interface SkillStep {
   key: string;
   /** For "extract" steps: the key to store the captured value under. */
   outputKey?: string;
+  /** Optional condition — when set, the step runs only if it's satisfied. */
+  condition?: StepCondition;
 }
 
 export interface Skill {

@@ -99,6 +99,22 @@ export async function executeRun(
           continue;
         }
 
+        // Conditional step (branching): run only if the condition holds.
+        if (step.condition && !(await conditionMet(page, step.condition))) {
+          await page.screenshot({ path: shotPath }).catch(() => {});
+          await recordStep(
+            runId,
+            step,
+            "",
+            value,
+            shotRel,
+            1,
+            false,
+            `Skipped: condition (${step.condition.kind} ${step.condition.selector}) not met.`,
+          );
+          continue;
+        }
+
         if (step.action === "navigate") {
           await assertSafeUrl(step.target); // SSRF guard before any navigation
           if (!hostInAllowlist(step.target, allowedHosts)) {
@@ -202,6 +218,20 @@ export async function executeRun(
     logError("runner.finalize", e);
   }
   return (await getRun(runId))!;
+}
+
+/** Evaluate a step's branch condition against the current page. */
+async function conditionMet(
+  page: Page,
+  cond: { kind: "exists" | "absent"; selector: string },
+): Promise<boolean> {
+  let present = false;
+  try {
+    present = (await page.locator(cond.selector).count()) > 0;
+  } catch {
+    present = false; // invalid selector → treat as not present
+  }
+  return cond.kind === "exists" ? present : !present;
 }
 
 function resolveValue(step: SkillStep, input: Record<string, string>): string {
