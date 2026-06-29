@@ -133,6 +133,32 @@ export async function listRunsByBulk(bulkId: string): Promise<Run[]> {
   );
 }
 
+/** Public, non-sensitive leaves of a batch: run id, leaf hash, index, proof. */
+export async function listBatchLeaves(batchId: string): Promise<
+  {
+    runId: string;
+    leafHash: string;
+    leafIndex: number;
+    proof: { siblings: { hash: string; left: boolean }[] };
+  }[]
+> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT id, receipt_hash, leaf_index, merkle_proof FROM runs
+          WHERE batch_id = ? ORDER BY leaf_index ASC`,
+    args: [batchId],
+  });
+  return r.rows.map((x) => ({
+    runId: String(x.id),
+    leafHash: String(x.receipt_hash),
+    leafIndex: Number(x.leaf_index),
+    proof:
+      x.merkle_proof == null
+        ? { siblings: [] }
+        : JSON.parse(String(x.merkle_proof)),
+  }));
+}
+
 export async function getBatch(batchId: string): Promise<ReceiptBatch | null> {
   await ready();
   const r = await db.execute({

@@ -84,6 +84,15 @@ export default async function VerifyPage({
                 >
                   root: {v.batch.root}
                 </div>
+                <a
+                  href={`/api/batch/${v.batch.id}/bundle`}
+                  className="mt-2 inline-block text-xs text-ink hover:underline"
+                >
+                  Download proof bundle ↓
+                </a>
+                <span className="ml-2 text-xs text-ink-3">
+                  self-contained · verifiable offline
+                </span>
                 {v.batch.anchor ? (
                   <p className="mt-2">
                     {v.batch.anchor.memoMatches === true

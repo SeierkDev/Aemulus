@@ -2,8 +2,9 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { db, ready } from "../../lib/db";
 import { createSkill } from "../../lib/skills";
 import { createRun, finishRun, addRunStep } from "../../lib/runs";
-import { attachReceipt, verifyReceipt } from "../../lib/receipt";
+import { attachReceipt, verifyReceipt, buildBatchBundle } from "../../lib/receipt";
 import { batchPendingReceipts } from "../../lib/receipt-batch";
+import { verifyProof } from "../../lib/merkle";
 import type { GeneralizedSkill } from "../../lib/types";
 
 const OWNER = "WALLET_BATCH";
@@ -75,6 +76,25 @@ describe("merkle receipt batching", () => {
 
     // nothing left pending → no new batch
     expect(await batchPendingReceipts()).toBeNull();
+  });
+
+  it("produces a self-contained proof bundle whose every leaf proves to the root", async () => {
+    const skill = await createSkill({ owner: OWNER, generalized: gen(), sourceDemoId: null });
+    for (let i = 0; i < 3; i++) await completedRunWithReceipt(skill.id);
+    const res = await batchPendingReceipts();
+
+    const bundle = await buildBatchBundle(res!.batchId);
+    expect(bundle).not.toBeNull();
+    expect(bundle!.root).toBe(res!.root);
+    expect(bundle!.leaves.length).toBe(res!.leafCount);
+    expect(bundle!.bundleHash).toMatch(/^[a-f0-9]{64}$/);
+    // every leaf in the bundle verifies against the root, offline
+    for (const leaf of bundle!.leaves) {
+      expect(verifyProof(leaf.leafHash, leaf.proof, bundle!.root)).toBe(true);
+    }
+    // content address is deterministic
+    const again = await buildBatchBundle(res!.batchId);
+    expect(again!.bundleHash).toBe(bundle!.bundleHash);
   });
 
   it("tampering after batching breaks the membership proof", async () => {

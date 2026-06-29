@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { assertSafeUrl } from "../lib/safe-url";
+import { assertSafeUrl, isUnsafeRequestUrl } from "../lib/safe-url";
 
 describe("assertSafeUrl (SSRF guard)", () => {
   const blocked = [
@@ -25,5 +25,34 @@ describe("assertSafeUrl (SSRF guard)", () => {
     await expect(
       assertSafeUrl("data:text/html,<h1>hi</h1>"),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("isUnsafeRequestUrl (per-request egress filter)", () => {
+  it("blocks internal hosts, private IPs, and odd schemes", () => {
+    for (const u of [
+      "http://localhost/x",
+      "http://127.0.0.1/x",
+      "http://169.254.169.254/latest",
+      "http://10.1.2.3/x",
+      "http://192.168.0.1/x",
+      "http://[::1]/x",
+      "file:///etc/passwd",
+      "ftp://example.com",
+      "not a url",
+    ]) {
+      expect(isUnsafeRequestUrl(u)).toBe(true);
+    }
+  });
+
+  it("allows public http(s) and inline data/blob", () => {
+    for (const u of [
+      "https://example.com/app.js",
+      "http://cdn.example.org/style.css",
+      "data:image/png;base64,AAAA",
+      "blob:https://example.com/abc",
+    ]) {
+      expect(isUnsafeRequestUrl(u)).toBe(false);
+    }
   });
 });

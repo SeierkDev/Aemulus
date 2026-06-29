@@ -36,6 +36,28 @@ function isPrivateIp(ip: string): boolean {
   return false;
 }
 
+/**
+ * Fast, synchronous request filter for per-request egress control during a run.
+ * Blocks non-http(s) schemes, known-internal hostnames, and literal private IPs
+ * — no DNS (kept cheap for every subresource). Top-level navigations still get
+ * the full DNS-resolving assertSafeUrl. data:/blob: are inline (allowed).
+ */
+export function isUnsafeRequestUrl(raw: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return true;
+  }
+  if (u.protocol === "data:" || u.protocol === "blob:") return false;
+  if (u.protocol !== "http:" && u.protocol !== "https:") return true;
+  // strip brackets from IPv6 literals (e.g. "[::1]") so net.isIP recognizes them
+  const host = u.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  if (BLOCKED_HOSTS.has(host)) return true;
+  if (net.isIP(host) && isPrivateIp(host)) return true;
+  return false;
+}
+
 /** Throws if `raw` is unsafe to navigate to. data: URLs are inline (no fetch). */
 export async function assertSafeUrl(raw: string): Promise<void> {
   let u: URL;

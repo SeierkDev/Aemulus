@@ -11,7 +11,7 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import bs58 from "bs58";
-import { getBatch, getRun, updateReceipt } from "./runs";
+import { getBatch, getRun, listBatchLeaves, updateReceipt } from "./runs";
 import { verifyProof } from "./merkle";
 import { logError } from "./log";
 import type { Run } from "./types";
@@ -138,6 +138,52 @@ export async function attachReceipt(runId: string): Promise<void> {
   } catch (e) {
     logError("receipt.attach", e, { run: runId });
   }
+}
+
+export interface BatchBundle {
+  batchId: string;
+  root: string;
+  sig: string | null;
+  cluster: string | null;
+  leafCount: number;
+  createdAt: number;
+  /** sha256 over {root, leaves} — content address; pin this anywhere. */
+  bundleHash: string;
+  leaves: {
+    runId: string;
+    leafHash: string;
+    leafIndex: number;
+    proof: { siblings: { hash: string; left: boolean }[] };
+  }[];
+}
+
+/**
+ * A self-contained, content-addressed proof bundle for a batch: the root, the
+ * (optional) on-chain signature, and every leaf's hash + Merkle proof. It's
+ * verifiable offline (recompute the root from each leaf+proof) and app-
+ * independent — pin it to Arweave/IPFS and the receipts outlive this service.
+ */
+export async function buildBatchBundle(
+  batchId: string,
+): Promise<BatchBundle | null> {
+  const batch = await getBatch(batchId);
+  if (!batch) return null;
+  const leaves = await listBatchLeaves(batchId);
+  const canonical = JSON.stringify({
+    root: batch.merkleRoot,
+    leaves: leaves.map((l) => ({ i: l.leafIndex, h: l.leafHash })),
+  });
+  const bundleHash = createHash("sha256").update(canonical).digest("hex");
+  return {
+    batchId: batch.id,
+    root: batch.merkleRoot,
+    sig: batch.sig,
+    cluster: batch.cluster,
+    leafCount: batch.leafCount,
+    createdAt: batch.createdAt,
+    bundleHash,
+    leaves,
+  };
 }
 
 /** Solana explorer URL for an anchored receipt. */

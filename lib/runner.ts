@@ -4,7 +4,7 @@ import path from "node:path";
 import { id } from "./ids";
 import { addRunStep, finishRun, getRun, setRunOutput } from "./runs";
 import { operatorChooseSelector, type Candidate } from "./operate";
-import { assertSafeUrl } from "./safe-url";
+import { assertSafeUrl, isUnsafeRequestUrl } from "./safe-url";
 import { runSlots } from "./semaphore";
 import { attachReceipt } from "./receipt";
 import type { Run, RunOverrides, RunStatus, Skill, SkillStep } from "./types";
@@ -24,6 +24,15 @@ import type { Run, RunOverrides, RunStatus, Skill, SkillStep } from "./types";
 const RUNS_DIR = path.join(process.cwd(), ".data", "recordings");
 const CONFIDENCE_FLOOR = 0.6;
 const DETERMINISTIC_CONFIDENCE = 0.99;
+// Sandbox guardrails for untrusted marketplace skills.
+const RUN_TIMEOUT_MS = Math.max(
+  10_000,
+  Number(process.env.AEMULUS_RUN_TIMEOUT_MS) || 120_000,
+);
+const STEP_TIMEOUT_MS = Math.max(
+  3_000,
+  Number(process.env.AEMULUS_STEP_TIMEOUT_MS) || 20_000,
+);
 
 export async function executeRun(
   skill: Skill,
@@ -48,9 +57,22 @@ export async function executeRun(
     const context = await browser.newContext({
       viewport: { width: 1280, height: 800 },
     });
+    // Egress guardrail: block requests to internal hosts / private IPs / unknown
+    // schemes so an untrusted skill can't pull from the server's network.
+    await context.route("**/*", (route) => {
+      if (isUnsafeRequestUrl(route.request().url())) route.abort();
+      else route.continue();
+    });
     const page = await context.newPage();
+    page.setDefaultTimeout(STEP_TIMEOUT_MS); // per-action cap (no hanging steps)
+    const deadline = Date.now() + RUN_TIMEOUT_MS; // hard wall-clock cap
 
     for (const step of skill.plan) {
+      if (Date.now() > deadline) {
+        finalStatus = "failed";
+        error = "Run exceeded the time limit.";
+        break;
+      }
       const value = resolveValue(step, input);
       const override = overrides[step.idx];
       const shotFile = `step-${String(step.idx).padStart(4, "0")}.png`;
