@@ -29,16 +29,19 @@ const STEP_ACTIONS: ActionType[] = [
   "key",
   "submit",
   "extract",
+  "run_skill",
 ];
 
 export function SkillEditor({
   initial,
   versions,
   triggers,
+  otherSkills,
 }: {
   initial: Skill;
   versions: SkillVersionMeta[];
   triggers: TriggerMeta[];
+  otherSkills: { id: string; name: string }[];
 }) {
   const [name, setName] = useState(initial.name);
   const [description, setDescription] = useState(initial.description);
@@ -336,7 +339,24 @@ export function SkillEditor({
                   Remove
                 </button>
               </div>
-              {s.action === "extract" ? (
+              {s.action === "run_skill" ? (
+                <div className="mt-3 grid grid-cols-[160px_1fr] items-center gap-3 pl-11">
+                  <span className="text-xs text-ink-3">run skill</span>
+                  <select
+                    className={input}
+                    value={s.subSkillId ?? ""}
+                    aria-label={`Step ${i + 1} sub-skill`}
+                    onChange={(e) => patchStep(i, { subSkillId: e.target.value })}
+                  >
+                    <option value="">— pick a skill —</option>
+                    {otherSkills.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : s.action === "extract" ? (
                 <div className="mt-3 grid gap-2 pl-11">
                   <div className="grid grid-cols-[160px_1fr] items-center gap-3">
                     <span className="text-xs text-ink-3">capture into key</span>

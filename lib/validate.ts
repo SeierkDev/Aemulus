@@ -7,7 +7,7 @@ import { NextResponse } from "next/server";
  * with a 400 before it reaches business logic.
  */
 
-const ACTIONS = ["navigate", "click", "input", "select", "key", "submit", "extract"] as const;
+const ACTIONS = ["navigate", "click", "input", "select", "key", "submit", "extract", "run_skill"] as const;
 
 export const VerifyBody = z.object({
   pubkey: z.string().min(32).max(64),
@@ -59,6 +59,7 @@ const SkillStepSchema = z.object({
   key: z.string().max(40),
   outputKey: z.string().max(200).optional(),
   loop: z.boolean().optional(),
+  subSkillId: z.string().max(200).optional(),
   condition: z
     .object({
       kind: z.enum(["exists", "absent"]),

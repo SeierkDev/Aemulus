@@ -15,6 +15,7 @@ import { assertSafeUrl, isUnsafeRequestUrl, hostInAllowlist } from "./safe-url";
 import { runSlots } from "./semaphore";
 import { attachReceipt } from "./receipt";
 import { learnSelectors } from "./skills";
+import { startChainedRun } from "./chain";
 import { verifyOutcome } from "./verify-outcome";
 import { incr } from "./metrics";
 import { logError, logInfo } from "./log";
@@ -125,6 +126,24 @@ export async function executeRun(
             false,
             `Skipped: condition (${step.condition.kind} ${step.condition.selector}) not met.`,
           );
+          continue;
+        }
+
+        // Skill chaining: start a child run of another skill (composition).
+        if (step.action === "run_skill") {
+          const res = await startChainedRun({
+            parentSkillId: skill.id,
+            subSkillId: step.subSkillId ?? "",
+            owner,
+            parentInput: input,
+            parentOutputs: outputs,
+          });
+          await page.screenshot({ path: shotPath }).catch(() => {});
+          const chainNote =
+            "runId" in res
+              ? `Chained skill -> run ${res.runId}`
+              : `Chain skipped: ${res.skipped}`;
+          await recordStep(runId, step, "", "", shotRel, DETERMINISTIC_CONFIDENCE, false, chainNote);
           continue;
         }
 

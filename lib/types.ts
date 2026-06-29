@@ -8,7 +8,8 @@ export type ActionType =
   | "select"
   | "key"
   | "submit"
-  | "extract";
+  | "extract"
+  | "run_skill";
 
 export interface RecordedAction {
   idx: number;
@@ -105,6 +106,8 @@ export interface SkillStep {
   /** For "extract" steps: capture EVERY matching element into a list (in-skill
    *  loop over the DOM), not just the first. Output is a JSON array. */
   loop?: boolean;
+  /** For "run_skill" steps: the skill to invoke as a child run (composition). */
+  subSkillId?: string;
   /** Optional condition - when set, the step runs only if it's satisfied. */
   condition?: StepCondition;
 }
