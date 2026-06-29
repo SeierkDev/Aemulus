@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Button, Card, Label } from "@/components/ui";
 import { BuyAemu } from "@/components/BuyAemu";
 import { SiteFooter } from "@/components/SiteFooter";
+import { Reveal } from "@/components/Reveal";
 
 const STAGES = [
   ["Record", "Do the task once in a controlled browser — Aemulus captures every action with a screenshot."],
@@ -14,6 +15,7 @@ export function Marketing() {
   return (
     <>
       {/* How it works */}
+      <Reveal>
       <section className="border-t border-border py-20 text-center">
         <h2 className="text-2xl font-semibold tracking-tight">How it works</h2>
         <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-ink-2">
@@ -31,8 +33,10 @@ export function Marketing() {
           ))}
         </div>
       </section>
+      </Reveal>
 
       {/* CTA */}
+      <Reveal>
       <section className="mb-20 overflow-hidden rounded-[var(--radius-base)] border border-border-strong bg-surface-2 p-10 text-center">
         <h2 className="text-2xl font-semibold tracking-tight">
           Show it once. Let it run.
@@ -47,6 +51,7 @@ export function Marketing() {
           <BuyAemu variant="default" />
         </div>
       </section>
+      </Reveal>
 
       <SiteFooter />
     </>

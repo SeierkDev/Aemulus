@@ -5,6 +5,7 @@ import { Dashboard } from "@/components/home/Dashboard";
 import { PopularSkills } from "@/components/home/PopularSkills";
 import { Marketing } from "@/components/home/Marketing";
 import { CodeBackdrop } from "@/components/CodeBackdrop";
+import { Reveal } from "@/components/Reveal";
 import { listSkills, listPublishedSkills } from "@/lib/skills";
 import { listRuns } from "@/lib/runs";
 import { getReputationBatch } from "@/lib/reputation";
@@ -56,7 +57,9 @@ export default async function Home() {
       </section>
 
         {hasData && <Dashboard skills={skills} runs={runs} />}
-        <PopularSkills skills={popular} rep={popularRep} />
+        <Reveal>
+          <PopularSkills skills={popular} rep={popularRep} />
+        </Reveal>
         <Marketing />
       </div>
     </>
