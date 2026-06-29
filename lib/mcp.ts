@@ -180,5 +180,3 @@ export async function handleMcp(
       return rpcErr(id, -32601, `Method not found: ${method}`);
   }
 }
-
-export const MCP_TOOL_NAMES = TOOLS.map((t) => t.name);
