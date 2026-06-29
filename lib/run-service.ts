@@ -2,7 +2,7 @@ import { executeRun } from "./runner";
 import { createRun, finishRun } from "./runs";
 import { incrementRunCount } from "./skills";
 import { invalidateReputation } from "./reputation";
-import { creditEarning } from "./earnings";
+import { creditEarning, hasEarnedFrom } from "./earnings";
 import { dispatchRunEvent, eventForStatus } from "./webhooks";
 import { SOLANA } from "./solana";
 import { logError } from "./log";
@@ -49,12 +49,14 @@ export async function completeRun(runId: string, args: RunArgs): Promise<void> {
     );
     await incrementRunCount(args.skill.id);
     invalidateReputation(args.skill.id); // success-rate aggregate changed
-    // Only pay the creator for runs that actually completed — a failed or
-    // needs_review run shouldn't earn the run fee.
+    // Pay the creator only for: a completed run, by someone other than the
+    // owner, who hasn't run this skill before. The "first run per distinct
+    // runner" rule is the anti-Sybil guard — see hasEarnedFrom.
     if (
       final.status === "completed" &&
       args.skill.owner &&
-      args.skill.owner !== args.runner
+      args.skill.owner !== args.runner &&
+      !(await hasEarnedFrom(args.skill.id, args.runner))
     ) {
       await creditEarning({
         owner: args.skill.owner,

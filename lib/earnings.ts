@@ -33,6 +33,25 @@ export async function creditEarning(input: {
   });
 }
 
+/**
+ * Has this runner ever earned the creator a credit for this skill? Used to
+ * credit only the FIRST run per distinct (skill, runner) — anti-Sybil: farming
+ * a creator's own skill from one burner wallet yields a single credit, and N
+ * credits would require N separately-funded wallets (each gated on a min $AEMU
+ * balance post-launch), making self-farming uneconomical.
+ */
+export async function hasEarnedFrom(
+  skillId: string,
+  runner: string,
+): Promise<boolean> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT 1 FROM earnings WHERE skill_id = ? AND runner = ? LIMIT 1`,
+    args: [skillId, runner],
+  });
+  return r.rows.length > 0;
+}
+
 /** Unclaimed accrued balance (what a "Claim" would settle). */
 export async function getClaimable(owner: string): Promise<number> {
   await ready();

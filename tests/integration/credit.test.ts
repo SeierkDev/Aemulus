@@ -81,4 +81,21 @@ describe("completeRun creator credit rules", () => {
     await runOnce(skill, "RUNNER_X");
     expect((await getEarningsSummary("CREATOR_C")).total).toBe(0);
   });
+
+  it("credits a runner only ONCE per skill (anti-Sybil), but a new runner does credit", async () => {
+    const skill = await createSkill({
+      owner: "CREATOR_D",
+      generalized: GEN,
+      sourceDemoId: null,
+    });
+    returns("completed");
+    await runOnce(skill, "RUNNER_Y"); // first run by Y → credit
+    await runOnce(skill, "RUNNER_Y"); // repeat by Y → NO extra credit
+    expect((await getEarningsSummary("CREATOR_D")).total).toBe(SOLANA.runFee);
+
+    await runOnce(skill, "RUNNER_Z"); // a distinct runner → credit
+    expect((await getEarningsSummary("CREATOR_D")).total).toBe(
+      SOLANA.runFee * 2,
+    );
+  });
 });

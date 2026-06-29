@@ -203,6 +203,7 @@ CREATE INDEX IF NOT EXISTS idx_skills_owner ON skills(owner);
 CREATE INDEX IF NOT EXISTS idx_runs_owner   ON runs(owner);
 CREATE INDEX IF NOT EXISTS idx_skills_pub   ON skills(published);
 CREATE INDEX IF NOT EXISTS idx_earn_owner   ON earnings(owner);
+CREATE INDEX IF NOT EXISTS idx_earn_skill_runner ON earnings(skill_id, runner);
 CREATE INDEX IF NOT EXISTS idx_sched_owner  ON schedules(owner);
 CREATE INDEX IF NOT EXISTS idx_sched_due    ON schedules(active, next_run_at);
 -- idx_runs_unbatched lives in migration 3 (created after batch_id is added).

@@ -181,4 +181,13 @@ export const MIGRATIONS: Migration[] = [
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_skill_versions ON skill_versions(skill_id, version);`,
     ],
   },
+
+  // 10 — index for the anti-Sybil "first run per (skill, runner)" earnings check.
+  {
+    id: 10,
+    name: "earnings_skill_runner_idx",
+    statements: [
+      `CREATE INDEX IF NOT EXISTS idx_earn_skill_runner ON earnings(skill_id, runner);`,
+    ],
+  },
 ];
