@@ -57,5 +57,10 @@ lib/          env · db (libsql) · schema · Claude client
 
 ## Status
 
-Phase 0 complete: scaffold, monochrome design system, database schema, Claude
-wiring. Next up: the **Record** capture loop (Phase 1).
+Core product is built: record a demonstration, generalize it into a reusable
+skill, run it (single, bulk/CSV, scheduled, or trigger-driven), a skill
+marketplace with reputation + moderation, creator earnings + on-chain claims,
+verifiable run receipts (Merkle-batched, optionally anchored on Solana), a
+public REST API + OpenAPI spec, a TypeScript SDK, an MCP server, and webhooks.
+Token gating, on-chain anchoring, and payouts are config-gated and activate at
+launch. See `lib/` and `app/api/` for the shipped surface.

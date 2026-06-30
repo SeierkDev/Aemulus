@@ -25,7 +25,7 @@ const ROADMAP = [
     body: [
       "Network-isolated micro-VM sandbox per run, so untrusted marketplace skills can't reach anything they shouldn't.",
       "Permanent receipt + screenshot storage on Arweave - proofs that outlive the app.",
-      "Run notifications: email, webhook, and Telegram when a run finishes or needs review.",
+      "More run notifications: email and Telegram (signed webhooks are already live today).",
       "Marketplace search, categories, and curated collections.",
     ],
   },
@@ -42,10 +42,10 @@ const ROADMAP = [
     phase: "Phase 4",
     title: "Open ecosystem",
     body: [
-      "Public API + SDK to run and compose skills programmatically.",
-      "Skill versioning and forking, with full history.",
+      "A published, versioned SDK package and additional language clients (the REST API, OpenAPI spec, in-repo TypeScript SDK, and MCP server are live today).",
+      "Skill forking and remixing across creators (versioning with full history already ships).",
       "Reputation as a portable, on-chain credential.",
-      "Team workspaces and shared skill libraries.",
+      "Richer team roles + shared run history (basic teams with shared skills already ship).",
     ],
   },
   {

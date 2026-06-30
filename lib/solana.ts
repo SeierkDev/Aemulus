@@ -37,9 +37,10 @@ export const SOLANA = {
   whaleMin: minNum("AEMULUS_WHALE_BALANCE", 10_000_000),
   /** Public pump.fun link shown on the gated screen (set after launch). */
   pumpUrl: process.env.AEMULUS_PUMP_URL ?? "https://pump.fun",
-  /** Social links for the footer (set when live). */
-  xUrl: process.env.AEMULUS_X_URL ?? "https://x.com",
-  githubUrl: process.env.AEMULUS_GITHUB_URL ?? "https://github.com",
+  /** Social links (empty until set, so the UI hides them rather than pointing at
+   *  the bare platform homepages). */
+  xUrl: process.env.AEMULUS_X_URL ?? "",
+  githubUrl: process.env.AEMULUS_GITHUB_URL ?? "",
   /** Daily run quotas per tier. A negative value means unlimited. */
   quotaHolder: num("AEMULUS_QUOTA_HOLDER", 5),
   quotaPro: num("AEMULUS_QUOTA_PRO", 50),

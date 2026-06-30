@@ -5,15 +5,13 @@ import { getQuota } from "@/lib/quota";
 import { getRun } from "@/lib/runs";
 import { getSkill, skillAccess } from "@/lib/skills";
 import { startRun } from "@/lib/run-service";
-import { enforceRateLimit } from "@/lib/ratelimit";
+import { enforceRateLimit, RUNS_PER_MIN } from "@/lib/ratelimit";
 import { readJson, ResolveBody } from "@/lib/validate";
 import type { RunOverrides } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
-
-const RUNS_PER_MIN = Math.max(1, Number(process.env.AEMULUS_RUNS_PER_MIN) || 10);
 
 /**
  * Resolve a flagged step and retry. The fix (a corrected selector and/or skip)

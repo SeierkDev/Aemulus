@@ -126,7 +126,7 @@ export default async function DevelopersPage() {
         <div className="mt-6">
           <CodeBlock
             title="sdk/ - run, read output, verify"
-            code={`import { Aemulus } from "aemulus/sdk";
+            code={`import { Aemulus } from "@/sdk";
 
 const aemulus = new Aemulus({ apiKey: process.env.AEMULUS_KEY! });
 
@@ -217,7 +217,8 @@ const t = tPart.slice(2), sig = sigPart.slice(7);
 if (Math.abs(Date.now() / 1000 - Number(t)) > 300) throw new Error("stale");
 const mac = createHmac("sha256", WHSEC).update(t + "." + rawBody).digest("hex");
 const ok = timingSafeEqual(Buffer.from(sig), Buffer.from(mac));
-// body → { event, runId, status, output, receiptHash, at }`}
+// status events → { event, runId, skillId, status, receiptHash, at }
+// run.output    → { event, runId, skillId, output, at }`}
           />
         </div>
         <div className="mt-6">
@@ -251,10 +252,13 @@ const ok = timingSafeEqual(Buffer.from(sig), Buffer.from(mac));
               ))}
             </div>
             <p className="mt-3 text-xs text-ink-3">
-              Payload:{" "}
+              Status events:{" "}
               <span className="mono">
-                {"{ event, runId, skillId, status, output, receiptHash, at }"}
+                {"{ event, runId, skillId, status, receiptHash, at }"}
               </span>
+              . The opt-in <span className="mono">run.output</span> event carries
+              the extracted data:{" "}
+              <span className="mono">{"{ event, runId, skillId, output, at }"}</span>.
             </p>
           </div>
           <div>
@@ -264,7 +268,9 @@ const ok = timingSafeEqual(Buffer.from(sig), Buffer.from(mac));
                 ["200", "OK"],
                 ["400", "Invalid request body"],
                 ["401", "Missing or invalid API key"],
+                ["403", "Insufficient $AEMU balance or missing key scope"],
                 ["404", "Skill / run / batch not found"],
+                ["409", "Idempotency-Key already in progress"],
                 ["429", "Rate limit or daily quota reached"],
               ].map(([code, desc]) => (
                 <Card key={code} className="flex items-center gap-3 p-3 text-sm">

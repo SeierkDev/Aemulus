@@ -3,7 +3,7 @@
  * Aemulus protocol (/api/v1). Lives in the Aemulus monorepo (sdk/); import it
  * directly. Works anywhere `fetch` exists (Node 18+, browsers, Deno, edge).
  *
- *   import { Aemulus } from "aemulus/sdk";
+ *   import { Aemulus } from "@/sdk";
  *   const aemulus = new Aemulus({ apiKey: process.env.AEMULUS_KEY! });
  *   const run = await aemulus.runAndWait("skl_…", { vendor: "Acme" });
  *   console.log(run.output);        // { total: "$42.00" }

@@ -51,24 +51,28 @@ export function Nav() {
         <NavLink href="/developers">Developers</NavLink>
       </nav>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 sm:justify-self-end">
-        <a
-          href={SOLANA.githubUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="GitHub"
-          className="text-ink-2 transition-colors hover:text-ink"
-        >
-          <GitHubIcon />
-        </a>
-        <a
-          href={SOLANA.xUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="X (Twitter)"
-          className="text-ink-2 transition-colors hover:text-ink"
-        >
-          <XIcon />
-        </a>
+        {SOLANA.githubUrl && (
+          <a
+            href={SOLANA.githubUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="GitHub"
+            className="text-ink-2 transition-colors hover:text-ink"
+          >
+            <GitHubIcon />
+          </a>
+        )}
+        {SOLANA.xUrl && (
+          <a
+            href={SOLANA.xUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="X (Twitter)"
+            className="text-ink-2 transition-colors hover:text-ink"
+          >
+            <XIcon />
+          </a>
+        )}
         <Link href="/record" className="ml-1">
           <Button variant="primary">Record a task</Button>
         </Link>

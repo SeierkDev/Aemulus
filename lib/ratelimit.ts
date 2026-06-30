@@ -18,6 +18,9 @@ export interface RateResult {
   retryAfterMs: number;
 }
 
+/** Shared per-wallet runs-per-minute ceiling (one definition, no drift). */
+export const RUNS_PER_MIN = Math.max(1, Number(process.env.AEMULUS_RUNS_PER_MIN) || 10);
+
 // Bound the Map: occasionally drop keys whose most recent hit is older than any
 // realistic window, so distinct callers don't accumulate forever.
 const SWEEP_EVERY = 1000;

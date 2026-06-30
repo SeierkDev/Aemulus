@@ -4,8 +4,14 @@
  * tokens for that model (Sonnet 4.6 defaults: $3 in / $15 out), overridable via
  * env if the operator model/pricing changes.
  */
-const IN_PER_M = Number(process.env.AEMULUS_OPERATOR_IN_PER_M) || 3;
-const OUT_PER_M = Number(process.env.AEMULUS_OPERATOR_OUT_PER_M) || 15;
+// Use a finite check (not `|| default`) so a legitimate 0 price (e.g. a free or
+// fully prompt-cached model) isn't silently replaced by the default.
+const price = (env: string | undefined, def: number): number => {
+  const n = Number(env);
+  return Number.isFinite(n) && n >= 0 ? n : def;
+};
+const IN_PER_M = price(process.env.AEMULUS_OPERATOR_IN_PER_M, 3);
+const OUT_PER_M = price(process.env.AEMULUS_OPERATOR_OUT_PER_M, 15);
 
 export function estimateRunCostUsd(tokensIn: number, tokensOut: number): number {
   return (tokensIn / 1_000_000) * IN_PER_M + (tokensOut / 1_000_000) * OUT_PER_M;

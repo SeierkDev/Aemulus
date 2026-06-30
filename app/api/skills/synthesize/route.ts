@@ -12,7 +12,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-const PER_HOUR = Math.max(1, Number(process.env.AEMULUS_GENERALIZE_PER_HOUR) || 20);
+// Dedicated cap, falling back to the generalize cap for back-compat.
+const PER_HOUR = Math.max(
+  1,
+  Number(process.env.AEMULUS_SYNTHESIZE_PER_HOUR || process.env.AEMULUS_GENERALIZE_PER_HOUR) || 20,
+);
 
 /** Synthesize one skill from several demonstrations of the same task. */
 export async function POST(req: Request) {

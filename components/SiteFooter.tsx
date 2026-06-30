@@ -29,12 +29,16 @@ export function SiteFooter() {
           <Link href="/org" className="hover:text-ink">
             Teams
           </Link>
-          <a href={SOLANA.xUrl} target="_blank" rel="noopener noreferrer" className="hover:text-ink">
-            X
-          </a>
-          <a href={SOLANA.githubUrl} target="_blank" rel="noopener noreferrer" className="hover:text-ink">
-            GitHub
-          </a>
+          {SOLANA.xUrl && (
+            <a href={SOLANA.xUrl} target="_blank" rel="noopener noreferrer" className="hover:text-ink">
+              X
+            </a>
+          )}
+          {SOLANA.githubUrl && (
+            <a href={SOLANA.githubUrl} target="_blank" rel="noopener noreferrer" className="hover:text-ink">
+              GitHub
+            </a>
+          )}
         </div>
       </div>
       <div className="mt-4 border-t border-border pt-4">

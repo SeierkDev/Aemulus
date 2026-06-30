@@ -4,12 +4,10 @@ import { getRun } from "./runs";
 import { getQuota } from "./quota";
 import { computeTier, getAemulusBalance } from "./solana";
 import { verifyReceipt } from "./receipt";
-import { rateLimit } from "./ratelimit";
+import { rateLimit, RUNS_PER_MIN } from "./ratelimit";
 import { hasScope, type Scope } from "./api-keys";
 import { RunBody } from "./validate";
 import type { Session } from "./siws";
-
-const RUNS_PER_MIN = Math.max(1, Number(process.env.AEMULUS_RUNS_PER_MIN) || 10);
 
 /**
  * Minimal MCP (Model Context Protocol) server over JSON-RPC. Exposes Aemulus

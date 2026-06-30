@@ -5,13 +5,11 @@ import { getQuota } from "@/lib/quota";
 import { getRun } from "@/lib/runs";
 import { getSkill, skillAccess } from "@/lib/skills";
 import { startRun } from "@/lib/run-service";
-import { enforceRateLimit } from "@/lib/ratelimit";
+import { enforceRateLimit, RUNS_PER_MIN } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
-
-const RUNS_PER_MIN = Math.max(1, Number(process.env.AEMULUS_RUNS_PER_MIN) || 10);
 
 /**
  * Retry a run: start a fresh run with the SAME input and any corrected

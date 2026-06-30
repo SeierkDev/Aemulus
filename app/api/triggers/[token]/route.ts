@@ -4,7 +4,7 @@ import { getSkill, skillAccess } from "@/lib/skills";
 import { startRun } from "@/lib/run-service";
 import { getQuota } from "@/lib/quota";
 import { computeTier, getAemulusBalance } from "@/lib/solana";
-import { rateLimit } from "@/lib/ratelimit";
+import { rateLimit, RUNS_PER_MIN } from "@/lib/ratelimit";
 import { incr } from "@/lib/metrics";
 import { logError } from "@/lib/log";
 import type { Session } from "@/lib/siws";
@@ -29,7 +29,6 @@ export async function POST(
     }
     // Per-trigger AND per-owner limits: the owner cap (same key as /api/runs)
     // stops many triggers from bursting past the per-wallet runs/min ceiling.
-    const RUNS_PER_MIN = Math.max(1, Number(process.env.AEMULUS_RUNS_PER_MIN) || 10);
     if (!rateLimit(`trigger:${trig.id}`, 30, 60_000).ok ||
         !rateLimit(`run:${trig.owner}`, RUNS_PER_MIN, 60_000).ok) {
       return NextResponse.json({ error: "Too many triggers" }, { status: 429 });

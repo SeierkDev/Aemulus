@@ -5,7 +5,7 @@ import { getQuota } from "@/lib/quota";
 import { getSkill, skillAccess } from "@/lib/skills";
 import { startRun } from "@/lib/run-service";
 import { computeTier, getAemulusBalance } from "@/lib/solana";
-import { rateLimit } from "@/lib/ratelimit";
+import { rateLimit, RUNS_PER_MIN } from "@/lib/ratelimit";
 import { withIdempotency } from "@/lib/idempotency";
 import { listRunsPage } from "@/lib/runs";
 import { decodeCursor, parseLimit } from "@/lib/pagination";
@@ -14,8 +14,6 @@ import type { Session } from "@/lib/siws";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const RUNS_PER_MIN = Math.max(1, Number(process.env.AEMULUS_RUNS_PER_MIN) || 10);
 
 /** Public API: list the caller's runs (newest first). Cursor-paginated. */
 export async function GET(req: Request) {
