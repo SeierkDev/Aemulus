@@ -409,4 +409,15 @@ export const MIGRATIONS: Migration[] = [
       { table: "runs", column: "bookkept", def: "INTEGER NOT NULL DEFAULT 0" },
     ],
   },
+
+  // 27 - on-chain registry anchor: the tx that recorded this run's receipt via
+  // the aemulus-registry program (separate from the Memo batch anchor).
+  {
+    id: 27,
+    name: "run_registry_anchor",
+    addColumns: [
+      { table: "runs", column: "registry_sig", def: "TEXT" },
+      { table: "runs", column: "registry_cluster", def: "TEXT" },
+    ],
+  },
 ];

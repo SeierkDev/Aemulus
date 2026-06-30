@@ -206,6 +206,8 @@ export interface ReceiptVerification {
   matches?: boolean;
   /** Private-receipt commitment root (selective disclosure; reveals nothing). */
   commitmentRoot?: string | null;
+  /** On-chain registry record (aemulus-registry program), if anchored. */
+  registry?: { sig: string; cluster: string; url: string };
   /** Merkle batch this run was anchored in, if batched. */
   batch?: {
     id: string;
@@ -269,6 +271,14 @@ export async function verifyReceipt(
     matches: recomputed === run.receiptHash,
     commitmentRoot: run.commitmentRoot,
   };
+
+  if (run.registrySig && run.registryCluster) {
+    verification.registry = {
+      sig: run.registrySig,
+      cluster: run.registryCluster,
+      url: explorerUrl(run.registrySig, run.registryCluster),
+    };
+  }
 
   if (run.batchId && run.merkleProof) {
     const batch = await getBatch(run.batchId);

@@ -163,6 +163,16 @@ export default async function RunPage({
             <p className="mt-1.5 text-xs text-ink-3">
               A tamper-evident hash of this run and every proof screenshot.
             </p>
+            {run.registrySig && run.registryCluster && (
+              <a
+                href={explorerUrl(run.registrySig, run.registryCluster)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 inline-block text-xs text-ink hover:underline"
+              >
+                Recorded in the on-chain registry →
+              </a>
+            )}
           </Card>
         )}
 

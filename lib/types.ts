@@ -268,6 +268,9 @@ export interface Run {
   outcomeReason: string | null;
   /** Private verifiable receipt: hiding-commitment root over the run's fields. */
   commitmentRoot: string | null;
+  /** On-chain registry anchor (aemulus-registry program), if recorded. */
+  registrySig: string | null;
+  registryCluster: string | null;
   steps: RunStepRecord[];
   createdAt: number;
   updatedAt: number;

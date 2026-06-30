@@ -1,12 +1,14 @@
 import { executeRun } from "./runner";
-import { createRun, getRun, claimRunBookkeeping } from "./runs";
+import { createRun, getRun, claimRunBookkeeping, setRunRegistryAnchor } from "./runs";
 import { incrementRunCount } from "./skills";
 import { invalidateReputation } from "./reputation";
 import { creditEarningOnce } from "./earnings";
 import { dispatchRunEvent, eventForStatus } from "./webhooks";
+import { recordRunOnChain, registryEnabled } from "./registry";
 import { enqueueRunJob } from "./jobs";
 import { SOLANA } from "./solana";
 import { incr } from "./metrics";
+import { logError } from "./log";
 import type { Run, RunOverrides, Skill } from "./types";
 
 interface RunArgs {
@@ -118,5 +120,16 @@ export async function completeRun(runId: string, args: RunArgs): Promise<void> {
       output: final.output,
       at: final.updatedAt,
     }).catch(() => {});
+  }
+
+  // On-chain registry anchor (gated/inert unless configured): record a completed
+  // run's receipt via the aemulus-registry program, then store the tx signature.
+  // Best-effort + fire-and-forget — a chain hiccup never affects the run.
+  if (final.status === "completed" && final.receiptHash && registryEnabled()) {
+    void recordRunOnChain(args.skill, final)
+      .then((res) => {
+        if (res) return setRunRegistryAnchor(runId, res.sig, res.cluster);
+      })
+      .catch((e) => logError("registry.record", e));
   }
 }

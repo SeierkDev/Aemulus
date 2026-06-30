@@ -54,6 +54,8 @@ export async function createRun(input: {
     outcomeStatus: null,
     outcomeReason: null,
     commitmentRoot: null,
+    registrySig: null,
+    registryCluster: null,
     steps: [],
     createdAt: now,
     updatedAt: now,
@@ -309,6 +311,19 @@ export async function setRunOutcome(
   });
 }
 
+/** Record that this run was anchored on-chain via the aemulus-registry program. */
+export async function setRunRegistryAnchor(
+  runId: string,
+  sig: string,
+  cluster: string,
+): Promise<void> {
+  await ready();
+  await db.execute({
+    sql: `UPDATE runs SET registry_sig = ?, registry_cluster = ? WHERE id = ?`,
+    args: [sig, cluster, runId],
+  });
+}
+
 /** Record operator (Claude) token usage for a run - cost transparency. */
 export async function setRunUsage(
   runId: string,
@@ -422,6 +437,9 @@ function rowToRun(row: Record<string, unknown>, steps: RunStepRecord[]): Run {
         : (String(row.outcome_status) as "achieved" | "unconfirmed"),
     outcomeReason: row.outcome_reason == null ? null : String(row.outcome_reason),
     commitmentRoot: row.commitment_root == null ? null : String(row.commitment_root),
+    registrySig: row.registry_sig == null ? null : String(row.registry_sig),
+    registryCluster:
+      row.registry_cluster == null ? null : String(row.registry_cluster),
     steps,
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),

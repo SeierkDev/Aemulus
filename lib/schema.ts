@@ -95,6 +95,9 @@ CREATE TABLE IF NOT EXISTS runs (
   commitment_salts TEXT,
   -- exactly-once post-run bookkeeping latch (counts/credit/webhooks)
   bookkept    INTEGER NOT NULL DEFAULT 0,
+  -- on-chain registry anchor (aemulus-registry program), separate from the Memo batch
+  registry_sig     TEXT,
+  registry_cluster TEXT,
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL
 );

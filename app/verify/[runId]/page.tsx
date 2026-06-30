@@ -123,6 +123,27 @@ export default async function VerifyPage({
             )}
           </Card>
 
+          {v.registry && (
+            <Card className="p-5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold">On-chain registry</h2>
+                <a
+                  href={v.registry.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-ink hover:underline"
+                >
+                  View on explorer →
+                </a>
+              </div>
+              <p className="mt-2 text-sm text-ink-2">
+                This run&apos;s receipt is recorded as immutable on-chain state in
+                the Aemulus registry program - its existence, receipt hash,
+                commitment root, and outcome are readable directly from Solana.
+              </p>
+            </Card>
+          )}
+
           {v.commitmentRoot && (
             <Card className="p-5">
               <h2 className="text-sm font-semibold">Private commitment</h2>
