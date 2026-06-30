@@ -1,14 +1,23 @@
 import { Badge } from "@/components/ui";
 import { Nav } from "@/components/Nav";
 import { MarketBrowser, type MarketItem } from "@/components/MarketBrowser";
-import { listPublishedSkills, categorize } from "@/lib/skills";
+import { listPublishedSkills, searchPublishedSkills, categorize } from "@/lib/skills";
 import { getReputationBatch } from "@/lib/reputation";
 import { isVerified } from "@/lib/moderation";
 
 export const dynamic = "force-dynamic";
 
-export default async function MarketPage() {
-  const skills = await listPublishedSkills();
+export default async function MarketPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
+  const { q } = await searchParams;
+  const query = (q ?? "").trim();
+  // Search hits ALL published skills; the default list shows the top by usage.
+  const skills = query
+    ? await searchPublishedSkills(query)
+    : await listPublishedSkills();
   const rep = await getReputationBatch(skills.map((s) => s.id));
 
   const items: MarketItem[] = skills.map((s) => {
@@ -42,10 +51,10 @@ export default async function MarketPage() {
               inputs - no recording required.
             </p>
           </div>
-          <Badge>{skills.length} published</Badge>
+          <Badge>{query ? `${skills.length} results` : `${skills.length} shown`}</Badge>
         </div>
 
-        <MarketBrowser items={items} />
+        <MarketBrowser items={items} initialQuery={query} />
       </div>
       <div className="py-10" />
     </div>

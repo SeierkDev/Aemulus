@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, cx } from "./ui";
 import { Stars } from "./Stars";
@@ -23,10 +24,36 @@ export interface MarketItem {
 const inputCls =
   "w-full rounded-[var(--radius-base)] border border-border-strong bg-surface-2 px-3.5 py-2.5 text-sm outline-none placeholder:text-ink-3 focus:border-ink-3";
 
-/** Searchable, category-filterable marketplace grid. */
-export function MarketBrowser({ items }: { items: MarketItem[] }) {
-  const [q, setQ] = useState("");
+/** Searchable, category-filterable marketplace grid. Search is server-driven
+ *  (debounced ?q=) so it covers ALL published skills, not just the first page;
+ *  the category pills refine the returned set client-side. */
+export function MarketBrowser({
+  items,
+  initialQuery = "",
+}: {
+  items: MarketItem[];
+  initialQuery?: string;
+}) {
+  const router = useRouter();
+  const [q, setQ] = useState(initialQuery);
   const [cat, setCat] = useState("All");
+  const firstRun = useRef(true);
+
+  // Debounce the query into the URL; the server re-queries across all skills.
+  useEffect(() => {
+    if (firstRun.current) {
+      firstRun.current = false;
+      return;
+    }
+    const t = setTimeout(() => {
+      const trimmed = q.trim();
+      router.replace(
+        trimmed ? `/market?q=${encodeURIComponent(trimmed)}` : "/market",
+        { scroll: false },
+      );
+    }, 350);
+    return () => clearTimeout(t);
+  }, [q, router]);
 
   const categories = useMemo(() => {
     const counts = new Map<string, number>();
@@ -34,17 +61,10 @@ export function MarketBrowser({ items }: { items: MarketItem[] }) {
     return ["All", ...[...counts.keys()].sort()];
   }, [items]);
 
-  const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    return items.filter((it) => {
-      if (cat !== "All" && it.category !== cat) return false;
-      if (!needle) return true;
-      return (
-        it.name.toLowerCase().includes(needle) ||
-        it.description.toLowerCase().includes(needle)
-      );
-    });
-  }, [items, q, cat]);
+  const filtered = useMemo(
+    () => items.filter((it) => cat === "All" || it.category === cat),
+    [items, cat],
+  );
 
   return (
     <div className="mt-6">

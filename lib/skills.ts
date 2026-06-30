@@ -170,6 +170,28 @@ export async function listPublishedSkillsLite(limit = 100): Promise<SkillLite[]>
 }
 
 /** Published skills, cursor-paginated (newest first) for the public API. */
+/**
+ * Search published skills by name/description across ALL of them (not just the
+ * top-N a plain list returns), so discovery scales past the first page. LIKE
+ * wildcards in the user's query are escaped so a literal "%" can't match-all.
+ */
+export async function searchPublishedSkills(
+  query: string,
+  limit = 50,
+): Promise<Skill[]> {
+  const q = query.trim().slice(0, 100);
+  if (!q) return listPublishedSkills(limit);
+  await ready();
+  const like = `%${q.replace(/[\\%_]/g, (c) => "\\" + c)}%`;
+  const r = await db.execute({
+    sql: `SELECT * FROM skills WHERE published = 1
+          AND (name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')
+          ORDER BY run_count DESC, published_at DESC LIMIT ?`,
+    args: [like, like, limit],
+  });
+  return r.rows.map(rowToSkill);
+}
+
 export async function listPublishedSkillsPage(
   limit: number,
   cursor: { createdAt: number; id: string } | null,
