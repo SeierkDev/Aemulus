@@ -33,12 +33,21 @@ export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await requireAccess();
-  if (!session) {
-    return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+  try {
+    const session = await requireAccess();
+    if (!session) {
+      return NextResponse.json({ error: "Not authorized" }, { status: 401 });
+    }
+    const { id } = await params;
+    const body = await req.json().catch(() => ({}));
+    const wallet = String((body as { wallet?: unknown })?.wallet ?? "");
+    if (!wallet) {
+      return NextResponse.json({ error: "wallet required" }, { status: 400 });
+    }
+    const ok = await removeMember(id, session.pubkey, wallet);
+    return NextResponse.json({ ok }, { status: ok ? 200 : 403 });
+  } catch (err) {
+    logError("api/orgs/members", err);
+    return NextResponse.json({ error: "Failed" }, { status: 500 });
   }
-  const { id } = await params;
-  const body = await req.json().catch(() => ({}));
-  const ok = await removeMember(id, session.pubkey, String(body?.wallet ?? ""));
-  return NextResponse.json({ ok }, { status: ok ? 200 : 403 });
 }

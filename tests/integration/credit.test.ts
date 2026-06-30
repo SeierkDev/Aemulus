@@ -6,7 +6,7 @@ vi.mock("../../lib/runner", () => ({ executeRun: vi.fn() }));
 
 import { ready } from "../../lib/db";
 import { createSkill } from "../../lib/skills";
-import { createRun } from "../../lib/runs";
+import { createRun, finishRun, getRun } from "../../lib/runs";
 import { completeRun } from "../../lib/run-service";
 import { getEarningsSummary } from "../../lib/earnings";
 import { executeRun } from "../../lib/runner";
@@ -56,6 +56,32 @@ describe("completeRun creator credit rules", () => {
     returns("completed");
     await runOnce(skill, "RUNNER_X");
     expect((await getEarningsSummary("CREATOR_A")).total).toBe(SOLANA.runFee);
+  });
+
+  it("is a no-op on an already-terminal run (recovered/duplicate job can't re-run or re-credit)", async () => {
+    const skill = await createSkill({
+      owner: "CREATOR_DUP",
+      generalized: GEN,
+      sourceDemoId: null,
+    });
+    const run = await createRun({ owner: "RUNNER_X", skillId: skill.id, input: {}, overrides: {} });
+    await finishRun(run.id, { status: "completed", result: "done" });
+    returns("completed"); // would credit if the run executed again
+    await completeRun(run.id, { skill, input: {}, runner: "RUNNER_X" });
+    expect(mockExec).not.toHaveBeenCalled(); // short-circuited, no second execution
+    expect((await getEarningsSummary("CREATOR_DUP")).total).toBe(0); // no double credit
+  });
+
+  it("finishRun never moves a run OUT of a terminal state", async () => {
+    const skill = await createSkill({
+      owner: "CREATOR_TERM",
+      generalized: GEN,
+      sourceDemoId: null,
+    });
+    const run = await createRun({ owner: "RUNNER_T", skillId: skill.id, input: {}, overrides: {} });
+    await finishRun(run.id, { status: "completed", result: "ok" });
+    await finishRun(run.id, { status: "failed", error: "late clobber" });
+    expect((await getRun(run.id))?.status).toBe("completed");
   });
 
   it("does NOT credit when the owner runs their own skill", async () => {

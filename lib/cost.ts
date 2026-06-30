@@ -12,7 +12,7 @@ export function estimateRunCostUsd(tokensIn: number, tokensOut: number): number 
 }
 
 export function formatUsd(n: number): string {
-  if (n <= 0) return "$0.00";
+  if (!(n > 0)) return "$0.00"; // also catches NaN
   if (n < 0.01) return "<$0.01";
   return `$${n.toFixed(2)}`;
 }

@@ -15,6 +15,7 @@ interface LiveSession {
   cdp: CDPSession | null;
   lastFrame: string | null;
   resolve: (() => void) | null;
+  timer: ReturnType<typeof setTimeout> | null;
 }
 
 declare global {
@@ -37,7 +38,7 @@ export function liveSessionActive(runId: string): boolean {
 
 /** Register a run's live page and start streaming it (screencast best-effort). */
 export async function registerLive(runId: string, page: Page): Promise<void> {
-  const s: LiveSession = { page, cdp: null, lastFrame: null, resolve: null };
+  const s: LiveSession = { page, cdp: null, lastFrame: null, resolve: null, timer: null };
   sessions.set(runId, s);
   try {
     const cdp = await page.context().newCDPSession(page);
@@ -98,10 +99,13 @@ export function waitForResume(
     if (!s) return resolve("timeout");
     const t = setTimeout(() => {
       s.resolve = null;
+      s.timer = null;
       resolve("timeout");
     }, timeoutMs);
+    s.timer = t;
     s.resolve = () => {
       clearTimeout(t);
+      s.timer = null;
       resolve("resumed");
     };
   });
@@ -118,6 +122,13 @@ export function resumeLive(runId: string): boolean {
 export async function unregisterLive(runId: string): Promise<void> {
   const s = sessions.get(runId);
   if (!s) return;
+  // Clear any pending wait-timer so a torn-down session can't leak a timeout
+  // (and the page closure it captures) for up to LIVE_TIMEOUT.
+  if (s.timer) {
+    clearTimeout(s.timer);
+    s.timer = null;
+  }
+  s.resolve = null;
   try {
     await s.cdp?.send("Page.stopScreencast");
   } catch {

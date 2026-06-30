@@ -48,10 +48,13 @@ export async function withIdempotency(
     });
     const row = r.rows[0];
     if (row && row.status != null) {
-      return {
-        status: Number(row.status),
-        body: JSON.parse(String(row.body ?? "null")),
-      };
+      let body: unknown = null;
+      try {
+        body = JSON.parse(String(row.body ?? "null"));
+      } catch {
+        body = String(row.body ?? ""); // tolerate a non-JSON stored body
+      }
+      return { status: Number(row.status), body };
     }
     // Reserved but no response yet → the original request is still in flight.
     return {

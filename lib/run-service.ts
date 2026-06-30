@@ -1,5 +1,5 @@
 import { executeRun } from "./runner";
-import { createRun } from "./runs";
+import { createRun, getRun } from "./runs";
 import { incrementRunCount } from "./skills";
 import { invalidateReputation } from "./reputation";
 import { creditEarning, hasEarnedFrom } from "./earnings";
@@ -54,7 +54,16 @@ export async function startRun(args: RunArgs): Promise<Run> {
  * normally (that's a real outcome, not something to retry). Exported for the
  * worker and for tests.
  */
+const TERMINAL = new Set(["completed", "failed", "needs_review"]);
+
 export async function completeRun(runId: string, args: RunArgs): Promise<void> {
+  // Idempotency guard: if a job is requeued by recoverStuckJobs (worker crash or
+  // a slow finalize) AFTER the run already finished, it can be re-claimed. Don't
+  // re-execute the browser run or re-fire bookkeeping/webhooks/metrics for a run
+  // that already reached a terminal state — just let the worker mark the job done.
+  const prior = await getRun(runId);
+  if (prior && TERMINAL.has(prior.status)) return;
+
   const final = await executeRun(
     args.skill,
     runId,

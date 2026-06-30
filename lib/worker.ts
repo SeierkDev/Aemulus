@@ -23,7 +23,13 @@ import { logError, logInfo } from "./log";
 const MAX_ATTEMPTS = 3;
 const TICK_MS = 1500;
 const RUN_TIMEOUT_MS = Number(process.env.AEMULUS_RUN_TIMEOUT_MS) || 120_000;
-const STALE_MS = RUN_TIMEOUT_MS + 120_000; // generous: a slot-waiting job isn't "stale"
+// A run can legitimately live past RUN_TIMEOUT during an interactive (live
+// takeover) pause of up to LIVE_TIMEOUT. STALE_MS must exceed run + live + a
+// buffer, or recoverStuckJobs would requeue a still-alive paused run and start a
+// second execution of it.
+const LIVE_TIMEOUT_MS =
+  Math.max(30_000, Number(process.env.AEMULUS_LIVE_TIMEOUT_MS) || 300_000);
+const STALE_MS = RUN_TIMEOUT_MS + LIVE_TIMEOUT_MS + 120_000;
 
 async function processJob(job: Job): Promise<void> {
   const skill = await getSkill(job.skillId);
@@ -43,7 +49,7 @@ async function processJob(job: Job): Promise<void> {
       overrides: job.overrides,
       runner: job.runner,
     });
-    await completeJob(job.id);
+    await completeJob(job.id, job.lockedAt);
     incr("jobs.done");
   } catch (e) {
     const msg = e instanceof Error ? e.message : "run failed";
@@ -72,7 +78,7 @@ async function tick(): Promise<void> {
   try {
     await recoverStuckJobs(Date.now(), STALE_MS);
     let n = 0;
-    const cap = Math.max(1, runSlots.free);
+    const cap = runSlots.free; // don't claim past free slots (no forced minimum)
     while (n < cap) {
       const job = await claimNextJob();
       if (!job) break;

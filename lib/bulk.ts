@@ -30,6 +30,11 @@ export async function createBulkRun(
       logError("bulk.startRun", e);
     }
   }
+  // If we were given rows but couldn't start a single one (e.g. the DB/queue is
+  // down), don't report a "successful" empty bulk — surface the failure.
+  if (rows.length > 0 && started === 0) {
+    throw new Error("Bulk run failed: no child runs could be started.");
+  }
   await db.execute({
     sql: `INSERT INTO bulk_runs (id, owner, skill_id, total, created_at)
           VALUES (?, ?, ?, ?, ?)`,

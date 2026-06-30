@@ -36,11 +36,13 @@ export async function POST(
       return NextResponse.json({ error: "Skill not found" }, { status: 404 });
     }
 
-    // Map the POST body onto the skill's declared inputs (ignore extras).
+    // Map the POST body onto the skill's declared inputs (ignore extras). This
+    // is the one PUBLIC input path, so cap each value (5000) like the
+    // authenticated routes do via zod.
     const body = await req.json().catch(() => ({}));
     const input: Record<string, string> = {};
     for (const f of skill.inputSchema.fields) {
-      if (body && body[f.key] != null) input[f.key] = String(body[f.key]);
+      if (body && body[f.key] != null) input[f.key] = String(body[f.key]).slice(0, 5000);
     }
 
     const tier = computeTier(await getAemulusBalance(trig.owner));

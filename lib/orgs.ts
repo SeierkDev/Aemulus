@@ -77,6 +77,8 @@ export async function listMembers(orgId: string): Promise<MemberMeta[]> {
   }));
 }
 
+const MAX_MEMBERS = 100;
+
 /** Add/update a member (admin only). */
 export async function addMember(
   orgId: string,
@@ -85,10 +87,28 @@ export async function addMember(
   role: OrgRole = "member",
 ): Promise<boolean> {
   if ((await roleOf(orgId, actor)) !== "admin") return false;
+  if (!wallet) return false;
+
+  const org = await db.execute({ sql: `SELECT owner FROM orgs WHERE id = ?`, args: [orgId] });
+  const owner = String(org.rows[0]?.owner ?? "");
+  // The creator stays an admin — never let an ON CONFLICT update demote them
+  // (that could leave the org with no admin).
+  let effRole: OrgRole = role === "admin" ? "admin" : "member";
+  if (wallet === owner) effRole = "admin";
+
+  const existing = await roleOf(orgId, wallet);
+  if (existing === null) {
+    const count = await db.execute({
+      sql: `SELECT COUNT(*) AS n FROM org_members WHERE org_id = ?`,
+      args: [orgId],
+    });
+    if (Number(count.rows[0]?.n ?? 0) >= MAX_MEMBERS) return false; // cap team size
+  }
+
   await db.execute({
     sql: `INSERT INTO org_members (org_id, wallet, role, created_at) VALUES (?, ?, ?, ?)
           ON CONFLICT(org_id, wallet) DO UPDATE SET role = excluded.role`,
-    args: [orgId, wallet, role === "admin" ? "admin" : "member", Date.now()],
+    args: [orgId, wallet, effRole, Date.now()],
   });
   return true;
 }

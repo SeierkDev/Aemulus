@@ -70,18 +70,21 @@ The originally recorded selector no longer matches. Pick the element from the ca
 Candidates:
 ${list}`;
 
-  const res = await getClaude().messages.create({
-    model: MODELS.operator,
-    max_tokens: 1024,
-    tools: [DECISION_TOOL],
-    tool_choice: { type: "tool", name: "choose_element" },
-    messages: [
-      {
-        role: "user",
-        content: [imageBlock(args.screenshotBase64), { type: "text", text: prompt }],
-      },
-    ],
-  });
+  const res = await getClaude().messages.create(
+    {
+      model: MODELS.operator,
+      max_tokens: 1024,
+      tools: [DECISION_TOOL],
+      tool_choice: { type: "tool", name: "choose_element" },
+      messages: [
+        {
+          role: "user",
+          content: [imageBlock(args.screenshotBase64), { type: "text", text: prompt }],
+        },
+      ],
+    },
+    { timeout: 60_000 }, // bound the call so a hang can't strand the run
+  );
 
   const tokensIn = res.usage?.input_tokens ?? 0;
   const tokensOut = res.usage?.output_tokens ?? 0;

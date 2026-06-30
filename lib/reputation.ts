@@ -96,6 +96,11 @@ export async function getReputationBatch(
   // Cache an independent copy so the returned map and the cache never alias.
   for (const sid of misses)
     cache.set(sid, { rep: { ...map.get(sid)! }, exp: now + CACHE_TTL_MS });
+  // Bound the cache: drop expired entries for skills that aren't re-requested,
+  // so the Map doesn't grow with every distinct skill id ever browsed.
+  if (cache.size > 256) {
+    for (const [sid, c] of cache) if (c.exp <= now) cache.delete(sid);
+  }
   return map;
 }
 

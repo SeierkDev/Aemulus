@@ -11,6 +11,16 @@ import type {
   RunStepRecord,
 } from "./types";
 
+/** Parse JSON from a DB column without ever throwing out of a read path. */
+function safeParse<T>(raw: unknown, fallback: T): T {
+  if (raw == null) return fallback;
+  try {
+    return JSON.parse(String(raw)) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 export async function createRun(input: {
   owner: string;
   skillId: string;
@@ -98,8 +108,12 @@ export async function finishRun(
   patch: { status: RunStatus; result?: string | null; error?: string | null },
 ): Promise<void> {
   await ready();
+  // Never move a run OUT of a terminal state. If a recovered/duplicate execution
+  // tries to re-finish an already-settled run, this is a no-op (last-writer can't
+  // clobber a real outcome).
   await db.execute({
-    sql: `UPDATE runs SET status = ?, result = ?, error = ?, updated_at = ? WHERE id = ?`,
+    sql: `UPDATE runs SET status = ?, result = ?, error = ?, updated_at = ?
+          WHERE id = ? AND status NOT IN ('completed','failed','needs_review')`,
     args: [patch.status, patch.result ?? null, patch.error ?? null, Date.now(), runId],
   });
 }
@@ -158,10 +172,7 @@ export async function listBatchLeaves(batchId: string): Promise<
     runId: String(x.id),
     leafHash: x.receipt_hash == null ? "" : String(x.receipt_hash),
     leafIndex: x.leaf_index == null ? -1 : Number(x.leaf_index),
-    proof:
-      x.merkle_proof == null
-        ? { siblings: [] }
-        : JSON.parse(String(x.merkle_proof)),
+    proof: safeParse(x.merkle_proof, { siblings: [] }),
   }));
 }
 
@@ -363,7 +374,7 @@ function rowToRun(row: Record<string, unknown>, steps: RunStepRecord[]): Run {
       row.input == null ? null : String(row.input),
       {},
     ),
-    overrides: JSON.parse(String(row.overrides || "{}")),
+    overrides: safeParse<RunOverrides>(row.overrides, {}),
     result: row.result == null ? null : String(row.result),
     error: row.error == null ? null : String(row.error),
     receiptHash: row.receipt_hash == null ? null : String(row.receipt_hash),
@@ -372,8 +383,7 @@ function rowToRun(row: Record<string, unknown>, steps: RunStepRecord[]): Run {
       row.receipt_cluster == null ? null : String(row.receipt_cluster),
     batchId: row.batch_id == null ? null : String(row.batch_id),
     leafIndex: row.leaf_index == null ? null : Number(row.leaf_index),
-    merkleProof:
-      row.merkle_proof == null ? null : JSON.parse(String(row.merkle_proof)),
+    merkleProof: safeParse(row.merkle_proof, null),
     bulkId: row.bulk_id == null ? null : String(row.bulk_id),
     rowIndex: row.row_index == null ? null : Number(row.row_index),
     output:

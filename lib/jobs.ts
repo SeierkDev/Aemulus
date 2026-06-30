@@ -18,6 +18,7 @@ export interface Job {
   input: Record<string, string>;
   overrides: RunOverrides;
   attempts: number;
+  lockedAt: number; // claim fence: completeJob/failJob only act while this matches
 }
 
 function rowToJob(row: Record<string, unknown>): Job {
@@ -35,6 +36,7 @@ function rowToJob(row: Record<string, unknown>): Job {
       {},
     ),
     attempts: Number(row.attempts ?? 0),
+    lockedAt: Number(row.locked_at ?? 0),
   };
 }
 
@@ -95,9 +97,18 @@ export async function claimNextJob(now: number = Date.now()): Promise<Job | null
   return null;
 }
 
-export async function completeJob(jobId: string): Promise<void> {
+export async function completeJob(jobId: string, lockedAt?: number): Promise<void> {
   await ready();
-  await db.execute({ sql: `UPDATE jobs SET status = 'done' WHERE id = ?`, args: [jobId] });
+  // Fence on the claim's locked_at: if the job was requeued + re-claimed since
+  // this worker claimed it, locked_at changed and this no-ops (the new owner wins).
+  if (lockedAt === undefined) {
+    await db.execute({ sql: `UPDATE jobs SET status = 'done' WHERE id = ?`, args: [jobId] });
+    return;
+  }
+  await db.execute({
+    sql: `UPDATE jobs SET status = 'done' WHERE id = ? AND locked_at = ?`,
+    args: [jobId, lockedAt],
+  });
 }
 
 /**
@@ -112,7 +123,7 @@ export async function failJob(
 ): Promise<boolean> {
   await ready();
   const r = await db.execute({ sql: `SELECT attempts FROM jobs WHERE id = ?`, args: [jobId] });
-  const attempts = Number(r.rows[0]?.attempts ?? maxAttempts);
+  const attempts = Number(r.rows[0]?.attempts ?? 0);
   if (attempts < maxAttempts) {
     const backoff = Math.min(60_000, 1000 * 2 ** (attempts - 1)); // 1s, 2s, 4s…
     await db.execute({

@@ -83,15 +83,18 @@ ${history.length ? `\nSo far you did:\n${history.join("\n")}` : ""}
 Elements:
 ${list}`;
 
-  const res = await getClaude().messages.create({
-    model: MODELS.operator,
-    max_tokens: 512,
-    tools: [ACT_TOOL],
-    tool_choice: { type: "tool", name: "act" },
-    messages: [
-      { role: "user", content: [imageBlock(shot.toString("base64")), { type: "text", text: prompt }] },
-    ],
-  });
+  const res = await getClaude().messages.create(
+    {
+      model: MODELS.operator,
+      max_tokens: 512,
+      tools: [ACT_TOOL],
+      tool_choice: { type: "tool", name: "act" },
+      messages: [
+        { role: "user", content: [imageBlock(shot.toString("base64")), { type: "text", text: prompt }] },
+      ],
+    },
+    { timeout: 60_000 }, // bound the call so a hang can't strand the run
+  );
   const tokensIn = res.usage?.input_tokens ?? 0;
   const tokensOut = res.usage?.output_tokens ?? 0;
   const block = res.content.find((b) => b.type === "tool_use");
