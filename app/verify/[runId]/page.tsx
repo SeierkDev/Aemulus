@@ -135,6 +135,12 @@ export default async function VerifyPage({
               <code className="mono mt-2 block truncate text-xs text-ink-3">
                 {v.commitmentRoot}
               </code>
+              <Link
+                href="/verify-disclosure"
+                className="mt-3 inline-block text-xs text-ink hover:underline"
+              >
+                Verify a disclosure →
+              </Link>
             </Card>
           )}
 

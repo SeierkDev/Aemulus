@@ -7,7 +7,9 @@ import { RetryButton } from "@/components/RetryButton";
 import { LiveTakeover } from "@/components/LiveTakeover";
 import { RunLive } from "@/components/RunLive";
 import { RunReplay } from "@/components/RunReplay";
+import { DisclosureGenerator } from "@/components/DisclosureGenerator";
 import { getRun } from "@/lib/runs";
+import { commitmentFields } from "@/lib/commitment";
 import { getSkill } from "@/lib/skills";
 import { getSession } from "@/lib/auth";
 import { explorerUrl } from "@/lib/receipt";
@@ -162,6 +164,16 @@ export default async function RunPage({
               A tamper-evident hash of this run and every proof screenshot.
             </p>
           </Card>
+        )}
+
+        {/* Selective disclosure: prove one field to anyone */}
+        {run.commitmentRoot && (
+          <div className="mt-6">
+            <DisclosureGenerator
+              runId={run.id}
+              fields={commitmentFields(run).map((f) => f.name)}
+            />
+          </div>
         )}
 
         {/* Replay: watch the run step-by-step */}

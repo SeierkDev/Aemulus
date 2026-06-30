@@ -35,6 +35,58 @@ export function Marketing() {
       </section>
       </Reveal>
 
+      {/* Verifiable receipts — the differentiator */}
+      <Reveal>
+      <section className="border-t border-border py-20">
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold tracking-tight">
+            Every run leaves a proof
+          </h2>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-ink-2">
+            Not a log you have to trust — a tamper-evident receipt anyone can
+            check, on their own.
+          </p>
+        </div>
+        <div className="mt-8 grid gap-4 text-left md:grid-cols-3">
+          <Card className="p-5">
+            <Label>Tamper-evident</Label>
+            <h3 className="mt-3 text-lg font-semibold tracking-tight">
+              Hashed receipt
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-ink-2">
+              The run and every proof screenshot hash to one receipt. Change a
+              pixel and verification fails.
+            </p>
+          </Card>
+          <Card className="p-5">
+            <Label>On-chain</Label>
+            <h3 className="mt-3 text-lg font-semibold tracking-tight">
+              Anchored on Solana
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-ink-2">
+              Receipts are Merkle-batched and the root is anchored on-chain —
+              independently confirmable, scalable to millions of runs.
+            </p>
+          </Card>
+          <Card className="p-5">
+            <Label>Private</Label>
+            <h3 className="mt-3 text-lg font-semibold tracking-tight">
+              Prove one field
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-ink-2">
+              Selective disclosure: prove a single output or input against the
+              anchored commitment without revealing anything else.
+            </p>
+          </Card>
+        </div>
+        <div className="mt-6 text-center">
+          <Link href="/verify-disclosure">
+            <Button variant="default">Try the verifier →</Button>
+          </Link>
+        </div>
+      </section>
+      </Reveal>
+
       {/* CTA */}
       <Reveal>
       <section className="mb-20 overflow-hidden rounded-[var(--radius-base)] border border-border-strong bg-surface-2 p-10 text-center">
