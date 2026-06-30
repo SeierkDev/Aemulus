@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { ready } from "../../lib/db";
 import { createSkill, setPublished, getSkill } from "../../lib/skills";
 import { reportSkill, countReports, isVerified } from "../../lib/moderation";
@@ -30,5 +30,17 @@ describe("marketplace moderation", () => {
 
   it("isVerified reflects the configured set (empty by default)", () => {
     expect(isVerified("anyone")).toBe(false);
+  });
+
+  it("isVerified returns true for a wallet in the configured allowlist", async () => {
+    // VERIFIED is built from env at module load, so re-import with the env set.
+    vi.resetModules();
+    process.env.AEMULUS_VERIFIED = "WALLET_A, WALLET_B";
+    const mod = await import("../../lib/moderation");
+    expect(mod.isVerified("WALLET_A")).toBe(true);
+    expect(mod.isVerified("WALLET_B")).toBe(true);
+    expect(mod.isVerified("WALLET_C")).toBe(false);
+    delete process.env.AEMULUS_VERIFIED;
+    vi.resetModules();
   });
 });

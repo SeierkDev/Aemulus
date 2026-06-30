@@ -39,6 +39,53 @@ export function u64le(n: bigint): Buffer {
   return b;
 }
 
+/** UI-unit amount → base units. Round (not floor) so the on-chain amount matches
+ *  the ledgered claim; amounts are whole $AEMU in practice, well within 2^53. */
+export function toBaseUnits(amount: number): bigint {
+  return BigInt(Math.round(amount * 10 ** DECIMALS));
+}
+
+/**
+ * Build the two instructions for a treasury → wallet $AEMU transfer:
+ * createIdempotent ATA (treasury pays) + SPL Transfer (ix 3). Pure + testable
+ * (no network/signing), so the money-critical account ordering and amount
+ * encoding can be unit-tested without broadcasting.
+ */
+export function buildPayoutInstructions(
+  treasury: PublicKey,
+  to: PublicKey,
+  mint: PublicKey,
+  base: bigint,
+): TransactionInstruction[] {
+  const src = ataFor(treasury, mint);
+  const dst = ataFor(to, mint);
+  return [
+    // Create the recipient's token account if needed (idempotent; treasury pays).
+    new TransactionInstruction({
+      programId: ATA_PROGRAM,
+      keys: [
+        { pubkey: treasury, isSigner: true, isWritable: true },
+        { pubkey: dst, isSigner: false, isWritable: true },
+        { pubkey: to, isSigner: false, isWritable: false },
+        { pubkey: mint, isSigner: false, isWritable: false },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        { pubkey: TOKEN_PROGRAM, isSigner: false, isWritable: false },
+      ],
+      data: Buffer.from([1]), // createIdempotent
+    }),
+    // SPL Transfer (instruction 3): treasury ATA → recipient ATA.
+    new TransactionInstruction({
+      programId: TOKEN_PROGRAM,
+      keys: [
+        { pubkey: src, isSigner: false, isWritable: true },
+        { pubkey: dst, isSigner: false, isWritable: true },
+        { pubkey: treasury, isSigner: true, isWritable: false },
+      ],
+      data: Buffer.concat([Buffer.from([3]), u64le(base)]),
+    }),
+  ];
+}
+
 /** Transfer `amount` (UI units) of $AEMU from treasury → wallet. Null if off. */
 export async function sendPayout(
   toWallet: string,
@@ -53,40 +100,11 @@ export async function sendPayout(
   const treasury = Keypair.fromSecretKey(bs58.decode(secret));
   const mint = new PublicKey(SOLANA.mint);
   const to = new PublicKey(toWallet);
-  const src = ataFor(treasury.publicKey, mint);
-  const dst = ataFor(to, mint);
-  // Round (not floor) to base units so the on-chain amount matches the
-  // ledgered claim; amounts are whole $AEMU in practice, well within 2^53.
-  const base = BigInt(Math.round(amount * 10 ** DECIMALS));
 
   const tx = new Transaction();
-  // Create the recipient's token account if needed (idempotent; treasury pays).
-  tx.add(
-    new TransactionInstruction({
-      programId: ATA_PROGRAM,
-      keys: [
-        { pubkey: treasury.publicKey, isSigner: true, isWritable: true },
-        { pubkey: dst, isSigner: false, isWritable: true },
-        { pubkey: to, isSigner: false, isWritable: false },
-        { pubkey: mint, isSigner: false, isWritable: false },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-        { pubkey: TOKEN_PROGRAM, isSigner: false, isWritable: false },
-      ],
-      data: Buffer.from([1]), // createIdempotent
-    }),
-  );
-  // SPL Transfer (instruction 3): treasury ATA → recipient ATA.
-  tx.add(
-    new TransactionInstruction({
-      programId: TOKEN_PROGRAM,
-      keys: [
-        { pubkey: src, isSigner: false, isWritable: true },
-        { pubkey: dst, isSigner: false, isWritable: true },
-        { pubkey: treasury.publicKey, isSigner: true, isWritable: false },
-      ],
-      data: Buffer.concat([Buffer.from([3]), u64le(base)]),
-    }),
-  );
+  for (const ix of buildPayoutInstructions(treasury.publicKey, to, mint, toBaseUnits(amount))) {
+    tx.add(ix);
+  }
 
   const sig = await sendAndConfirmTransaction(conn, tx, [treasury]);
   return { sig, cluster };

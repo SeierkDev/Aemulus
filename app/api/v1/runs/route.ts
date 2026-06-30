@@ -129,7 +129,7 @@ export async function POST(req: Request) {
   } catch (err) {
     logError("api/v1/runs", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Run failed" },
+      { error: "Run failed" },
       { status: 500 },
     );
   }

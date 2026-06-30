@@ -33,7 +33,7 @@ export async function POST(
   } catch (err) {
     logError("api/skills/restore", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Restore failed" },
+      { error: "Restore failed" },
       { status: 500 },
     );
   }

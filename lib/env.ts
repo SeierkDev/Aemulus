@@ -43,12 +43,30 @@ export const env = {
   get authSecret(): string {
     const v = optional("AUTH_SECRET");
     const DEV_DEFAULT = "aemulus-dev-secret-change-me";
-    if (this.isProd && (!v || v === DEV_DEFAULT)) {
-      throw new Error(
-        "AUTH_SECRET must be set to a strong, unique value in production.",
-      );
+    if (this.isProd) {
+      // This secret signs session JWTs AND derives the AES-256 at-rest key, so a
+      // weak value is forgeable + weakens encryption. Require a real one in prod.
+      if (!v || v === DEV_DEFAULT) {
+        throw new Error(
+          "AUTH_SECRET must be set to a strong, unique value in production.",
+        );
+      }
+      if (v.length < 32) {
+        throw new Error(
+          "AUTH_SECRET must be at least 32 characters in production.",
+        );
+      }
     }
     return v ?? DEV_DEFAULT;
+  },
+
+  /**
+   * Touch every required secret so a missing/weak prod config fails at BOOT
+   * (in instrumentation.register) rather than mid-request on the first use.
+   */
+  validateAtBoot(): void {
+    if (!this.isProd) return;
+    void this.authSecret; // throws if unset/weak
   },
 
   get isProd(): boolean {

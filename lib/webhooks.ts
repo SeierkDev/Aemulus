@@ -20,7 +20,7 @@ export type RunEvent =
   | "run.output";
 
 /** All subscribable events; run.output carries a run's extracted data. */
-export const ALL_EVENTS: RunEvent[] = [
+const ALL_EVENTS: RunEvent[] = [
   "run.completed",
   "run.needs_review",
   "run.failed",

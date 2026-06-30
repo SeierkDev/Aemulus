@@ -10,7 +10,7 @@ import { id } from "./ids";
  */
 
 export type Scope = "read" | "run";
-export const ALL_SCOPES: Scope[] = ["read", "run"];
+const ALL_SCOPES: Scope[] = ["read", "run"];
 
 export interface ApiKeyMeta {
   id: string;

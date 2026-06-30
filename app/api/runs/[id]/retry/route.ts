@@ -64,7 +64,7 @@ export async function POST(
   } catch (err) {
     logError("api/runs/retry", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Retry failed" },
+      { error: "Retry failed" },
       { status: 500 },
     );
   }

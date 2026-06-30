@@ -7,7 +7,7 @@ import type { Session } from "./auth";
  * from the wallet's access level (Holder < Pro < Whale/Open). Each run - and
  * each resolve/retry - counts against it.
  */
-export const QUOTA_WINDOW_MS = 24 * 60 * 60 * 1000;
+const QUOTA_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export interface QuotaStatus {
   tier: string;

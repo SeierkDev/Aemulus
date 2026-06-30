@@ -5,6 +5,9 @@
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
+    // Fail fast on a missing/weak prod secret rather than mid-request later.
+    const { env } = await import("./lib/env");
+    env.validateAtBoot();
     const { startJobWorker } = await import("./lib/worker");
     startJobWorker();
     const { startScheduler } = await import("./lib/scheduler");

@@ -62,7 +62,7 @@ export async function POST(
   } catch (err) {
     logError("api/skills/bulk", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Bulk run failed" },
+      { error: "Bulk run failed" },
       { status: 500 },
     );
   }

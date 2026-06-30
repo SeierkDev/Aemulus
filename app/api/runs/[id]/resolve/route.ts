@@ -78,7 +78,7 @@ export async function POST(
   } catch (err) {
     logError("api/runs/resolve", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Resolve failed" },
+      { error: "Resolve failed" },
       { status: 500 },
     );
   }

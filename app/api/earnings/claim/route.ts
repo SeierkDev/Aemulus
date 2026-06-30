@@ -34,10 +34,9 @@ export async function POST(req: Request) {
     );
     return NextResponse.json(body, { status });
   } catch (err) {
+    // Don't echo the raw error (it can carry RPC/payout internals) - log it,
+    // return a fixed message.
     logError("api/earnings/claim", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Claim failed" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Claim failed" }, { status: 500 });
   }
 }
