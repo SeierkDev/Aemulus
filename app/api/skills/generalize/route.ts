@@ -5,6 +5,7 @@ import { enforceRateLimit } from "@/lib/ratelimit";
 import { getDemonstration } from "@/lib/demonstrations";
 import { generalizeDemonstration } from "@/lib/generalize";
 import { createSkill } from "@/lib/skills";
+import { recordedNavHosts } from "@/lib/skill-utils";
 import { readJson, GeneralizeBody } from "@/lib/validate";
 
 export const runtime = "nodejs";
@@ -40,6 +41,7 @@ export async function POST(req: Request) {
       owner: session.pubkey,
       generalized,
       sourceDemoId: demo.id,
+      allowedHosts: recordedNavHosts(demo.trace),
     });
     return NextResponse.json({ skill });
   } catch (err) {

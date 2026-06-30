@@ -5,6 +5,7 @@ import { enforceRateLimit } from "@/lib/ratelimit";
 import { getDemonstration } from "@/lib/demonstrations";
 import { synthesizeSkill } from "@/lib/synthesize";
 import { createSkill } from "@/lib/skills";
+import { recordedNavHosts } from "@/lib/skill-utils";
 import { readJson, SynthesizeBody } from "@/lib/validate";
 
 export const runtime = "nodejs";
@@ -49,6 +50,8 @@ export async function POST(req: Request) {
       owner: session.pubkey,
       generalized: result.skill,
       sourceDemoId: demos[0].id,
+      // Real navigations across all source demos (not the model's plan).
+      allowedHosts: [...new Set(demos.flatMap((d) => recordedNavHosts(d.trace)))],
     });
     return NextResponse.json({
       skill,

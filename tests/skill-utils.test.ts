@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { skillTargets, categorize } from "../lib/skill-utils";
+import { skillTargets, categorize, recordedNavHosts } from "../lib/skill-utils";
+import { GeneralizedSchema } from "../lib/generalize";
 import type { SkillStep } from "../lib/types";
 
 function nav(target: string): SkillStep {
@@ -18,6 +19,57 @@ function nav(target: string): SkillStep {
 function click(): SkillStep {
   return { ...nav(""), action: "click", intent: "click", target: "Button" };
 }
+
+describe("recordedNavHosts (allowlist from REAL navigations, not model output)", () => {
+  it("returns hostnames only from recorded navigate actions", () => {
+    const trace = [
+      { type: "navigate", url: "https://realsite.com/login" },
+      { type: "click", url: "https://realsite.com/login" },
+      { type: "navigate", url: "https://app.realsite.com/x" },
+    ];
+    expect(recordedNavHosts(trace).sort()).toEqual(["app.realsite.com", "realsite.com"]);
+  });
+
+  it("a model-injected navigate host is NOT included (only real navs count)", () => {
+    // The recording only ever visited realsite.com; an injected attacker host
+    // in the generated plan must not appear here (it feeds allowedHosts).
+    const trace = [{ type: "navigate", url: "https://realsite.com/" }];
+    expect(recordedNavHosts(trace)).toEqual(["realsite.com"]);
+    expect(recordedNavHosts(trace)).not.toContain("attacker.tld");
+  });
+});
+
+describe("GeneralizedSchema caps model output", () => {
+  const field = { key: "k", label: "l", example: "" };
+  const step = {
+    intent: "i",
+    action: "click" as const,
+    selectors: [],
+    target: "",
+    valueSource: "none" as const,
+    value: "",
+    inputKey: "",
+    key: "",
+  };
+  it("rejects a plan beyond 200 steps", () => {
+    const r = GeneralizedSchema.safeParse({
+      name: "n",
+      description: "d",
+      inputFields: [field],
+      steps: Array.from({ length: 201 }, () => step),
+    });
+    expect(r.success).toBe(false);
+  });
+  it("rejects an oversized field value", () => {
+    const r = GeneralizedSchema.safeParse({
+      name: "n",
+      description: "d",
+      inputFields: [{ ...field, example: "x".repeat(5001) }],
+      steps: [step],
+    });
+    expect(r.success).toBe(false);
+  });
+});
 
 describe("skillTargets", () => {
   it("extracts unique hostnames from navigate steps", () => {

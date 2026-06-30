@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
 import { setSkillOrg } from "@/lib/skills";
 import { roleOf } from "@/lib/orgs";
+import { readJson, ShareBody } from "@/lib/validate";
 import { logError } from "@/lib/log";
 
 export const runtime = "nodejs";
@@ -19,8 +20,9 @@ export async function POST(
       return NextResponse.json({ error: "Not authorized" }, { status: 401 });
     }
     const { id } = await params;
-    const body = await req.json().catch(() => ({}));
-    const orgId: string | null = body?.orgId ?? null;
+    const parsed = await readJson(req, ShareBody);
+    if (!parsed.ok) return parsed.res;
+    const orgId: string | null = parsed.data.orgId ?? null;
     if (orgId && (await roleOf(orgId, session.pubkey)) === null) {
       return NextResponse.json({ error: "Not a member of that org" }, { status: 403 });
     }

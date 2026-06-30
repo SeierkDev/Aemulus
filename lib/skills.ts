@@ -41,6 +41,9 @@ export async function createSkill(input: {
   owner: string;
   generalized: GeneralizedSkill;
   sourceDemoId: string | null;
+  /** Hosts the demo REALLY navigated to (derive from the recorded trace, not the
+   *  model's plan). Falls back to the plan's targets only when not supplied. */
+  allowedHosts?: string[];
 }): Promise<Skill> {
   await ready();
   const now = Date.now();
@@ -56,9 +59,12 @@ export async function createSkill(input: {
     plan,
     inputSchema: { fields: input.generalized.inputFields },
     // Secure-by-default: restrict navigation to the hosts the demo actually
-    // used. Owner can widen/clear it in the editor; existing skills (pre-this)
-    // stay unrestricted via the migration default.
-    allowedHosts: skillTargets(plan).filter((h) => h !== "inline page"),
+    // used (from the trusted recording when available, else the plan's targets).
+    // Owner can widen/clear it in the editor; existing skills stay unrestricted
+    // via the migration default.
+    allowedHosts: (input.allowedHosts ?? skillTargets(plan)).filter(
+      (h) => h !== "inline page",
+    ),
     orgId: null,
     sourceDemoId: input.sourceDemoId,
     published: false,

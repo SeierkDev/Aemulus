@@ -1,5 +1,27 @@
 import type { SkillStep } from "./types";
 
+/**
+ * The distinct hostnames the user ACTUALLY navigated to in a recording. Used to
+ * derive a skill's allowedHosts from real (trusted) navigation, NOT from the
+ * generalizer's model output - the trace text is attacker-influenced, so a
+ * model-emitted navigate target must not be able to widen the allowlist.
+ */
+export function recordedNavHosts(
+  trace: { type: string; url?: string | null }[],
+): string[] {
+  const hosts = new Set<string>();
+  for (const a of trace) {
+    if (a.type === "navigate" && a.url) {
+      try {
+        hosts.add(new URL(a.url).hostname.toLowerCase());
+      } catch {
+        /* not a URL - skip */
+      }
+    }
+  }
+  return [...hosts];
+}
+
 /** The distinct sites a skill's plan will navigate to (for trust warnings). */
 export function skillTargets(plan: SkillStep[]): string[] {
   const hosts = new Set<string>();

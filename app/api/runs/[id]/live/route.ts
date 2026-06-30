@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { getRun } from "@/lib/runs";
-import { liveFrame, liveInput, resumeLive, type LiveInputEvent } from "@/lib/live";
+import { liveFrame, liveInput, resumeLive } from "@/lib/live";
+import { LiveInputSchema } from "@/lib/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,7 +41,11 @@ export async function POST(
     return NextResponse.json({ ok: resumeLive(id) });
   }
   if (body?.input) {
-    await liveInput(id, body.input as LiveInputEvent);
+    const parsed = LiveInputSchema.safeParse(body.input);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid input event" }, { status: 400 });
+    }
+    await liveInput(id, parsed.data);
     return NextResponse.json({ ok: true });
   }
   return NextResponse.json({ error: "Nothing to do" }, { status: 400 });

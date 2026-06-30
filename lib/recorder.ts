@@ -7,10 +7,28 @@ import {
 } from "playwright";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
+import { z } from "zod";
 import { id } from "./ids";
 import { recorderInitScript } from "./recorder-inject";
 import { isUnsafeRequestUrl, navHostResolvesPrivate } from "./safe-url";
 import type { RecordedAction, RecorderState } from "./types";
+
+// window.__aemRecord is reachable by ANY script on the recorded page, so the raw
+// payload is untrusted: validate + bound it before storing (a hostile page can't
+// fabricate oversized/malformed actions), and cap the number of actions so a
+// scripted page can't flood the recording (cost/DoS on the later generalize).
+const MAX_ACTIONS = 1000;
+const RawActionSchema = z.object({
+  type: z.enum(["navigate", "click", "input", "select", "key", "submit", "extract", "run_skill"]),
+  selectors: z.array(z.string().max(2000)).max(50).optional(),
+  tag: z.string().max(40).optional(),
+  role: z.string().max(80).optional(),
+  name: z.string().max(2000).optional(),
+  text: z.string().max(2000).optional(),
+  value: z.string().max(5000).optional(),
+  sensitive: z.boolean().optional(),
+  key: z.string().max(40).optional(),
+});
 
 /**
  * Server-side recorder. Launches a HEADLESS Chromium, streams its screen to the
@@ -174,8 +192,14 @@ class RecorderSession {
 
   /** Append an action, capturing a screenshot, serialized via `tail`. */
   private enqueue(page: Page, raw: RawAction) {
+    // Validate + bound the (page-supplied) payload; drop anything malformed or
+    // beyond the per-recording action cap.
+    const parsed = RawActionSchema.safeParse(raw);
+    if (!parsed.success) return;
+    const safeRaw = parsed.data;
     this.tail = this.tail.then(async () => {
       if (!this.state || this.state.status !== "recording") return;
+      if (this.state.actions.length >= MAX_ACTIONS) return;
       const idx = this.state.actions.length;
       const file = `step-${String(idx).padStart(4, "0")}.png`;
       const rel = path.posix.join("recordings", this.state.owner, this.state.id, file);
@@ -187,7 +211,7 @@ class RecorderSession {
         // Page may be mid-navigation; keep the action without a screenshot.
       }
       const action: RecordedAction = {
-        ...raw,
+        ...safeRaw,
         idx,
         ts: Date.now(),
         url: safeUrl(page),

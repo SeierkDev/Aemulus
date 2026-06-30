@@ -94,6 +94,20 @@ export const OrgMemberBody = z.object({
   wallet: z.string().min(32).max(64),
   role: z.enum(["admin", "member"]).optional(),
 });
+export const OrgRemoveBody = z.object({ wallet: z.string().min(32).max(64) });
+
+// Share a skill with a team (or null to unshare). orgId is bounded.
+export const ShareBody = z.object({
+  orgId: z.string().max(64).nullable().optional(),
+});
+
+// Live-takeover input event (subset of the recorder's events the runner injects).
+export const LiveInputSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("click"), x: z.number(), y: z.number() }),
+  z.object({ type: z.literal("scroll"), dy: z.number() }),
+  z.object({ type: z.literal("text"), text: z.string().max(2000) }),
+  z.object({ type: z.literal("key"), key: z.string().max(40) }),
+]);
 
 export const VaultBody = z.object({
   host: z.string().min(1).max(255),

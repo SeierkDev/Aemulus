@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
 import { addMember, removeMember } from "@/lib/orgs";
-import { readJson, OrgMemberBody } from "@/lib/validate";
+import { readJson, OrgMemberBody, OrgRemoveBody } from "@/lib/validate";
 import { logError } from "@/lib/log";
 
 export const runtime = "nodejs";
@@ -39,12 +39,9 @@ export async function DELETE(
       return NextResponse.json({ error: "Not authorized" }, { status: 401 });
     }
     const { id } = await params;
-    const body = await req.json().catch(() => ({}));
-    const wallet = String((body as { wallet?: unknown })?.wallet ?? "");
-    if (!wallet) {
-      return NextResponse.json({ error: "wallet required" }, { status: 400 });
-    }
-    const ok = await removeMember(id, session.pubkey, wallet);
+    const parsed = await readJson(req, OrgRemoveBody);
+    if (!parsed.ok) return parsed.res;
+    const ok = await removeMember(id, session.pubkey, parsed.data.wallet);
     return NextResponse.json({ ok }, { status: ok ? 200 : 403 });
   } catch (err) {
     logError("api/orgs/members", err);

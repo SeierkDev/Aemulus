@@ -1,4 +1,4 @@
-import { getSkill, listPublishedSkills, categorize } from "./skills";
+import { getSkill, listPublishedSkills, categorize, skillAccess } from "./skills";
 import { startRun } from "./run-service";
 import { getRun } from "./runs";
 import { getQuota } from "./quota";
@@ -6,6 +6,7 @@ import { computeTier, getAemulusBalance } from "./solana";
 import { verifyReceipt } from "./receipt";
 import { rateLimit } from "./ratelimit";
 import { hasScope, type Scope } from "./api-keys";
+import { RunBody } from "./validate";
 import type { Session } from "./siws";
 
 const RUNS_PER_MIN = Math.max(1, Number(process.env.AEMULUS_RUNS_PER_MIN) || 10);
@@ -105,19 +106,27 @@ async function callTool(
       if (!hasScope(scopes, "run")) {
         return textResult("API key lacks 'run' scope.", true);
       }
-      const skillId = String(args.skillId ?? "");
-      const input =
-        args.input && typeof args.input === "object"
-          ? (args.input as Record<string, string>)
-          : {};
+      // Validate args the same way the REST run route does (bounded skillId +
+      // input map), instead of trusting raw JSON-RPC arguments.
+      const parsed = RunBody.safeParse({ skillId: args.skillId, input: args.input });
+      if (!parsed.success) {
+        return textResult("Invalid arguments: skillId/input.", true);
+      }
+      const { skillId } = parsed.data;
+      const input = parsed.data.input ?? {};
       if (!rateLimit(`run:${owner}`, RUNS_PER_MIN, 60_000).ok) {
         return textResult(`Rate limit: max ${RUNS_PER_MIN} runs/min.`, true);
       }
       const skill = await getSkill(skillId);
-      if (!skill || (skill.owner !== owner && !skill.published)) {
+      // Same authorization as REST: owner OR org member OR published.
+      if (!skill || !(await skillAccess(skill, owner)).run) {
         return textResult("Skill not found or not runnable.", true);
       }
       const tier = computeTier(await getAemulusBalance(owner));
+      // Mirror REST's access gate (REST blocks level < 1 before quota).
+      if (tier.level < 1) {
+        return textResult("Insufficient $AEMU balance for access.", true);
+      }
       const session: Session = {
         pubkey: owner,
         tier: tier.name as Session["tier"],
