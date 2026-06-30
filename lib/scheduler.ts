@@ -36,7 +36,12 @@ async function runDue(): Promise<void> {
   }
 
   for (const s of due) {
-    const next = nextRunAfter(s.cadence, Date.now());
+    // Anchor the next run to the SCHEDULED time, not the processing moment, so
+    // per-tick latency doesn't accumulate into forward drift. Roll forward past
+    // any backlog (downtime) to the next future slot in one step - no drift and
+    // no replay storm.
+    let next = nextRunAfter(s.cadence, s.nextRunAt);
+    while (next <= now) next = nextRunAfter(s.cadence, next);
     // Reserve this firing before doing anything - losers (other ticks /
     // instances) skip it. A claimed run that then fails just waits a cadence.
     if (!(await claimSchedule(s.id, now, next))) continue;

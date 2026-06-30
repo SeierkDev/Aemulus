@@ -50,6 +50,7 @@ export interface ScheduleDue {
   cadence: Cadence;
   level: number;
   tier: string;
+  nextRunAt: number;
 }
 
 export async function createSchedule(input: {
@@ -134,7 +135,10 @@ export async function deleteSchedule(
 export async function dueSchedules(now: number): Promise<ScheduleDue[]> {
   await ready();
   const r = await db.execute({
-    sql: `SELECT * FROM schedules WHERE active = 1 AND next_run_at <= ? LIMIT 25`,
+    // Oldest-due first so a backlog drains fairly and the most-overdue schedules
+    // aren't starved when more than the page size are due at once.
+    sql: `SELECT * FROM schedules WHERE active = 1 AND next_run_at <= ?
+          ORDER BY next_run_at ASC LIMIT 25`,
     args: [now],
   });
   return r.rows.map((row) => ({
@@ -148,6 +152,7 @@ export async function dueSchedules(now: number): Promise<ScheduleDue[]> {
     cadence: String(row.cadence) as Cadence,
     level: Number(row.level),
     tier: String(row.tier),
+    nextRunAt: Number(row.next_run_at),
   }));
 }
 

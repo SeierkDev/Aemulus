@@ -139,7 +139,18 @@ export async function dispatchRunEvent(
   // replay window doesn't reject a legitimate retry.
   const ts = Math.floor(Date.now() / 1000);
 
-  for (const w of subscribers) {
+  // Deliver to all subscribers concurrently so one slow/dead endpoint can't
+  // serialize behind the others (each still retries with backoff internally).
+  await Promise.allSettled(subscribers.map((w) => deliver(w, event, body, ts)));
+}
+
+async function deliver(
+  w: Record<string, unknown>,
+  event: RunEvent,
+  body: string,
+  ts: number,
+): Promise<void> {
+  {
     const url = String(w.url);
     const signature = sign(String(w.secret), ts, body);
     let status = 0;

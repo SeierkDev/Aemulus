@@ -92,22 +92,26 @@ export async function completeRun(runId: string, args: RunArgs): Promise<void> {
       amount: SOLANA.runFee,
     });
   }
-  await dispatchRunEvent(args.runner, eventForStatus(final.status), {
+  // Webhook delivery is best-effort and MUST NOT block the run/job from settling
+  // (a slow or dead subscriber would otherwise hold a worker slot). Fire-and-
+  // forget — the worker process is long-lived so the deliveries still run.
+  // The status event carries NO output: extracted data is delivered only via the
+  // opt-in run.output event, so a status-only subscriber doesn't receive it.
+  void dispatchRunEvent(args.runner, eventForStatus(final.status), {
     runId,
     skillId: args.skill.id,
     status: final.status,
-    output: final.output,
     receiptHash: final.receiptHash,
     at: final.updatedAt,
-  });
+  }).catch(() => {});
   // Output destination: a data-only event, fired only when the run actually
   // captured something — so a results endpoint isn't spammed by empty runs.
   if (final.output && Object.keys(final.output).length > 0) {
-    await dispatchRunEvent(args.runner, "run.output", {
+    void dispatchRunEvent(args.runner, "run.output", {
       runId,
       skillId: args.skill.id,
       output: final.output,
       at: final.updatedAt,
-    });
+    }).catch(() => {});
   }
 }
