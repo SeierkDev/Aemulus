@@ -233,6 +233,12 @@ export async function executeRun(
             throw new Error(`Navigation to ${step.target} is not in the skill's allowed hosts.`);
           }
           await page.goto(step.target, { waitUntil: "domcontentloaded" });
+          // Give SPA / lazily-rendered content a chance to settle before the
+          // next step looks for its element. Bounded so a long-polling page
+          // (never "idle") can't stall the run.
+          await page
+            .waitForLoadState("networkidle", { timeout: 5_000 })
+            .catch(() => {});
           await page.screenshot({ path: shotPath });
           await recordStep(runId, step, "", value, shotRel, DETERMINISTIC_CONFIDENCE, false, "");
           continue;
@@ -477,16 +483,22 @@ async function locate(
   page: Page,
   selectors: string[],
 ): Promise<{ locator: Locator; selector: string } | null> {
+  // Prefer a VISIBLE match (a selector can match a hidden/duplicate node while
+  // the real, actionable one is visible). Fall back to the first element that
+  // merely exists, preserving the old behavior when nothing is visible yet.
+  let fallback: { locator: Locator; selector: string } | null = null;
   for (const sel of selectors) {
     if (!sel) continue;
     try {
       const locator = page.locator(sel).first();
-      if ((await locator.count()) > 0) return { locator, selector: sel };
+      if ((await locator.count()) === 0) continue;
+      if (!fallback) fallback = { locator, selector: sel };
+      if (await locator.isVisible()) return { locator, selector: sel };
     } catch {
       // invalid selector - skip
     }
   }
-  return null;
+  return fallback;
 }
 
 /** True if `url`'s host equals `host` or is a subdomain of it. */

@@ -6,6 +6,7 @@ import { ResolveForm } from "@/components/ResolveForm";
 import { RetryButton } from "@/components/RetryButton";
 import { LiveTakeover } from "@/components/LiveTakeover";
 import { RunLive } from "@/components/RunLive";
+import { RunReplay } from "@/components/RunReplay";
 import { getRun } from "@/lib/runs";
 import { getSkill } from "@/lib/skills";
 import { getSession } from "@/lib/auth";
@@ -163,7 +164,30 @@ export default async function RunPage({
           </Card>
         )}
 
-        {/* Steps with proof */}
+        {/* Replay: watch the run step-by-step */}
+        {run.steps.some((s) => s.screenshot) && (
+          <>
+            <h2 className="mt-10 text-lg font-semibold tracking-tight">Replay</h2>
+            <div className="mt-4">
+              <RunReplay
+                steps={run.steps
+                  .filter((s) => s.screenshot)
+                  .map((s) => ({
+                    idx: s.idx,
+                    action: s.action,
+                    intent: s.intent,
+                    value: s.value,
+                    screenshot: s.screenshot,
+                    flagged: s.flagged,
+                    note: s.note,
+                    confidence: s.confidence,
+                  }))}
+              />
+            </div>
+          </>
+        )}
+
+        {/* Steps (compact list; screenshots are in the replay above) */}
         <h2 className="mt-10 text-lg font-semibold tracking-tight">Steps</h2>
         <div className="mt-4 grid gap-3">
           {run.steps.length === 0 && (
@@ -200,16 +224,6 @@ export default async function RunPage({
               )}
               {s.flagged && run.status === "needs_review" && (
                 <ResolveForm runId={run.id} stepIdx={s.idx} />
-              )}
-              {s.screenshot && (
-                <div className="border-t border-border bg-bg">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`/api/${s.screenshot}`}
-                    alt={`step ${s.idx} proof`}
-                    className="max-h-[420px] w-full object-contain"
-                  />
-                </div>
               )}
             </Card>
           ))}
