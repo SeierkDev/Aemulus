@@ -1,19 +1,57 @@
 import type { NextConfig } from "next";
 
-// Security response headers. The critical one for a wallet-signing dapp is
-// clickjacking protection (X-Frame-Options + frame-ancestors) so the signing UI
-// can't be invisibly framed over decoy content. The CSP here uses only
-// non-script directives (frame-ancestors/object-src/base-uri/form-action) so it
-// can't break Next's hydration or the wallet adapter; a full nonce-based
-// script-src CSP is a follow-up (needs middleware nonces).
+const isDev = process.env.NODE_ENV !== "production";
+
+// Allow the Solana RPC the client talks to (balance reads + tx confirm) on the
+// connect-src. Derived from the configured RPC so it follows a custom endpoint.
+const rpc = process.env.NEXT_PUBLIC_SOLANA_RPC || "https://api.mainnet-beta.solana.com";
+let rpcOrigin = "";
+try {
+  rpcOrigin = new URL(rpc).origin;
+} catch {
+  /* keep empty */
+}
+const rpcWss = rpcOrigin.replace(/^https/, "wss");
+
+// Full Content-Security-Policy. The key defense is `script-src` (no injected or
+// third-party scripts can execute) on top of the clickjacking + base-uri/
+// form-action lockdown. Next's hydration uses inline scripts/styles, so
+// 'unsafe-inline' is required; dev (Turbopack/HMR) additionally needs
+// 'unsafe-eval' and a websocket.
+const csp = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+  // Tailwind inlines styles; the Solana wallet-adapter UI pulls DM Sans from
+  // Google Fonts.
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "img-src 'self' data:", // screencast/recording frames are data: URLs
+  "font-src 'self' https://fonts.gstatic.com",
+  [
+    "connect-src 'self'",
+    rpcOrigin,
+    rpcWss,
+    "https://*.solana.com",
+    "wss://*.solana.com",
+    isDev ? "ws:" : "",
+  ]
+    .filter(Boolean)
+    .join(" "),
+  "worker-src 'self' blob:",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'",
+].join("; ");
+
 const SECURITY_HEADERS = [
   { key: "X-Frame-Options", value: "DENY" },
-  {
-    key: "Content-Security-Policy",
-    value: "frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'",
-  },
+  { key: "Content-Security-Policy", value: csp },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), microphone=(), geolocation=()",
+  },
   {
     key: "Strict-Transport-Security",
     value: "max-age=63072000; includeSubDomains; preload",
