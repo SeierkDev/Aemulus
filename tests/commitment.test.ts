@@ -35,6 +35,20 @@ describe("private verifiable receipts (hiding commitment + selective disclosure)
     expect(verifyDisclosure("0".repeat(64), d.field, d.value, d.salt, d.proof)).toBe(false);
   });
 
+  it("rejects a boundary-shift forgery (leaf encoding is injective)", () => {
+    // A leaf committed as (name, value) must NOT also verify under a different
+    // (name, value) split of the same underlying data — otherwise an owner could
+    // present a misleading field/value for the same anchored leaf.
+    const f = [{ name: "input.a", value: "b c" }];
+    const { root, salts } = buildCommitment(f);
+    const d = discloseField(f, salts, root, "input.a")!;
+    // honest disclosure verifies
+    expect(verifyDisclosure(root, "input.a", "b c", d.salt, d.proof)).toBe(true);
+    // shifting the space across the name/value boundary must fail
+    expect(verifyDisclosure(root, "input.a b", "c", d.salt, d.proof)).toBe(false);
+    expect(verifyDisclosure(root, "input.a b c", "", d.salt, d.proof)).toBe(false);
+  });
+
   it("is hiding: the same fields commit to different roots (random salts)", () => {
     expect(buildCommitment(fields).root).not.toBe(buildCommitment(fields).root);
   });

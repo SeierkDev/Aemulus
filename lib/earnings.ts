@@ -35,6 +35,42 @@ export async function creditEarning(input: {
 }
 
 /**
+ * Atomically credit the creator at most ONCE per (skill, runner). The
+ * `WHERE NOT EXISTS` makes the gate-and-insert a single statement, so two
+ * concurrent completed runs of the same skill by the same runner can't both
+ * pass a separate check-then-insert and double-credit (SQLite serializes
+ * writes). Returns true iff a credit row was actually written. This is the
+ * anti-Sybil credit path used by completeRun.
+ */
+export async function creditEarningOnce(input: {
+  owner: string;
+  skillId: string;
+  runId: string;
+  runner: string;
+  amount: number;
+}): Promise<boolean> {
+  await ready();
+  if (!input.owner || !Number.isFinite(input.amount) || input.amount <= 0) return false;
+  const r = await db.execute({
+    sql: `INSERT INTO earnings (id, owner, skill_id, run_id, runner, amount, created_at)
+          SELECT ?, ?, ?, ?, ?, ?, ?
+          WHERE NOT EXISTS (SELECT 1 FROM earnings WHERE skill_id = ? AND runner = ?)`,
+    args: [
+      id("earn"),
+      input.owner,
+      input.skillId,
+      input.runId,
+      input.runner,
+      input.amount,
+      Date.now(),
+      input.skillId,
+      input.runner,
+    ],
+  });
+  return r.rowsAffected > 0;
+}
+
+/**
  * Has this runner ever earned the creator a credit for this skill? Used to
  * credit only the FIRST run per distinct (skill, runner) - anti-Sybil: farming
  * a creator's own skill from one burner wallet yields a single credit, and N

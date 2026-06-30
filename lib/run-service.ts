@@ -2,7 +2,7 @@ import { executeRun } from "./runner";
 import { createRun, getRun } from "./runs";
 import { incrementRunCount } from "./skills";
 import { invalidateReputation } from "./reputation";
-import { creditEarning, hasEarnedFrom } from "./earnings";
+import { creditEarningOnce } from "./earnings";
 import { dispatchRunEvent, eventForStatus } from "./webhooks";
 import { enqueueRunJob } from "./jobs";
 import { SOLANA } from "./solana";
@@ -80,10 +80,11 @@ export async function completeRun(runId: string, args: RunArgs): Promise<void> {
   if (
     final.status === "completed" &&
     args.skill.owner &&
-    args.skill.owner !== args.runner &&
-    !(await hasEarnedFrom(args.skill.id, args.runner))
+    args.skill.owner !== args.runner
   ) {
-    await creditEarning({
+    // Atomic credit-once per (skill, runner): the anti-Sybil first-run rule,
+    // safe against two concurrent completions racing a check-then-insert.
+    await creditEarningOnce({
       owner: args.skill.owner,
       skillId: args.skill.id,
       runId,
