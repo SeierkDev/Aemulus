@@ -132,6 +132,32 @@ export async function listPublishedSkills(limit = 50): Promise<Skill[]> {
   return r.rows.map(rowToSkill);
 }
 
+/** Lightweight published-skill rows for related-discovery cards: selects only the
+ *  display columns so we don't JSON-parse every skill's plan/schema just to show
+ *  a few "related" cards. */
+export interface SkillLite {
+  id: string;
+  name: string;
+  description: string;
+  owner: string;
+  runCount: number;
+}
+export async function listPublishedSkillsLite(limit = 100): Promise<SkillLite[]> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT id, name, description, owner, run_count FROM skills
+          WHERE published = 1 ORDER BY run_count DESC, published_at DESC LIMIT ?`,
+    args: [limit],
+  });
+  return r.rows.map((x) => ({
+    id: String(x.id),
+    name: String(x.name),
+    description: String(x.description ?? ""),
+    owner: String(x.owner),
+    runCount: Number(x.run_count ?? 0),
+  }));
+}
+
 /** Published skills, cursor-paginated (newest first) for the public API. */
 export async function listPublishedSkillsPage(
   limit: number,

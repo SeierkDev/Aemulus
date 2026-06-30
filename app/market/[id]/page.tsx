@@ -11,7 +11,7 @@ import {
   getSkill,
   skillTargets,
   categorize,
-  listPublishedSkills,
+  listPublishedSkillsLite,
 } from "@/lib/skills";
 import { hasRunSkill } from "@/lib/runs";
 import { getSession } from "@/lib/auth";
@@ -47,7 +47,7 @@ export default async function MarketSkillPage({
     session && !isOwner
       ? hasRunSkill(session.pubkey, skill.id)
       : Promise.resolve(false),
-    listPublishedSkills(100),
+    listPublishedSkillsLite(100),
   ]);
   const canRate = !!session && !isOwner && hasRun;
 

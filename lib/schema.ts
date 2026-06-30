@@ -278,6 +278,10 @@ CREATE INDEX IF NOT EXISTS idx_runs_owner   ON runs(owner);
 CREATE INDEX IF NOT EXISTS idx_skills_pub   ON skills(published);
 CREATE INDEX IF NOT EXISTS idx_earn_owner   ON earnings(owner);
 CREATE INDEX IF NOT EXISTS idx_earn_skill_runner ON earnings(skill_id, runner);
+-- Composite indexes for the hottest list/aggregate paths (see migration 25).
+CREATE INDEX IF NOT EXISTS idx_runs_owner_created ON runs(owner, created_at);
+CREATE INDEX IF NOT EXISTS idx_runs_skill_created ON runs(skill_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_earn_owner_created ON earnings(owner, created_at);
 
 -- Durable job queue: run execution is enqueued here and processed by a worker,
 -- so runs survive restarts, retry on transient failure, and a second instance

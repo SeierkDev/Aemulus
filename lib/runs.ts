@@ -142,15 +142,25 @@ export async function listRunsByBulk(bulkId: string): Promise<Run[]> {
     sql: `SELECT * FROM runs WHERE bulk_id = ? ORDER BY row_index ASC`,
     args: [bulkId],
   });
-  return Promise.all(
-    r.rows.map(async (row) => {
-      const steps = await db.execute({
-        sql: `SELECT * FROM run_steps WHERE run_id = ? ORDER BY idx ASC`,
-        args: [String(row.id)],
-      });
-      return rowToRun(row, steps.rows.map(rowToStep));
-    }),
-  );
+  if (r.rows.length === 0) return [];
+  // Fetch all steps for the batch in ONE query (was 1 + N), then group by run.
+  const ids = r.rows.map((row) => String(row.id));
+  const ph = ids.map(() => "?").join(",");
+  const allSteps = await db.execute({
+    sql: `SELECT * FROM run_steps WHERE run_id IN (${ph}) ORDER BY run_id, idx ASC`,
+    args: ids,
+  });
+  const byRun = new Map<string, RunStepRecord[]>();
+  for (const s of allSteps.rows) {
+    const rid = String(s.run_id);
+    let arr = byRun.get(rid);
+    if (!arr) {
+      arr = [];
+      byRun.set(rid, arr);
+    }
+    arr.push(rowToStep(s));
+  }
+  return r.rows.map((row) => rowToRun(row, byRun.get(String(row.id)) ?? []));
 }
 
 /** Public, non-sensitive leaves of a batch: run id, leaf hash, index, proof. */

@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { ready } from "../../lib/db";
-import { getBulkRun, listRunsByBulk, setRunOutput, getRun } from "../../lib/runs";
+import { getBulkRun, listRunsByBulk, setRunOutput, getRun, addRunStep } from "../../lib/runs";
 import { createSkill } from "../../lib/skills";
 import { createBulkRun } from "../../lib/bulk";
 import type { GeneralizedSkill } from "../../lib/types";
@@ -44,6 +44,35 @@ describe("bulk runs", () => {
     expect(children.map((r) => r.rowIndex)).toEqual([0, 1, 2]);
     expect(children.map((r) => r.input.vendor)).toEqual(["Acme", "Beta", "Gamma"]);
     expect(children.every((r) => r.bulkId === bulk.id)).toBe(true);
+  });
+
+  it("groups each child's steps to the right run (batched fetch, no cross-talk)", async () => {
+    const skill = await createSkill({ owner: OWNER, generalized: gen(), sourceDemoId: null });
+    const bulk = await createBulkRun(skill, [{ vendor: "A" }, { vendor: "B" }], OWNER);
+    const children = await listRunsByBulk(bulk.id);
+    const step = (runId: string, idx: number, intent: string) =>
+      addRunStep({
+        id: `st_${runId}_${idx}`,
+        runId,
+        idx,
+        intent,
+        action: "click",
+        selectorUsed: "",
+        value: "",
+        screenshot: "",
+        confidence: 1,
+        flagged: false,
+        note: "",
+        createdAt: Date.now(),
+      });
+    // child 0 gets two steps, child 1 gets one — must not bleed across runs.
+    await step(children[0].id, 0, "c0-a");
+    await step(children[0].id, 1, "c0-b");
+    await step(children[1].id, 0, "c1-a");
+
+    const after = await listRunsByBulk(bulk.id);
+    expect(after[0].steps.map((s) => s.intent)).toEqual(["c0-a", "c0-b"]);
+    expect(after[1].steps.map((s) => s.intent)).toEqual(["c1-a"]);
   });
 
   it("persists + round-trips extracted output (encrypted at rest)", async () => {

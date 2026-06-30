@@ -384,4 +384,18 @@ export const MIGRATIONS: Migration[] = [
     name: "skill_org",
     addColumns: [{ table: "skills", column: "org_id", def: "TEXT" }],
   },
+
+  // 25 - composite indexes for the hottest list/aggregate paths. `runs` is the
+  // fastest-growing table: listRuns, the keyset page, and the per-run quota count
+  // all filter by owner and sort/range on created_at; analytics ranges runs by
+  // skill_id + created_at; the earnings page sorts an owner's ledger by date.
+  {
+    id: 25,
+    name: "hot_path_indexes",
+    statements: [
+      `CREATE INDEX IF NOT EXISTS idx_runs_owner_created ON runs(owner, created_at);`,
+      `CREATE INDEX IF NOT EXISTS idx_runs_skill_created ON runs(skill_id, created_at);`,
+      `CREATE INDEX IF NOT EXISTS idx_earn_owner_created ON earnings(owner, created_at);`,
+    ],
+  },
 ];
