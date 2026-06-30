@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
 import { logError } from "@/lib/log";
 import { getQuota } from "@/lib/quota";
-import { getSkill } from "@/lib/skills";
+import { getSkill, skillAccess } from "@/lib/skills";
 import { createBulkRun } from "@/lib/bulk";
 import { enforceRateLimit } from "@/lib/ratelimit";
 import { readJson, BulkBody } from "@/lib/validate";
@@ -33,7 +33,7 @@ export async function POST(
 
     const { id } = await params;
     const skill = await getSkill(id);
-    if (!skill || (skill.owner !== session.pubkey && !skill.published)) {
+    if (!skill || !(await skillAccess(skill, session.pubkey)).run) {
       return NextResponse.json({ error: "Skill not found" }, { status: 404 });
     }
     const parsed = await readJson(req, BulkBody);

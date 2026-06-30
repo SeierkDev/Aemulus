@@ -86,6 +86,8 @@ export function LiveTakeover({ runId }: { runId: string }) {
       </div>
       <div
         className="mt-3 aspect-[16/10] w-full overflow-hidden rounded-[var(--radius-base)] border border-border bg-surface-2"
+        role="application"
+        aria-label="Live run view — click and type to control the page"
         tabIndex={0}
         onClick={(e) => {
           const { x, y } = toView(e);

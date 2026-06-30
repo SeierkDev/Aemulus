@@ -19,7 +19,7 @@ interface Org {
 }
 
 /** Create teams, add/remove members. Admins manage; members just appear. */
-export function OrgManager({ initial }: { initial: Org[] }) {
+export function OrgManager({ initial, me }: { initial: Org[]; me: string }) {
   const [orgs, setOrgs] = useState<Org[]>(initial);
   const [name, setName] = useState("");
   const [wallet, setWallet] = useState<Record<string, string>>({});
@@ -36,8 +36,9 @@ export function OrgManager({ initial }: { initial: Org[] }) {
       });
       const d = await r.json();
       if (r.ok) {
+        // The creator is added as an admin server-side (createOrg) — reflect it.
         setOrgs((o) => [
-          { ...d.org, members: [] },
+          { ...d.org, members: [{ wallet: me, role: "admin" }] },
           ...o,
         ]);
         setName("");

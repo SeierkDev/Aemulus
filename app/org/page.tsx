@@ -25,7 +25,7 @@ export default async function OrgPage() {
 
         <div className="mt-6">
           {session ? (
-            <OrgManager initial={withMembers} />
+            <OrgManager initial={withMembers} me={session.pubkey} />
           ) : (
             <Card className="p-8 text-center text-sm text-ink-2">
               Connect your wallet to manage teams.

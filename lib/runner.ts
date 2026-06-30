@@ -189,7 +189,7 @@ export async function executeRun(
             parentSkillId: skill.id,
             subSkillId: step.subSkillId ?? "",
             owner,
-            parentInput: input,
+            parentInput: effInput,
             parentOutputs: outputs,
           });
           await page.screenshot({ path: shotPath }).catch(() => {});
@@ -320,8 +320,12 @@ export async function executeRun(
         .catch(() => null);
     }
   } catch (err) {
-    finalStatus = "failed";
-    error = err instanceof Error ? err.message : "Run failed to start.";
+    // This only fires for an INFRASTRUCTURE failure (e.g. the browser couldn't
+    // launch) — step-level errors are caught inside the loop and settle the run
+    // as failed/needs_review normally. Rethrow so completeRun propagates it and
+    // the job worker retries with backoff (per the worker contract). The finally
+    // below still runs (closes the browser + releases the slot) before it does.
+    throw err instanceof Error ? err : new Error("Run failed to start.");
   } finally {
     await browser?.close().catch(() => {});
     runSlots.release();

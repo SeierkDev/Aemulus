@@ -60,12 +60,18 @@ export function SkillEditor({
   const [saved, setSaved] = useState(false);
 
   async function share(next: string) {
+    const prev = orgId;
     setOrgId(next);
-    await fetch(`/api/skills/${initial.id}/share`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orgId: next || null }),
-    }).catch(() => {});
+    try {
+      const r = await fetch(`/api/skills/${initial.id}/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId: next || null }),
+      });
+      if (!r.ok) setOrgId(prev); // server rejected — don't lie about the state
+    } catch {
+      setOrgId(prev);
+    }
   }
   const [busy, setBusy] = useState(false);
 
@@ -215,14 +221,16 @@ export function SkillEditor({
           <div className="mono text-xs text-ink-3">{initial.id}</div>
         </Card>
 
-        {/* Publish */}
-        <div className="mt-6">
-          <PublishToggle
-            skillId={initial.id}
-            initialPublished={initial.published}
-            runCount={initial.runCount}
-          />
-        </div>
+        {/* Publish (owner only) */}
+        {isOwner && (
+          <div className="mt-6">
+            <PublishToggle
+              skillId={initial.id}
+              initialPublished={initial.published}
+              runCount={initial.runCount}
+            />
+          </div>
+        )}
 
         {/* Run */}
         <div className="mt-6">
@@ -255,10 +263,12 @@ export function SkillEditor({
           />
         </div>
 
-        {/* Trigger URLs (event-driven runs) */}
-        <div className="mt-6">
-          <TriggerPanel skillId={initial.id} initial={triggers} />
-        </div>
+        {/* Trigger URLs (event-driven runs) — owner only */}
+        {isOwner && (
+          <div className="mt-6">
+            <TriggerPanel skillId={initial.id} initial={triggers} />
+          </div>
+        )}
 
         {/* Inputs */}
         <div className="mt-8 flex items-end justify-between">
@@ -413,7 +423,9 @@ export function SkillEditor({
                       placeholder="CSS selector of the element to read"
                       aria-label="Selector"
                       onChange={(e) =>
-                        patchStep(i, { selectors: [e.target.value] })
+                        patchStep(i, {
+                          selectors: [e.target.value, ...(s.selectors?.slice(1) ?? [])],
+                        })
                       }
                     />
                   </div>

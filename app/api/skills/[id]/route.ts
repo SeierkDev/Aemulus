@@ -23,12 +23,18 @@ export async function PUT(
   if (!parsed.ok) return parsed.res;
   const body = parsed.data;
 
+  // allowedHosts gates which vault credentials auto-fill at run time, so only
+  // the OWNER may change it — an org admin can edit the plan but not repoint the
+  // host (defense around the credential vault).
+  const isOwner = existing.owner === session.pubkey;
   await updateSkill(id, {
     name: body.name ?? existing.name,
     description: body.description ?? existing.description,
     plan: body.plan ?? existing.plan,
     inputSchema: body.inputSchema ?? existing.inputSchema,
-    allowedHosts: body.allowedHosts ?? existing.allowedHosts,
+    allowedHosts: isOwner
+      ? (body.allowedHosts ?? existing.allowedHosts)
+      : existing.allowedHosts,
   });
   const updated = await getSkill(id);
   return NextResponse.json({ skill: updated });

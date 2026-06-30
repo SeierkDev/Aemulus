@@ -3,7 +3,7 @@ import { requireAccess } from "@/lib/auth";
 import { logError } from "@/lib/log";
 import { getQuota } from "@/lib/quota";
 import { getRun } from "@/lib/runs";
-import { getSkill } from "@/lib/skills";
+import { getSkill, skillAccess } from "@/lib/skills";
 import { startRun } from "@/lib/run-service";
 import { enforceRateLimit } from "@/lib/ratelimit";
 
@@ -42,7 +42,7 @@ export async function POST(
       return NextResponse.json({ error: "Run not found" }, { status: 404 });
     }
     const skill = await getSkill(original.skillId);
-    if (!skill || (skill.owner !== session.pubkey && !skill.published)) {
+    if (!skill || !(await skillAccess(skill, session.pubkey)).run) {
       return NextResponse.json({ error: "Skill not found" }, { status: 404 });
     }
 
