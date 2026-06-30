@@ -61,9 +61,13 @@ export function MarketBrowser({
     return ["All", ...[...counts.keys()].sort()];
   }, [items]);
 
+  // Effective category falls back to "All" when the selected one isn't in the
+  // current (search) results — so a stale pill can't hide valid matches.
+  const activeCat = categories.includes(cat) ? cat : "All";
+
   const filtered = useMemo(
-    () => items.filter((it) => cat === "All" || it.category === cat),
-    [items, cat],
+    () => items.filter((it) => activeCat === "All" || it.category === activeCat),
+    [items, activeCat],
   );
 
   return (
@@ -81,10 +85,10 @@ export function MarketBrowser({
           <button
             key={c}
             onClick={() => setCat(c)}
-            aria-pressed={c === cat}
+            aria-pressed={c === activeCat}
             className={cx(
               "rounded-full border px-3 py-1 text-xs transition-colors",
-              c === cat
+              c === activeCat
                 ? "border-border-strong bg-elevated text-ink"
                 : "border-border bg-surface-2 text-ink-2 hover:text-ink",
             )}

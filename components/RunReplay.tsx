@@ -87,7 +87,8 @@ export function RunReplay({ steps }: { steps: ReplayStep[] }) {
         </div>
       </div>
 
-      {/* controls */}
+      {/* controls (only when there's more than one step to move between) */}
+      {n > 1 && (
       <div className="flex items-center gap-3 border-t border-border px-4 py-2.5">
         <button
           type="button"
@@ -128,6 +129,7 @@ export function RunReplay({ steps }: { steps: ReplayStep[] }) {
           {Math.min(i + 1, n)} / {n}
         </span>
       </div>
+      )}
     </Card>
   );
 }
