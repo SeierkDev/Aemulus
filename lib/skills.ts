@@ -11,6 +11,17 @@ import type {
   SkillVersionMeta,
 } from "./types";
 
+/** Parse a JSON column without throwing out of a read path. `|| "[]"` only
+ *  covers NULL/empty; a corrupt (truncated/malformed) value still throws. */
+function parseJson<T>(raw: unknown, fallback: T): T {
+  if (raw == null || raw === "") return fallback;
+  try {
+    return JSON.parse(String(raw)) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 /** Snapshot a skill's content into its version history. */
 async function snapshotVersion(s: {
   id: string;
@@ -283,8 +294,8 @@ export async function restoreSkillVersion(
     description: row.description == null ? "" : String(row.description),
     // Defensive fallbacks (mirror rowToSkill) so a NULL/corrupt snapshot column
     // can't throw an uncaught 500 out of a restore.
-    plan: JSON.parse(String(row.plan || "[]")),
-    inputSchema: JSON.parse(String(row.input_schema || '{"fields":[]}')),
+    plan: parseJson<SkillStep[]>(row.plan, []),
+    inputSchema: parseJson<{ fields: SkillInputField[] }>(row.input_schema, { fields: [] }),
   });
   return true;
 }
@@ -354,9 +365,9 @@ function rowToSkill(row: Record<string, unknown>): Skill {
     owner: row.owner == null ? "" : String(row.owner),
     name: String(row.name),
     description: row.description == null ? "" : String(row.description),
-    plan: JSON.parse(String(row.plan || "[]")) as SkillStep[],
-    inputSchema: JSON.parse(String(row.input_schema || '{"fields":[]}')),
-    allowedHosts: JSON.parse(String(row.allowed_hosts || "[]")) as string[],
+    plan: parseJson<SkillStep[]>(row.plan, []),
+    inputSchema: parseJson<{ fields: SkillInputField[] }>(row.input_schema, { fields: [] }),
+    allowedHosts: parseJson<string[]>(row.allowed_hosts, []),
     orgId: row.org_id == null ? null : String(row.org_id),
     sourceDemoId: row.source_demo_id == null ? null : String(row.source_demo_id),
     published: Number(row.published) === 1,

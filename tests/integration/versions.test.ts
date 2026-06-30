@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { ready } from "../../lib/db";
+import { ready, db } from "../../lib/db";
 import {
   createSkill,
   getSkill,
@@ -36,6 +36,22 @@ function gen(name = "V1"): GeneralizedSkill {
 
 beforeAll(async () => {
   await ready();
+});
+
+describe("skill row robustness", () => {
+  it("getSkill survives a corrupt plan column (returns empty, not a 500)", async () => {
+    const skill = await createSkill({ owner: OWNER, generalized: gen("Corrupt"), sourceDemoId: null });
+    // Simulate a corrupt/truncated JSON column (the `|| "[]"` fallback only
+    // covers NULL/empty, not malformed JSON).
+    await db.execute({
+      sql: `UPDATE skills SET plan = ?, allowed_hosts = ? WHERE id = ?`,
+      args: ["[{ broken", "not json", skill.id],
+    });
+    const got = await getSkill(skill.id);
+    expect(got).not.toBeNull();
+    expect(got!.plan).toEqual([]);
+    expect(got!.allowedHosts).toEqual([]);
+  });
 });
 
 describe("skill versioning", () => {
