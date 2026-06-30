@@ -25,7 +25,9 @@ export function childInput(
 ): Record<string, string> {
   const out: Record<string, string> = {};
   for (const f of fields) {
-    const v = parentOutputs[f.key] ?? parentInput[f.key];
+    // Use `||` not `??`: an empty-string captured output (a step that extracted
+    // nothing) should fall through to the parent's run input, not shadow it.
+    const v = parentOutputs[f.key] || parentInput[f.key];
     if (v != null) out[f.key] = String(v);
   }
   return out;

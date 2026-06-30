@@ -118,6 +118,20 @@ export async function finishRun(
   });
 }
 
+/**
+ * Atomically claim the post-run bookkeeping for a run. Returns true for exactly
+ * ONE caller even if two executions of the same run race (a recovered duplicate),
+ * so run_count / earnings / webhooks / metrics fire exactly once.
+ */
+export async function claimRunBookkeeping(runId: string): Promise<boolean> {
+  await ready();
+  const r = await db.execute({
+    sql: `UPDATE runs SET bookkept = 1 WHERE id = ? AND bookkept = 0`,
+    args: [runId],
+  });
+  return r.rowsAffected > 0;
+}
+
 export async function getBulkRun(bulkId: string): Promise<BulkRun | null> {
   await ready();
   const r = await db.execute({

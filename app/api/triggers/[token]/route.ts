@@ -27,8 +27,11 @@ export async function POST(
     if (!trig) {
       return NextResponse.json({ error: "Unknown trigger" }, { status: 404 });
     }
-    const limited = rateLimit(`trigger:${trig.id}`, 30, 60_000);
-    if (!limited.ok) {
+    // Per-trigger AND per-owner limits: the owner cap (same key as /api/runs)
+    // stops many triggers from bursting past the per-wallet runs/min ceiling.
+    const RUNS_PER_MIN = Math.max(1, Number(process.env.AEMULUS_RUNS_PER_MIN) || 10);
+    if (!rateLimit(`trigger:${trig.id}`, 30, 60_000).ok ||
+        !rateLimit(`run:${trig.owner}`, RUNS_PER_MIN, 60_000).ok) {
       return NextResponse.json({ error: "Too many triggers" }, { status: 429 });
     }
     const skill = await getSkill(trig.skillId);

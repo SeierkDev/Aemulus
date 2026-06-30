@@ -93,6 +93,8 @@ CREATE TABLE IF NOT EXISTS runs (
   -- private verifiable receipt: hiding-commitment root + per-field salts (enc)
   commitment_root  TEXT,
   commitment_salts TEXT,
+  -- exactly-once post-run bookkeeping latch (counts/credit/webhooks)
+  bookkept    INTEGER NOT NULL DEFAULT 0,
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL
 );

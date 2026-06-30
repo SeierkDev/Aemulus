@@ -1,5 +1,5 @@
 import { executeRun } from "./runner";
-import { createRun, getRun } from "./runs";
+import { createRun, getRun, claimRunBookkeeping } from "./runs";
 import { incrementRunCount } from "./skills";
 import { invalidateReputation } from "./reputation";
 import { creditEarningOnce } from "./earnings";
@@ -71,6 +71,11 @@ export async function completeRun(runId: string, args: RunArgs): Promise<void> {
     args.input,
     args.overrides ?? {},
   );
+  // Exactly-once latch: the terminal short-circuit above stops a SEQUENTIAL
+  // re-run, but two executions can still run CONCURRENTLY (a job requeued while
+  // a multi-checkpoint run is still alive). Only the latch winner does the
+  // counts/credit/webhooks, so they fire exactly once regardless.
+  if (!(await claimRunBookkeeping(runId))) return;
   incr(`runs.${final.status}`); // runs.completed / needs_review / failed
   await incrementRunCount(args.skill.id);
   invalidateReputation(args.skill.id); // success-rate aggregate changed

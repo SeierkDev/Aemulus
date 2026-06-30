@@ -398,4 +398,15 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_earn_owner_created ON earnings(owner, created_at);`,
     ],
   },
+
+  // 26 - exactly-once post-run bookkeeping latch: a recovered/duplicate execution
+  // of the same run (e.g. a multi-checkpoint run that outlived STALE_MS) must not
+  // double-count run_count / re-fire webhooks / double metrics.
+  {
+    id: 26,
+    name: "run_bookkept",
+    addColumns: [
+      { table: "runs", column: "bookkept", def: "INTEGER NOT NULL DEFAULT 0" },
+    ],
+  },
 ];

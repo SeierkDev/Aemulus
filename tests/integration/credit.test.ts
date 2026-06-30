@@ -5,7 +5,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../../lib/runner", () => ({ executeRun: vi.fn() }));
 
 import { ready } from "../../lib/db";
-import { createSkill } from "../../lib/skills";
+import { createSkill, getSkill } from "../../lib/skills";
 import { createRun, finishRun, getRun } from "../../lib/runs";
 import { completeRun } from "../../lib/run-service";
 import { getEarningsSummary } from "../../lib/earnings";
@@ -70,6 +70,18 @@ describe("completeRun creator credit rules", () => {
     await completeRun(run.id, { skill, input: {}, runner: "RUNNER_X" });
     expect(mockExec).not.toHaveBeenCalled(); // short-circuited, no second execution
     expect((await getEarningsSummary("CREATOR_DUP")).total).toBe(0); // no double credit
+  });
+
+  it("bookkeeping fires exactly once if completeRun runs twice (latch)", async () => {
+    // run_count is NOT otherwise idempotent, so it proves the latch: a recovered
+    // duplicate execution of the same run must not double-count it.
+    const skill = await createSkill({ owner: "CREATOR_LATCH", generalized: GEN, sourceDemoId: null });
+    const run = await createRun({ owner: "RUNNER_L", skillId: skill.id, input: {}, overrides: {} });
+    returns("completed");
+    await completeRun(run.id, { skill, input: {}, runner: "RUNNER_L" });
+    await completeRun(run.id, { skill, input: {}, runner: "RUNNER_L" }); // duplicate
+    expect((await getSkill(skill.id))!.runCount).toBe(1);
+    expect((await getEarningsSummary("CREATOR_LATCH")).total).toBe(SOLANA.runFee);
   });
 
   it("finishRun never moves a run OUT of a terminal state", async () => {

@@ -41,6 +41,11 @@ export async function POST(
     if (!original || original.owner !== session.pubkey) {
       return NextResponse.json({ error: "Run not found" }, { status: 404 });
     }
+    // Only retry a SETTLED run — retrying one that's still running/awaiting_input
+    // would spawn a concurrent duplicate of the same run.
+    if (!["completed", "failed", "needs_review"].includes(original.status)) {
+      return NextResponse.json({ error: "Run is not finished yet" }, { status: 409 });
+    }
     const skill = await getSkill(original.skillId);
     if (!skill || !(await skillAccess(skill, session.pubkey)).run) {
       return NextResponse.json({ error: "Skill not found" }, { status: 404 });

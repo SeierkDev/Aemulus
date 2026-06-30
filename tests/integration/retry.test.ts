@@ -9,7 +9,7 @@ vi.mock("../../lib/auth", () => ({ requireAccess: vi.fn(async () => session) }))
 
 import { ready } from "../../lib/db";
 import { createSkill } from "../../lib/skills";
-import { createRun, getRun } from "../../lib/runs";
+import { createRun, getRun, finishRun } from "../../lib/runs";
 import { POST } from "../../app/api/runs/[id]/retry/route";
 import type { GeneralizedSkill } from "../../lib/types";
 
@@ -32,6 +32,7 @@ describe("POST /api/runs/[id]/retry", () => {
       input: { vendor: "Acme" },
       overrides: { "2": { selector: "#fixed" } },
     });
+    await finishRun(orig.id, { status: "failed", error: "boom" }); // retry a settled run
 
     const res = await POST(new Request("http://t/x", { method: "POST" }), {
       params: Promise.resolve({ id: orig.id }),

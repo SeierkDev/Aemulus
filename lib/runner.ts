@@ -242,7 +242,9 @@ export async function executeRun(
         // browser is actually on the credential's host. Without this a skill
         // could navigate to another (also-allowed) host and capture the secret.
         if (
-          step.action === "input" &&
+          // input + select are the actions that actually apply the resolved
+          // value to the page, so a vault secret could land there off-host.
+          (step.action === "input" || step.action === "select") &&
           step.valueSource === "input" &&
           vaultKeys.has(step.inputKey) &&
           !hostMatches(page.url(), vaultHost)
@@ -270,6 +272,18 @@ export async function executeRun(
         let selectorUsed = loc?.selector ?? "";
         let confidence = DETERMINISTIC_CONFIDENCE;
         let note = "";
+
+        // A dead selector triggers slow model calls (operator + up to 5 agentic
+        // steps, each ~60s). Bail before them if we're already past the deadline
+        // so one stuck step can't blow the overall RUN_TIMEOUT by minutes (the
+        // loop-top check only fires BETWEEN steps).
+        if (!loc && Date.now() > deadline) {
+          finalStatus = "failed";
+          error = "Run exceeded the time limit.";
+          await page.screenshot({ path: shotPath }).catch(() => {});
+          await recordStep(runId, step, "", value, shotRel, 0, true, "Skipped: run time limit reached.");
+          break;
+        }
 
         if (!loc) {
           const decision = await tryOperator(page, step, value);

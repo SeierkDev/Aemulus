@@ -41,6 +41,11 @@ export async function POST(
     if (!original || original.owner !== session.pubkey) {
       return NextResponse.json({ error: "Run not found" }, { status: 404 });
     }
+    // Resolve applies human corrections to a run that PAUSED for review; only a
+    // needs_review run is resolvable (not a running or already-finished one).
+    if (original.status !== "needs_review") {
+      return NextResponse.json({ error: "Run is not awaiting review" }, { status: 409 });
+    }
     const skill = await getSkill(original.skillId);
     if (!skill || !(await skillAccess(skill, session.pubkey)).run) {
       return NextResponse.json({ error: "Skill not found" }, { status: 404 });
