@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The Solana/Anchor workspace has its own toolchain (Rust + ts-mocha).
+    "anchor/**",
   ]),
 ]);
 

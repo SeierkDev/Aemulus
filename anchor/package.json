@@ -1,0 +1,19 @@
+{
+  "name": "aemulus-anchor",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Anchor workspace for the aemulus-registry Solana program (isolated from the Next app).",
+  "scripts": {
+    "lint": "prettier --check 'programs/**/*.rs' 'tests/**/*.ts'",
+    "test": "anchor test"
+  },
+  "devDependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "@types/chai": "^4.3.0",
+    "@types/mocha": "^10.0.0",
+    "chai": "^4.3.4",
+    "mocha": "^10.0.0",
+    "ts-mocha": "^10.0.0",
+    "typescript": "^5.0.0"
+  }
+}
