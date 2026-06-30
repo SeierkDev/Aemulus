@@ -21,10 +21,9 @@ describe("assertSafeUrl (SSRF guard)", () => {
     });
   }
 
-  it("allows data: URLs (inline, no network)", async () => {
-    await expect(
-      assertSafeUrl("data:text/html,<h1>hi</h1>"),
-    ).resolves.toBeUndefined();
+  it("blocks data:/blob: as navigation targets (attacker-authored, bypasses allowlist)", async () => {
+    await expect(assertSafeUrl("data:text/html,<h1>hi</h1>")).rejects.toThrow();
+    await expect(assertSafeUrl("blob:https://x/abc")).rejects.toThrow();
   });
 });
 

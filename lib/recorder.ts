@@ -9,6 +9,7 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { id } from "./ids";
 import { recorderInitScript } from "./recorder-inject";
+import { isUnsafeRequestUrl, navHostResolvesPrivate } from "./safe-url";
 import type { RecordedAction, RecorderState } from "./types";
 
 /**
@@ -77,7 +78,23 @@ class RecorderSession {
     this.browser = await chromium.launch({
       headless: process.env.AEMULUS_RECORD_HEADED !== "1",
     });
-    this.context = await this.browser.newContext({ viewport: VIEWPORT });
+    this.context = await this.browser.newContext({
+      viewport: VIEWPORT,
+      acceptDownloads: false,
+    });
+
+    // SSRF egress guard for the WHOLE session, not just the initial URL: an
+    // in-page redirect/click to an internal host or a hostname that resolves
+    // private would otherwise be loaded and screencast into the recording.
+    await this.context.route("**/*", async (route) => {
+      const req = route.request();
+      const url = req.url();
+      if (isUnsafeRequestUrl(url)) return route.abort();
+      if (req.isNavigationRequest() && (await navHostResolvesPrivate(url))) {
+        return route.abort();
+      }
+      return route.continue();
+    });
 
     // Bridge: in-page script calls window.__aemRecord(action).
     await this.context.exposeBinding(

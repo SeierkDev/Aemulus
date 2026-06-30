@@ -83,7 +83,7 @@ export const OPENAPI: OpenApiDoc = {
           skillId: { type: "string" },
           status: {
             type: "string",
-            enum: ["running", "completed", "needs_review", "failed"],
+            enum: ["running", "awaiting_input", "completed", "needs_review", "failed"],
           },
           result: { type: "string", nullable: true },
           output: {
@@ -96,6 +96,25 @@ export const OPENAPI: OpenApiDoc = {
           createdAt: { type: "integer" },
         },
       },
+      RunListItem: {
+        type: "object",
+        description: "List items omit `result` and `steps` (fetch a single run for those).",
+        properties: {
+          id: { type: "string" },
+          skillId: { type: "string" },
+          status: {
+            type: "string",
+            enum: ["running", "awaiting_input", "completed", "needs_review", "failed"],
+          },
+          output: {
+            type: "object",
+            nullable: true,
+            additionalProperties: { type: "string" },
+          },
+          receiptHash: { type: "string", nullable: true },
+          createdAt: { type: "integer" },
+        },
+      },
       RunStarted: {
         type: "object",
         description: "POST /runs returns only these two fields (the run starts async).",
@@ -103,7 +122,7 @@ export const OPENAPI: OpenApiDoc = {
           id: { type: "string" },
           status: {
             type: "string",
-            enum: ["running", "completed", "needs_review", "failed"],
+            enum: ["running", "awaiting_input", "completed", "needs_review", "failed"],
           },
         },
       },
@@ -203,7 +222,7 @@ export const OPENAPI: OpenApiDoc = {
             ...json({
               type: "object",
               properties: {
-                runs: { type: "array", items: ref("Run") },
+                runs: { type: "array", items: ref("RunListItem") },
                 nextCursor: { type: "string", nullable: true },
               },
             }),

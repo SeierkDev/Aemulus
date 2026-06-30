@@ -18,10 +18,15 @@ import {
   waitForResume,
 } from "./live";
 import { buildCommitment, commitmentFields } from "./commitment";
-import { resolveCredentials, primaryHost } from "./vault";
+import { resolveCredentials } from "./vault";
 import { operatorChooseSelector } from "./operate";
 import { collectCandidates } from "./dom";
-import { assertSafeUrl, isUnsafeRequestUrl, hostInAllowlist } from "./safe-url";
+import {
+  assertSafeUrl,
+  isUnsafeRequestUrl,
+  hostInAllowlist,
+  navHostResolvesPrivate,
+} from "./safe-url";
 import { runSlots } from "./semaphore";
 import { attachReceipt } from "./receipt";
 import { learnSelectors } from "./skills";
@@ -91,6 +96,7 @@ export async function executeRun(
     });
     const context = await browser.newContext({
       viewport: { width: 1280, height: 800 },
+      acceptDownloads: false, // a hostile page can't fill disk via downloads
     });
     // Egress guardrail: block requests to internal hosts / private IPs / unknown
     // schemes so an untrusted skill can't pull from the server's network. Plus
@@ -98,30 +104,50 @@ export async function executeRun(
     // published skill can't be edited to quietly exfiltrate to a new domain);
     // subresources still load so pages render. Empty allowlist = unrestricted.
     const allowedHosts = skill.allowedHosts ?? [];
-    await context.route("**/*", (route) => {
+    await context.route("**/*", async (route) => {
       const req = route.request();
       const url = req.url();
       if (isUnsafeRequestUrl(url)) return route.abort();
-      if (req.isNavigationRequest() && !hostInAllowlist(url, allowedHosts)) {
-        return route.abort();
+      if (req.isNavigationRequest()) {
+        if (!hostInAllowlist(url, allowedHosts)) return route.abort();
+        // Block a redirect/clicked-link to a hostname that RESOLVES private
+        // (the sync filter above only catches literal private IPs).
+        if (await navHostResolvesPrivate(url)) return route.abort();
       }
-      route.continue();
+      return route.continue();
     });
     const page = await context.newPage();
+    // Close any popup/extra tab the run didn't open (the runner only drives the
+    // original page) so a window.open() storm can't leak Page objects.
+    context.on("page", (p) => {
+      if (p !== page) void p.close().catch(() => {});
+    });
     page.setDefaultTimeout(STEP_TIMEOUT_MS); // per-action cap (no hanging steps)
     let deadline = Date.now() + RUN_TIMEOUT_MS; // hard wall-clock cap (extended over human pauses)
 
-    // Credential vault: auto-fill the runner's stored secrets for this host into
-    // any matching input field not already provided (explicit input wins).
+    // Credential vault: auto-fill the runner's stored secrets into any matching
+    // input field not already provided (explicit input wins). Only when the skill
+    // has an OWNER-SET allowlist (so an author can't steer which of the runner's
+    // vault hosts gets filled via a plan-derived host), and each secret is bound
+    // to vaultHost — it's only actually typed while the page is on that host
+    // (see the per-step host check below), so a skill can't navigate elsewhere
+    // and capture the credential.
     let effInput = input;
+    const vaultKeys = new Set<string>();
+    const vaultHost = allowedHosts[0]?.toLowerCase() ?? "";
     try {
-      const creds = await resolveCredentials(owner, primaryHost(allowedHosts, skill.plan));
-      const fieldKeys = new Set(skill.inputSchema.fields.map((f) => f.key));
-      const fill: Record<string, string> = {};
-      for (const [k, v] of Object.entries(creds)) {
-        if (fieldKeys.has(k) && !input[k]) fill[k] = v;
+      if (vaultHost) {
+        const creds = await resolveCredentials(owner, vaultHost);
+        const fieldKeys = new Set(skill.inputSchema.fields.map((f) => f.key));
+        const fill: Record<string, string> = {};
+        for (const [k, v] of Object.entries(creds)) {
+          if (fieldKeys.has(k) && !input[k]) {
+            fill[k] = v;
+            vaultKeys.add(k);
+          }
+        }
+        if (Object.keys(fill).length) effInput = { ...fill, ...input };
       }
-      if (Object.keys(fill).length) effInput = { ...fill, ...input };
     } catch (e) {
       logError("runner.vault", e);
     }
@@ -209,6 +235,29 @@ export async function executeRun(
           await page.goto(step.target, { waitUntil: "domcontentloaded" });
           await page.screenshot({ path: shotPath });
           await recordStep(runId, step, "", value, shotRel, DETERMINISTIC_CONFIDENCE, false, "");
+          continue;
+        }
+
+        // Host-bind vault secrets: only type an auto-filled credential while the
+        // browser is actually on the credential's host. Without this a skill
+        // could navigate to another (also-allowed) host and capture the secret.
+        if (
+          step.action === "input" &&
+          step.valueSource === "input" &&
+          vaultKeys.has(step.inputKey) &&
+          !hostMatches(page.url(), vaultHost)
+        ) {
+          await page.screenshot({ path: shotPath }).catch(() => {});
+          await recordStep(
+            runId,
+            step,
+            "",
+            "",
+            shotRel,
+            1,
+            true,
+            "Vault credential withheld: the page host does not match the credential host.",
+          );
           continue;
         }
 
@@ -426,17 +475,35 @@ async function locate(
   return null;
 }
 
+/** True if `url`'s host equals `host` or is a subdomain of it. */
+function hostMatches(url: string, host: string): boolean {
+  if (!host) return false;
+  try {
+    const h = new URL(url).hostname.toLowerCase();
+    return h === host || h.endsWith(`.${host}`);
+  } catch {
+    return false; // about:blank / no host
+  }
+}
+
+// Cap a single captured value so a hostile page with a multi-megabyte text node
+// can't bloat the (encrypted) run output / commitment / memory.
+const MAX_CAPTURE_CHARS = 20_000;
+
 /** Read a value off an element: form value for inputs, else visible text. */
 async function captureValue(loc: Locator): Promise<string> {
+  let raw = "";
   try {
     const tag = await loc.evaluate((el) => el.tagName.toLowerCase());
     if (tag === "input" || tag === "textarea" || tag === "select") {
-      return (await loc.inputValue()).trim();
+      raw = (await loc.inputValue()).trim();
+    } else {
+      raw = ((await loc.textContent()) ?? "").trim();
     }
   } catch {
-    /* fall through to text */
+    raw = ((await loc.textContent()) ?? "").trim();
   }
-  return ((await loc.textContent()) ?? "").trim();
+  return raw.slice(0, MAX_CAPTURE_CHARS);
 }
 
 async function perform(

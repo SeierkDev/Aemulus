@@ -33,7 +33,10 @@ describe("hostInAllowlist", () => {
     expect(hostInAllowlist("https://evil.com/x", ["example.com"])).toBe(false);
     // not a sneaky suffix match
     expect(hostInAllowlist("https://notexample.com/x", ["example.com"])).toBe(false);
-    expect(hostInAllowlist("data:text/html,hi", ["example.com"])).toBe(true);
+    // data:/blob: are never allowed as a navigation target (even with empty list)
+    expect(hostInAllowlist("data:text/html,hi", ["example.com"])).toBe(false);
+    expect(hostInAllowlist("data:text/html,hi", [])).toBe(false);
+    expect(hostInAllowlist("blob:https://x/abc", [])).toBe(false);
   });
 });
 

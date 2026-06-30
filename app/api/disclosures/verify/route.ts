@@ -9,16 +9,31 @@ export const dynamic = "force-dynamic";
  * auth, no private data - the caller cross-checks `root` against the run's
  * on-chain anchored receipt.
  */
+// This is a public, unauthenticated endpoint, so bound every field before doing
+// any work (no giant strings or unbounded proof arrays).
+const str = (s: unknown, max: number): s is string =>
+  typeof s === "string" && s.length <= max;
+
 export async function POST(req: Request) {
   try {
     const b = await req.json();
-    const valid =
-      typeof b?.root === "string" &&
-      typeof b?.field === "string" &&
-      typeof b?.value === "string" &&
-      typeof b?.salt === "string" &&
-      b?.proof &&
-      verifyDisclosure(b.root, b.field, b.value, b.salt, b.proof);
+    const proof = b?.proof;
+    const okShape =
+      str(b?.root, 128) &&
+      str(b?.field, 256) &&
+      str(b?.value, 20_000) &&
+      str(b?.salt, 128) &&
+      proof &&
+      Array.isArray(proof.siblings) &&
+      proof.siblings.length <= 256 &&
+      proof.siblings.every(
+        (s: unknown) =>
+          typeof s === "object" &&
+          s !== null &&
+          str((s as { hash?: unknown }).hash, 128) &&
+          typeof (s as { left?: unknown }).left === "boolean",
+      );
+    const valid = okShape && verifyDisclosure(b.root, b.field, b.value, b.salt, proof);
     return NextResponse.json({ valid: !!valid });
   } catch {
     return NextResponse.json({ valid: false }, { status: 400 });
