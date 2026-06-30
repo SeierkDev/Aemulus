@@ -10,7 +10,13 @@ import {
   setRunOutcome,
   setRunUsage,
   setRunCommitment,
+  setRunStatus,
 } from "./runs";
+import {
+  registerLive,
+  unregisterLive,
+  waitForResume,
+} from "./live";
 import { buildCommitment, commitmentFields } from "./commitment";
 import { resolveCredentials, primaryHost } from "./vault";
 import { operatorChooseSelector } from "./operate";
@@ -42,6 +48,13 @@ const RUNS_DIR = path.join(process.cwd(), ".data", "recordings");
 const CONFIDENCE_FLOOR = 0.6;
 const DETERMINISTIC_CONFIDENCE = 0.99;
 const LOOP_MAX = Math.max(1, Number(process.env.AEMULUS_LOOP_MAX) || 500); // cap per-loop captures
+const LIVE_TIMEOUT_MS = Math.max(
+  30_000,
+  Number(process.env.AEMULUS_LIVE_TIMEOUT_MS) || 300_000,
+); // how long an interactive checkpoint waits for a human
+function liveHandoffEnabled(): boolean {
+  return process.env.AEMULUS_LIVE_HANDOFF === "1";
+}
 // Sandbox guardrails for untrusted marketplace skills.
 const RUN_TIMEOUT_MS = Math.max(
   10_000,
@@ -96,7 +109,7 @@ export async function executeRun(
     });
     const page = await context.newPage();
     page.setDefaultTimeout(STEP_TIMEOUT_MS); // per-action cap (no hanging steps)
-    const deadline = Date.now() + RUN_TIMEOUT_MS; // hard wall-clock cap
+    let deadline = Date.now() + RUN_TIMEOUT_MS; // hard wall-clock cap (extended over human pauses)
 
     // Credential vault: auto-fill the runner's stored secrets for this host into
     // any matching input field not already provided (explicit input wins).
@@ -146,6 +159,27 @@ export async function executeRun(
             false,
             `Skipped: condition (${step.condition.kind} ${step.condition.selector}) not met.`,
           );
+          continue;
+        }
+
+        // Interactive checkpoint: pause for a live human takeover (e.g. 2FA),
+        // keeping THIS browser/context alive so the authenticated session
+        // persists, then resume. Opt-in via AEMULUS_LIVE_HANDOFF=1.
+        if (step.interactive && liveHandoffEnabled()) {
+          await setRunStatus(runId, "awaiting_input");
+          await registerLive(runId, page);
+          const pauseStart = Date.now();
+          const outcome = await waitForResume(runId, LIVE_TIMEOUT_MS);
+          await unregisterLive(runId);
+          deadline += Date.now() - pauseStart; // don't bill the human pause to the run
+          await page.screenshot({ path: shotPath }).catch(() => {});
+          if (outcome === "timeout") {
+            await recordStep(runId, step, "", value, shotRel, 1, true, "Timed out waiting for the live takeover.");
+            finalStatus = "needs_review";
+            break;
+          }
+          await setRunStatus(runId, "running");
+          await recordStep(runId, step, "", value, shotRel, 1, false, "Human completed an interactive checkpoint.");
           continue;
         }
 

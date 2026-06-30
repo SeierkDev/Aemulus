@@ -512,6 +512,17 @@ export function SkillEditor({
                   />
                 )}
               </div>
+
+              {/* Interactive checkpoint (live human takeover, e.g. 2FA) */}
+              <label className="mt-2 flex items-center gap-2 pl-11 text-xs text-ink-3">
+                <input
+                  type="checkbox"
+                  checked={!!s.interactive}
+                  aria-label={`Step ${i + 1} interactive checkpoint`}
+                  onChange={(e) => patchStep(i, { interactive: e.target.checked })}
+                />
+                pause here for a live human takeover (e.g. 2FA)
+              </label>
             </Card>
           ))}
         </div>

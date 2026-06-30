@@ -108,6 +108,8 @@ export interface SkillStep {
   loop?: boolean;
   /** For "run_skill" steps: the skill to invoke as a child run (composition). */
   subSkillId?: string;
+  /** Human checkpoint: pause for a live takeover (e.g. a 2FA prompt). */
+  interactive?: boolean;
   /** Optional condition - when set, the step runs only if it's satisfied. */
   condition?: StepCondition;
 }
@@ -152,6 +154,7 @@ export interface GeneralizedSkill {
 
 export type RunStatus =
   | "running"
+  | "awaiting_input"
   | "needs_review"
   | "completed"
   | "failed";

@@ -60,6 +60,7 @@ const SkillStepSchema = z.object({
   outputKey: z.string().max(200).optional(),
   loop: z.boolean().optional(),
   subSkillId: z.string().max(200).optional(),
+  interactive: z.boolean().optional(),
   condition: z
     .object({
       kind: z.enum(["exists", "absent"]),

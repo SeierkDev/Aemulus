@@ -18,6 +18,7 @@ export interface AemulusOptions {
 
 export type RunStatus =
   | "running"
+  | "awaiting_input"
   | "completed"
   | "needs_review"
   | "failed";

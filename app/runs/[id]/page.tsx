@@ -4,6 +4,7 @@ import { Card, Label } from "@/components/ui";
 import { StatusBadge } from "@/components/StatusBadge";
 import { ResolveForm } from "@/components/ResolveForm";
 import { RetryButton } from "@/components/RetryButton";
+import { LiveTakeover } from "@/components/LiveTakeover";
 import { RunLive } from "@/components/RunLive";
 import { getRun } from "@/lib/runs";
 import { getSkill } from "@/lib/skills";
@@ -67,6 +68,12 @@ export default async function RunPage({
             </>
           )}
         </div>
+
+        {run.status === "awaiting_input" && (
+          <div className="mt-6">
+            <LiveTakeover runId={run.id} />
+          </div>
+        )}
 
         {/* Cost transparency */}
         <Card className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-1 p-4 text-sm">

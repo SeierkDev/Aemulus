@@ -228,6 +228,15 @@ export async function setRunOutput(
   });
 }
 
+/** Set a run's status (e.g. running -> awaiting_input -> running). */
+export async function setRunStatus(runId: string, status: string): Promise<void> {
+  await ready();
+  await db.execute({
+    sql: `UPDATE runs SET status = ?, updated_at = ? WHERE id = ?`,
+    args: [status, Date.now(), runId],
+  });
+}
+
 /** Store a run's private-receipt commitment: public root + encrypted salts. */
 export async function setRunCommitment(
   runId: string,
