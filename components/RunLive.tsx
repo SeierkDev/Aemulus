@@ -47,5 +47,11 @@ export function RunLive({
     return () => clearInterval(iv);
   }, [runId, status, router]);
 
-  return null;
+  // Announce status changes to screen readers (the visual update happens via the
+  // server-component refresh; this gives a non-visual cue as the run progresses).
+  return (
+    <span aria-live="polite" className="sr-only">
+      Run status: {status.replace("_", " ")}
+    </span>
+  );
 }

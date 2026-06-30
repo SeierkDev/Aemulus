@@ -178,6 +178,8 @@ export function SkillEditor({
         </div>
       </header>
 
+      <h1 className="sr-only">Edit skill: {name || initial.name}</h1>
+
       <div className="border-t border-border pt-8">
         {/* Identity */}
         <Card className="flex flex-col gap-4 p-5">
@@ -319,6 +321,7 @@ export function SkillEditor({
                 <input
                   className={input}
                   value={f.key}
+                  aria-label={`Input ${i + 1} key`}
                   onChange={(e) => patchField(i, { key: e.target.value })}
                 />
               </Field>
@@ -326,6 +329,7 @@ export function SkillEditor({
                 <input
                   className={input}
                   value={f.label}
+                  aria-label={`Input ${i + 1} label`}
                   onChange={(e) => patchField(i, { label: e.target.value })}
                 />
               </Field>
@@ -335,6 +339,7 @@ export function SkillEditor({
                   value={f.secret ? "" : f.example}
                   disabled={f.secret}
                   placeholder={f.secret ? "(hidden)" : ""}
+                  aria-label={`Input ${i + 1} example value`}
                   onChange={(e) => patchField(i, { example: e.target.value })}
                 />
               </Field>

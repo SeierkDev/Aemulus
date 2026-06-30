@@ -92,18 +92,30 @@ function connection(): Connection {
  */
 export async function getAemulusBalance(owner: string): Promise<number> {
   if (!gatingEnabled()) return 0;
+  // Bound the RPC read: web3.js has no request timeout, so a connected-but-
+  // unresponsive RPC would otherwise hang this call forever - and it's on the
+  // gating-critical path (sign-in, scheduler, MCP). Time out → 0 (fails closed).
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<number>((res) => {
+    timer = setTimeout(() => res(0), 8_000);
+  });
   try {
-    const res = await connection().getParsedTokenAccountsByOwner(
-      new PublicKey(owner),
-      { mint: new PublicKey(SOLANA.mint) },
-    );
-    let total = 0;
-    for (const { account } of res.value) {
-      const amt = account.data.parsed?.info?.tokenAmount?.uiAmount;
-      if (typeof amt === "number") total += amt;
-    }
-    return total;
+    const read = (async () => {
+      const res = await connection().getParsedTokenAccountsByOwner(
+        new PublicKey(owner),
+        { mint: new PublicKey(SOLANA.mint) },
+      );
+      let total = 0;
+      for (const { account } of res.value) {
+        const amt = account.data.parsed?.info?.tokenAmount?.uiAmount;
+        if (typeof amt === "number") total += amt;
+      }
+      return total;
+    })();
+    return await Promise.race([read, timeout]);
   } catch {
     return 0;
+  } finally {
+    clearTimeout(timer);
   }
 }

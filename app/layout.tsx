@@ -31,9 +31,17 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:border focus:border-border focus:bg-bg focus:px-3 focus:py-2 focus:text-sm"
+        >
+          Skip to content
+        </a>
         <Providers>
           <TokenBanner />
-          {children}
+          <main id="main-content" className="flex flex-1 flex-col">
+            {children}
+          </main>
         </Providers>
       </body>
     </html>

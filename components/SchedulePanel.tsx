@@ -57,6 +57,7 @@ export function SchedulePanel({
         <select
           className={input}
           value={cadence}
+          aria-label="Cadence"
           onChange={(e) => setCadence(e.target.value as Cadence)}
         >
           <option value="hourly">Every hour</option>

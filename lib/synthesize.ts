@@ -113,19 +113,22 @@ async function proposeFromDemos(
         .join("\n")}`
     : "";
 
-  const res = await getClaude().messages.create({
-    model: MODELS.generalizer,
-    max_tokens: 8000,
-    system: SYNTH_SYSTEM,
-    tools: [EMIT_SKILL_TOOL],
-    tool_choice: { type: "tool", name: "emit_skill" },
-    messages: [
-      {
-        role: "user",
-        content: `${demos.length} demonstrations of the same task:\n\n${examples}${repairBlock}`,
-      },
-    ],
-  });
+  const res = await getClaude().messages.create(
+    {
+      model: MODELS.generalizer,
+      max_tokens: 8000,
+      system: SYNTH_SYSTEM,
+      tools: [EMIT_SKILL_TOOL],
+      tool_choice: { type: "tool", name: "emit_skill" },
+      messages: [
+        {
+          role: "user",
+          content: `${demos.length} demonstrations of the same task:\n\n${examples}${repairBlock}`,
+        },
+      ],
+    },
+    { timeout: 120_000 }, // bound the call (it loops up to maxIterations)
+  );
 
   const block = res.content.find((b) => b.type === "tool_use");
   if (!block || block.type !== "tool_use") {

@@ -61,6 +61,7 @@ export function MarketBrowser({ items }: { items: MarketItem[] }) {
           <button
             key={c}
             onClick={() => setCat(c)}
+            aria-pressed={c === cat}
             className={cx(
               "rounded-full border px-3 py-1 text-xs transition-colors",
               c === cat

@@ -54,7 +54,8 @@ export function RatingWidget({
               <button
                 key={n}
                 onClick={() => setStars(n)}
-                aria-label={`${n} stars`}
+                aria-label={`Rate ${n} star${n === 1 ? "" : "s"}`}
+                aria-pressed={n <= stars}
                 className={cx(
                   "transition-colors",
                   n <= stars ? "text-ink" : "text-ink-3 hover:text-ink-2",

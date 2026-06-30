@@ -84,7 +84,7 @@ export function RunPanel({
                 autoComplete={f.secret ? "off" : undefined}
                 value={values[f.key] ?? ""}
                 placeholder={f.secret ? "entered fresh each run" : f.example}
-                aria-label={f.label || f.key}
+                aria-label={`${f.label || f.key}${f.secret ? " (secret)" : ""}`}
                 onChange={(e) =>
                   setValues((v) => ({ ...v, [f.key]: e.target.value }))
                 }
