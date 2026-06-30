@@ -23,16 +23,13 @@ function GitHubIcon() {
 /** The Aemulus mark. */
 export function Brand() {
   return (
-    <span className="flex items-center gap-2.5">
-      <Image
-        src="/aemulus-mark.png"
-        alt="Aemulus"
-        width={36}
-        height={26}
-        priority
-      />
-      <span className="mono text-sm font-semibold tracking-tight">aemulus</span>
-    </span>
+    <Image
+      src="/aemulus-mark.png"
+      alt="Aemulus"
+      width={50}
+      height={36}
+      priority
+    />
   );
 }
 
