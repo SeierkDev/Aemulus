@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "./ui";
 import { WalletStatus } from "./WalletStatus";
 import { SOLANA } from "@/lib/solana";
@@ -19,16 +20,17 @@ function GitHubIcon() {
   );
 }
 
-/** The Aemulus mark - two nested squares (the original and its copy). */
+/** The Aemulus mark. */
 export function Brand() {
   return (
     <span className="flex items-center gap-2.5">
-      <span className="grid h-7 w-7 place-items-center rounded-md border border-border-strong bg-surface-2">
-        <span className="relative h-3.5 w-3.5">
-          <span className="absolute inset-0 rounded-[3px] border border-ink-2" />
-          <span className="absolute -right-1 -top-1 h-3 w-3 rounded-[3px] border border-ink bg-bg" />
-        </span>
-      </span>
+      <Image
+        src="/aemulus-mark.png"
+        alt="Aemulus"
+        width={36}
+        height={26}
+        priority
+      />
       <span className="mono text-sm font-semibold tracking-tight">aemulus</span>
     </span>
   );
