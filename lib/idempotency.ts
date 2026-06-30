@@ -19,6 +19,23 @@ export interface IdemResult {
 
 const MAX_KEY_LEN = 255;
 
+/**
+ * Delete idempotency reservations older than `olderThanMs` (default 24h). Keeps
+ * the table from growing forever and bounds stale-key replay: a client reusing a
+ * key after this window starts a fresh operation rather than replaying an old
+ * stored response. (Retries happen within seconds/minutes, so 24h is generous.)
+ */
+export async function pruneIdempotencyKeys(
+  olderThanMs = 24 * 60 * 60 * 1000,
+): Promise<number> {
+  await ready();
+  const r = await db.execute({
+    sql: `DELETE FROM idempotency_keys WHERE created_at < ?`,
+    args: [Date.now() - olderThanMs],
+  });
+  return r.rowsAffected;
+}
+
 export async function withIdempotency(
   owner: string,
   scope: string,

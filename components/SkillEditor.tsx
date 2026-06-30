@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { Button, Card, Label, cx } from "@/components/ui";
 import { RunPanel } from "@/components/RunPanel";
@@ -58,6 +58,18 @@ export function SkillEditor({
   );
   const [orgId, setOrgId] = useState(initial.orgId ?? "");
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+
+  // Stable client-side keys for the editable lists so React reconciles by
+  // identity, not array index — otherwise removing/reordering a field or step
+  // bleeds focus, cursor, and <select> state into the adjacent row.
+  const seq = useRef(0); // only incremented in add handlers (never read in render)
+  const [fieldKeys, setFieldKeys] = useState<string[]>(() =>
+    fields.map((_, i) => `f${i}`),
+  );
+  const [stepKeys, setStepKeys] = useState<string[]>(() =>
+    steps.map((_, i) => `s${i}`),
+  );
 
   async function share(next: string) {
     const prev = orgId;
@@ -81,10 +93,12 @@ export function SkillEditor({
   }
   function removeField(i: number) {
     setFields((f) => f.filter((_, j) => j !== i));
+    setFieldKeys((k) => k.filter((_, j) => j !== i));
     setSaved(false);
   }
   function addField() {
     setFields((f) => [...f, { key: "", label: "", example: "" }]);
+    setFieldKeys((k) => [...k, `a${seq.current++}`]);
     setSaved(false);
   }
   function patchStep(i: number, p: Partial<SkillStep>) {
@@ -107,17 +121,20 @@ export function SkillEditor({
         outputKey: "",
       },
     ]);
+    setStepKeys((k) => [...k, `a${seq.current++}`]);
     setSaved(false);
   }
   function removeStep(i: number) {
     setSteps((s) =>
       s.filter((_, j) => j !== i).map((x, j) => ({ ...x, idx: j })),
     );
+    setStepKeys((k) => k.filter((_, j) => j !== i));
     setSaved(false);
   }
 
   async function save() {
     setBusy(true);
+    setSaveError(false);
     try {
       const r = await fetch(`/api/skills/${initial.id}`, {
         method: "PUT",
@@ -134,6 +151,9 @@ export function SkillEditor({
         }),
       });
       if (r.ok) setSaved(true);
+      else setSaveError(true); // surface failure instead of silently "saving"
+    } catch {
+      setSaveError(true);
     } finally {
       setBusy(false);
     }
@@ -147,6 +167,11 @@ export function SkillEditor({
         </Link>
         <div className="flex items-center gap-3">
           {saved && <span className="text-xs text-ink-3">Saved</span>}
+          {saveError && (
+            <span className="text-xs text-ink" role="alert">
+              Save failed — try again
+            </span>
+          )}
           <Button variant="primary" onClick={save} disabled={busy}>
             {busy ? "Saving…" : "Save changes"}
           </Button>
@@ -289,7 +314,7 @@ export function SkillEditor({
             </Card>
           )}
           {fields.map((f, i) => (
-            <Card key={i} className="grid grid-cols-[1fr_1fr_1fr_auto_auto] gap-3 p-4">
+            <Card key={fieldKeys[i]} className="grid grid-cols-[1fr_1fr_1fr_auto_auto] gap-3 p-4">
               <Field label="Key">
                 <input
                   className={input}
@@ -352,7 +377,7 @@ export function SkillEditor({
         </div>
         <div className="mt-4 grid gap-2">
           {steps.map((s, i) => (
-            <Card key={i} className="p-4">
+            <Card key={stepKeys[i]} className="p-4">
               <div className="flex items-center gap-3">
                 <span className="mono w-8 shrink-0 text-ink-3">
                   {String(i).padStart(2, "0")}

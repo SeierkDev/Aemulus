@@ -59,6 +59,17 @@ export async function reportSkill(
     });
     tookDown = r.rowsAffected > 0;
     if (tookDown) {
+      // A takedown is a kill-switch: also stop autonomous execution paths so the
+      // skill can't keep running via an existing schedule or trigger (the owner
+      // otherwise still has access to their own unpublished skill).
+      await db.execute({
+        sql: `UPDATE schedules SET active = 0 WHERE skill_id = ?`,
+        args: [skillId],
+      });
+      await db.execute({
+        sql: `UPDATE triggers SET active = 0 WHERE skill_id = ?`,
+        args: [skillId],
+      });
       incr("reports.takedowns");
       logInfo("moderation.takedown", `skill ${skillId} auto-unpublished`, { reports });
     }

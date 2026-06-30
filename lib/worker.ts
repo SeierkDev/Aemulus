@@ -7,8 +7,10 @@ import {
   completeJob,
   failJob,
   recoverStuckJobs,
+  pruneTerminalJobs,
   type Job,
 } from "./jobs";
+import { pruneIdempotencyKeys } from "./idempotency";
 import { runSlots } from "./semaphore";
 import { incr } from "./metrics";
 import { logError, logInfo } from "./log";
@@ -72,11 +74,20 @@ async function processJob(job: Job): Promise<void> {
 }
 
 let ticking = false;
+let lastPruneAt = 0;
+const PRUNE_EVERY_MS = 3_600_000; // hourly housekeeping
+
 async function tick(): Promise<void> {
   if (ticking) return; // never overlap ticks
   ticking = true;
   try {
     await recoverStuckJobs(Date.now(), STALE_MS);
+    // Periodic housekeeping: bound the idempotency + finished-jobs tables.
+    if (Date.now() - lastPruneAt > PRUNE_EVERY_MS) {
+      lastPruneAt = Date.now();
+      void pruneIdempotencyKeys().catch((e) => logError("worker.prune.idem", e));
+      void pruneTerminalJobs().catch((e) => logError("worker.prune.jobs", e));
+    }
     let n = 0;
     const cap = runSlots.free; // don't claim past free slots (no forced minimum)
     while (n < cap) {

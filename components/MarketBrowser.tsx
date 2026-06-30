@@ -86,7 +86,13 @@ export function MarketBrowser({ items }: { items: MarketItem[] }) {
                 <h3 className="font-medium tracking-tight">
                   {it.name}
                   {it.verified && (
-                    <span className="ml-1.5 align-middle text-xs text-ink-3">✓</span>
+                    <span
+                      className="ml-1.5 align-middle text-xs text-ink-3"
+                      role="img"
+                      aria-label="verified creator"
+                    >
+                      ✓
+                    </span>
                   )}
                 </h3>
                 {it.ratingCount > 0 && (

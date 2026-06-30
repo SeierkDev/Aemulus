@@ -61,7 +61,7 @@ export function TriggerPanel({
               key={t.id}
               className="flex items-center gap-2 rounded-[var(--radius-base)] border border-border bg-surface-2 p-2.5"
             >
-              <code className="mono flex-1 truncate text-xs text-ink">
+              <code className="mono flex-1 truncate text-xs text-ink" suppressHydrationWarning>
                 {urlFor(t.token)}
               </code>
               <span className="shrink-0 text-xs text-ink-3">

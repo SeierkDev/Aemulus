@@ -156,6 +156,22 @@ export async function recoverStuckJobs(
   return r.rowsAffected;
 }
 
+/**
+ * Delete terminal (done/failed) jobs older than `olderThanMs` (default 7d) so
+ * the queue table doesn't accumulate one row per run forever (each also stores
+ * encrypted input/overrides, so this is a retention measure too).
+ */
+export async function pruneTerminalJobs(
+  olderThanMs = 7 * 24 * 60 * 60 * 1000,
+): Promise<number> {
+  await ready();
+  const r = await db.execute({
+    sql: `DELETE FROM jobs WHERE status IN ('done', 'failed') AND created_at < ?`,
+    args: [Date.now() - olderThanMs],
+  });
+  return r.rowsAffected;
+}
+
 /** Queue-depth snapshot for /api/health. */
 export async function jobCounts(): Promise<Record<string, number>> {
   await ready();

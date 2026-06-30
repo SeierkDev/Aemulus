@@ -27,6 +27,8 @@ export function LiveView({
       </div>
       <div
         className="grid aspect-[16/10] place-items-center bg-bg outline-none"
+        role="application"
+        aria-label="Live browser — click to interact, then type"
         tabIndex={0}
         onKeyDown={onKey}
       >

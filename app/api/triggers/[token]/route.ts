@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveTrigger, recordTriggerFire } from "@/lib/triggers";
-import { getSkill } from "@/lib/skills";
+import { getSkill, skillAccess } from "@/lib/skills";
 import { startRun } from "@/lib/run-service";
 import { getQuota } from "@/lib/quota";
 import { computeTier, getAemulusBalance } from "@/lib/solana";
@@ -32,7 +32,11 @@ export async function POST(
       return NextResponse.json({ error: "Too many triggers" }, { status: 429 });
     }
     const skill = await getSkill(trig.skillId);
-    if (!skill) {
+    // Re-validate the trigger owner's access at fire time, not just at creation:
+    // if they've lost access (e.g. removed from the org the skill was shared
+    // through, or it was taken down), the trigger stops working. The owner of a
+    // private skill always retains access, so personal automation is unaffected.
+    if (!skill || !(await skillAccess(skill, trig.owner)).run) {
       return NextResponse.json({ error: "Skill not found" }, { status: 404 });
     }
 
