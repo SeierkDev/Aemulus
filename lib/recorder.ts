@@ -1,10 +1,10 @@
 import {
-  chromium,
   type Browser,
   type BrowserContext,
   type CDPSession,
   type Page,
 } from "playwright";
+import { launchBrowser } from "./browser";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
@@ -93,7 +93,7 @@ class RecorderSession {
 
     // Headless - the user drives it remotely via the streamed view.
     // AEMULUS_RECORD_HEADED=1 opens a real window for local debugging.
-    this.browser = await chromium.launch({
+    this.browser = await launchBrowser({
       headless: process.env.AEMULUS_RECORD_HEADED !== "1",
     });
     this.context = await this.browser.newContext({

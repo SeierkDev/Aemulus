@@ -22,6 +22,8 @@
     "jose": "^6.2.3",
     "next": "16.2.9",
     "playwright": "^1.61.1",
+    "playwright-extra": "^4.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "tweetnacl": "^1.0.3",

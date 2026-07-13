@@ -1,4 +1,5 @@
-import { chromium, type Browser, type Locator, type Page } from "playwright";
+import { type Browser, type Locator, type Page } from "playwright";
+import { launchBrowser } from "./browser";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { id } from "./ids";
@@ -91,7 +92,7 @@ export async function executeRun(
   // Bound concurrent Chromium launches; excess runs queue here.
   await runSlots.acquire();
   try {
-    browser = await chromium.launch({
+    browser = await launchBrowser({
       headless: process.env.AEMULUS_RUN_HEADED !== "1",
     });
     const context = await browser.newContext({
