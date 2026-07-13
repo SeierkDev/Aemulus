@@ -64,7 +64,15 @@ function fmt(ms: number): string {
  * capture disabled, or a capture that failed) so the caller falls back to the
  * screenshot replay.
  */
-export function RunRrwebReplay({ src }: { src: string }) {
+export function RunRrwebReplay({
+  src,
+  fallback = null,
+}: {
+  src: string;
+  /** Rendered instead when there are no events or the replay fails to load
+   *  (e.g. the screenshot scrubber), so the run page never shows a dead box. */
+  fallback?: React.ReactNode;
+}) {
   const stageRef = useRef<HTMLDivElement>(null);
   const replayerRef = useRef<Replayer | null>(null);
   const rafRef = useRef<number>(0);
@@ -167,7 +175,9 @@ export function RunRrwebReplay({ src }: { src: string }) {
     [playing],
   );
 
-  if (status === "empty") return null;
+  // No events, or the replay couldn't load: defer to the fallback (screenshot
+  // scrubber) so the run page never shows a dead box.
+  if (status === "empty" || status === "error") return <>{fallback}</>;
 
   return (
     <div>
@@ -176,11 +186,6 @@ export function RunRrwebReplay({ src }: { src: string }) {
       </div>
       {status === "loading" && (
         <p className="mt-2 text-sm text-ink-3">Loading replay…</p>
-      )}
-      {status === "error" && (
-        <p className="mt-2 text-sm text-ink-3">
-          Couldn&apos;t load the interactive replay.
-        </p>
       )}
       {status === "ready" && (
         <div className="mt-3 flex items-center gap-3">

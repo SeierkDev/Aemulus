@@ -203,32 +203,44 @@ export default async function RunPage({
         )}
 
         {/* Replay: watch the run play back. Prefer the pixel-perfect rrweb
-            replay when captured; otherwise the per-step screenshot scrubber. */}
-        {(hasRichReplay || hasShotReplay) && (
-          <>
-            <h2 className="mt-10 text-lg font-semibold tracking-tight">Replay</h2>
-            <div className="mt-4">
-              {hasRichReplay ? (
-                <RunRrwebReplay src={`/api/runs/${run.id}/rrweb`} />
-              ) : (
-                <RunReplay
-                  steps={run.steps
-                    .filter((s) => s.screenshot)
-                    .map((s) => ({
-                      idx: s.idx,
-                      action: s.action,
-                      intent: s.intent,
-                      value: s.value,
-                      screenshot: s.screenshot,
-                      flagged: s.flagged,
-                      note: s.note,
-                      confidence: s.confidence,
-                    }))}
-                />
-              )}
-            </div>
-          </>
-        )}
+            replay when captured; otherwise (or if it fails to load) the per-step
+            screenshot scrubber. */}
+        {(hasRichReplay || hasShotReplay) &&
+          (() => {
+            const shotReplay = hasShotReplay ? (
+              <RunReplay
+                steps={run.steps
+                  .filter((s) => s.screenshot)
+                  .map((s) => ({
+                    idx: s.idx,
+                    action: s.action,
+                    intent: s.intent,
+                    value: s.value,
+                    screenshot: s.screenshot,
+                    flagged: s.flagged,
+                    note: s.note,
+                    confidence: s.confidence,
+                  }))}
+              />
+            ) : null;
+            return (
+              <>
+                <h2 className="mt-10 text-lg font-semibold tracking-tight">
+                  Replay
+                </h2>
+                <div className="mt-4">
+                  {hasRichReplay ? (
+                    <RunRrwebReplay
+                      src={`/api/runs/${run.id}/rrweb`}
+                      fallback={shotReplay}
+                    />
+                  ) : (
+                    shotReplay
+                  )}
+                </div>
+              </>
+            );
+          })()}
 
         {/* Steps (compact list; screenshots are in the replay above) */}
         <h2 className="mt-10 text-lg font-semibold tracking-tight">Steps</h2>

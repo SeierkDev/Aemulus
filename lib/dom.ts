@@ -53,12 +53,15 @@ export function collectCandidates(page: Page): Promise<Candidate[]> {
         }
       }
 
-      // Structural path with :nth-of-type, stopping as soon as it's unique or we
-      // reach a uniquely-id'd ancestor.
+      // Structural path with :nth-of-type, walking up until the path is unique
+      // or we anchor at a uniquely-id'd ancestor / <body>. A complete nth-of-type
+      // path down from <body> is always unique, so we must keep walking (not stop
+      // at an arbitrary shallow depth, which could return an ambiguous selector);
+      // the cap is only a runaway guard for pathologically deep DOMs.
       const parts: string[] = [];
       let node: Element | null = el;
       let depth = 0;
-      while (node && node.nodeType === 1 && node !== document.documentElement && depth < 8) {
+      while (node && node.nodeType === 1 && node !== document.documentElement && depth < 40) {
         const anchor = idSelector(node);
         if (anchor) {
           parts.unshift(anchor);

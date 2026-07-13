@@ -81,6 +81,11 @@ export async function attachRrwebCapture(
     });
     await context.addInitScript(bundle);
     await context.addInitScript(() => {
+      // Only the TOP frame records. Init scripts run in every frame (incl.
+      // iframes); if each frame started its own recorder they'd all emit into
+      // the one shared events stream and produce a garbled, multi-full-snapshot
+      // replay. rrweb walks same-origin child frames itself from the top.
+      if (window.top !== window.self) return;
       // Defer: a synchronous record() here fires the first binding call during
       // page creation and deadlocks it.
       setTimeout(() => {

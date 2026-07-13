@@ -44,9 +44,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Vendored at build time from node_modules (predev/prebuild)
-/public/vendor/
-
 # Rust/Anchor build artifacts
 /anchor/target/
 /anchor-zk/target/

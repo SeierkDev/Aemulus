@@ -77,7 +77,11 @@ export async function recordRunCompressed(run: {
   const light = await import("@lightprotocol/stateless.js");
   const anchor = await import("@coral-xyz/anchor");
 
-  const programId = new PublicKey(process.env.AEMULUS_ZK_PROGRAM!);
+  // Single source of truth for the program id: the IDL's `address` is what
+  // anchor.Program dispatches to AND what the on-chain program derives its
+  // compressed addresses under (&crate::ID), so we must derive with the SAME id.
+  // Fall back to the env var only if the IDL somehow omits it.
+  const programId = new PublicKey(idl.address || process.env.AEMULUS_ZK_PROGRAM!);
   const payer = Keypair.fromSecretKey(bs58.decode(process.env.AEMULUS_ZK_SECRET!));
   const cluster = process.env.AEMULUS_RECEIPT_CLUSTER || "mainnet-beta";
   const rpcUrl = process.env.AEMULUS_ZK_RPC!;
@@ -99,56 +103,69 @@ export async function recordRunCompressed(run: {
   ]);
   const address = light.deriveAddressV2(seed, addressTree, programId);
 
-  // Prove the new address doesn't already exist (creation path). // DEVNET
-  const proof = await rpc.getValidityProofV0(
-    [],
-    [{ tree: addressTree, queue: addressTree, address: light.bn(address.toBytes()) }],
-  );
+  // All network work (the validity-proof round-trip AND the send) runs inside
+  // one timed block so a slow/hung compression RPC can't pin the worker - the
+  // proof request was previously unbounded, before the timeout was armed.
+  const work = (async (): Promise<{ sig: string; address: string; cluster: string }> => {
+    // Prove the new address doesn't already exist (creation path). // DEVNET
+    const proof = await rpc.getValidityProofV0(
+      [],
+      [{ tree: addressTree, queue: addressTree, address: light.bn(address.toBytes()) }],
+    );
 
-  // Pack the Light system accounts + address tree into remaining accounts. // DEVNET
-  const systemConfig = light.SystemAccountMetaConfig.new(programId);
-  const packed = new light.PackedAccounts();
-  packed.addSystemAccountsV2(systemConfig);
-  const treeIndex = packed.insertOrGet(addressTree);
-  const outputStateTreeIndex = packed.insertOrGet(new PublicKey(light.batchMerkleTree));
-  const addressTreeInfo = {
-    rootIndex: proof.rootIndices[0],
-    addressMerkleTreePubkeyIndex: treeIndex,
-    addressQueuePubkeyIndex: treeIndex,
-  };
+    // Pack the Light system accounts + address tree into remaining accounts. // DEVNET
+    const systemConfig = light.SystemAccountMetaConfig.new(programId);
+    const packed = new light.PackedAccounts();
+    packed.addSystemAccountsV2(systemConfig);
+    const treeIndex = packed.insertOrGet(addressTree);
+    const outputStateTreeIndex = packed.insertOrGet(new PublicKey(light.batchMerkleTree)); // DEVNET
+    const addressTreeInfo = {
+      rootIndex: proof.rootIndices[0],
+      addressMerkleTreePubkeyIndex: treeIndex,
+      addressQueuePubkeyIndex: treeIndex,
+    };
 
-  const wallet = new anchor.Wallet(payer);
-  const connection = new Connection(rpcUrl, "confirmed");
-  const provider = new anchor.AnchorProvider(
-    connection as never,
-    wallet,
-    { commitment: "confirmed" },
-  );
-  // anchor 0.30+/1.x: programId is read from idl.address.
-  const program = new anchor.Program(idl as Idl, provider);
+    const wallet = new anchor.Wallet(payer);
+    const connection = new Connection(rpcUrl, "confirmed");
+    const provider = new anchor.AnchorProvider(connection as never, wallet, {
+      commitment: "confirmed",
+    });
+    const program = new anchor.Program(idl as Idl, provider);
 
-  const build = (program.methods as Record<string, (...a: unknown[]) => {
-    accounts: (a: unknown) => { remainingAccounts: (a: unknown) => { rpc: () => Promise<string> } };
-  }>)
-    .recordReceipt(
-      proof.compressedProof, // ValidityProof // DEVNET
-      addressTreeInfo,
-      outputStateTreeIndex,
-      receiptHash,
-      commitmentRoot,
-      outcome,
+    const sig = await (
+      program.methods as Record<
+        string,
+        (...a: unknown[]) => {
+          accounts: (a: unknown) => {
+            remainingAccounts: (a: unknown) => { rpc: () => Promise<string> };
+          };
+        }
+      >
     )
-    .accounts({ payer: payer.publicKey })
-    .remainingAccounts(packed.toAccountMetas().remainingAccounts);
+      .recordReceipt(
+        proof.compressedProof, // ValidityProof // DEVNET
+        addressTreeInfo,
+        outputStateTreeIndex,
+        receiptHash,
+        commitmentRoot,
+        outcome,
+      )
+      .accounts({ payer: payer.publicKey })
+      .remainingAccounts(packed.toAccountMetas().remainingAccounts)
+      .rpc();
 
-  // Bound the send so a slow RPC can't pin the worker (best-effort recorder).
+    return { sig, address: address.toString(), cluster };
+  })();
+  // If the timeout wins the race, `work` is abandoned; swallow any later
+  // rejection so it can't surface as an unhandledRejection.
+  work.catch(() => {});
+
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<null>((res) => {
     timer = setTimeout(() => res(null), SEND_TIMEOUT_MS);
   });
   try {
-    const sig = await Promise.race([build.rpc(), timeout]);
-    return sig ? { sig, address: address.toString(), cluster } : null;
+    return await Promise.race([work, timeout]);
   } catch {
     return null;
   } finally {
