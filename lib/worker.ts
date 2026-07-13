@@ -94,7 +94,11 @@ async function tick(): Promise<void> {
       const job = await claimNextJob();
       if (!job) break;
       n++;
-      void processJob(job); // browser concurrency bounded by the semaphore
+      // Fire-and-forget (browser concurrency bounded by the semaphore), but
+      // catch here: processJob's pre-try lines (getSkill/failJob) can reject
+      // outside its own try, and an unhandled rejection could take down the
+      // worker. A stranded 'running' job is still recovered via STALE_MS.
+      void processJob(job).catch((e) => logError("worker.processJob", e));
     }
   } catch (e) {
     logError("worker.tick", e);
