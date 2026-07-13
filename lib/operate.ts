@@ -14,6 +14,8 @@ export interface Candidate {
   tag: string;
   text: string;
   name: string;
+  /** Accessibility role (implicit or explicit) - stable across visual redesigns. */
+  role?: string;
 }
 
 export interface OperatorDecision {
@@ -58,7 +60,7 @@ export async function operatorChooseSelector(args: {
   const list = args.candidates
     .map(
       (c, i) =>
-        `${i}. selector=${c.selector}  <${c.tag}> name="${c.name}" text="${c.text}"`,
+        `${i}. selector=${c.selector}  <${c.tag}>${c.role ? ` role=${c.role}` : ""} name="${c.name}" text="${c.text}"`,
     )
     .join("\n");
 
