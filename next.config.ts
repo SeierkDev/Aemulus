@@ -37,6 +37,10 @@ const csp = [
     .filter(Boolean)
     .join(" "),
   "worker-src 'self' blob:",
+  // rrweb's run-replay reconstructs the recorded DOM inside a same-origin
+  // about:blank iframe. Its content (CSS/images/fonts) is inlined as data: at
+  // capture time, so no external hosts are needed here.
+  "frame-src 'self'",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

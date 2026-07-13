@@ -1,5 +1,10 @@
 import { type Browser, type Locator, type Page } from "playwright";
 import { launchBrowser } from "./browser";
+import {
+  attachRrwebCapture,
+  saveRrwebEvents,
+  type RrwebCapture,
+} from "./rrweb-capture";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { id } from "./ids";
@@ -81,6 +86,7 @@ export async function executeRun(
   await mkdir(path.join(RUNS_DIR, owner, runId), { recursive: true });
 
   let browser: Browser | null = null;
+  let capture: RrwebCapture | null = null; // rrweb session events (if enabled)
   let finalStatus: RunStatus = "completed";
   let error: string | null = null;
   const outputs: Record<string, string> = {}; // values captured by extract steps
@@ -99,6 +105,9 @@ export async function executeRun(
       viewport: { width: 1280, height: 800 },
       acceptDownloads: false, // a hostile page can't fill disk via downloads
     });
+    // Best-effort rrweb capture for the rich replay (AEMULUS_RRWEB=1). Must be
+    // wired before the first page is created; null + inert when disabled.
+    capture = await attachRrwebCapture(context);
     // Egress guardrail: block requests to internal hosts / private IPs / unknown
     // schemes so an untrusted skill can't pull from the server's network. Plus
     // the per-skill allowlist - NAVIGATIONS must target a declared host (so a
@@ -398,6 +407,9 @@ export async function executeRun(
     throw err instanceof Error ? err : new Error("Run failed to start.");
   } finally {
     await browser?.close().catch(() => {});
+    // Persist the rrweb events (best-effort) for the replay - even for failed
+    // runs, where the replay is most useful for debugging.
+    if (capture) await saveRrwebEvents(RUNS_DIR, owner, runId, capture.events);
     runSlots.release();
   }
 

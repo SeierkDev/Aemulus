@@ -7,8 +7,11 @@ import { RetryButton } from "@/components/RetryButton";
 import { LiveTakeover } from "@/components/LiveTakeover";
 import { RunLive } from "@/components/RunLive";
 import { RunReplay } from "@/components/RunReplay";
+import { RunRrwebReplay } from "@/components/RunRrwebReplay";
 import { DisclosureGenerator } from "@/components/DisclosureGenerator";
+import path from "node:path";
 import { getRun } from "@/lib/runs";
+import { hasRrwebEvents } from "@/lib/rrweb-capture";
 import { commitmentFields } from "@/lib/commitment";
 import { getSkill } from "@/lib/skills";
 import { getSession } from "@/lib/auth";
@@ -38,6 +41,9 @@ export default async function RunPage({
     (skill?.inputSchema.fields ?? []).filter((f) => f.secret).map((f) => f.key),
   );
   const isTerminal = ["completed", "failed", "needs_review"].includes(run.status);
+  const RUNS_DIR = path.join(process.cwd(), ".data", "recordings");
+  const hasRichReplay = hasRrwebEvents(RUNS_DIR, run.owner, run.id);
+  const hasShotReplay = run.steps.some((s) => s.screenshot);
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-6">
@@ -186,25 +192,30 @@ export default async function RunPage({
           </div>
         )}
 
-        {/* Replay: watch the run step-by-step */}
-        {run.steps.some((s) => s.screenshot) && (
+        {/* Replay: watch the run play back. Prefer the pixel-perfect rrweb
+            replay when captured; otherwise the per-step screenshot scrubber. */}
+        {(hasRichReplay || hasShotReplay) && (
           <>
             <h2 className="mt-10 text-lg font-semibold tracking-tight">Replay</h2>
             <div className="mt-4">
-              <RunReplay
-                steps={run.steps
-                  .filter((s) => s.screenshot)
-                  .map((s) => ({
-                    idx: s.idx,
-                    action: s.action,
-                    intent: s.intent,
-                    value: s.value,
-                    screenshot: s.screenshot,
-                    flagged: s.flagged,
-                    note: s.note,
-                    confidence: s.confidence,
-                  }))}
-              />
+              {hasRichReplay ? (
+                <RunRrwebReplay src={`/api/runs/${run.id}/rrweb`} />
+              ) : (
+                <RunReplay
+                  steps={run.steps
+                    .filter((s) => s.screenshot)
+                    .map((s) => ({
+                      idx: s.idx,
+                      action: s.action,
+                      intent: s.intent,
+                      value: s.value,
+                      screenshot: s.screenshot,
+                      flagged: s.flagged,
+                      note: s.note,
+                      confidence: s.confidence,
+                    }))}
+                />
+              )}
             </div>
           </>
         )}

@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // The Solana/Anchor workspace has its own toolchain (Rust + ts-mocha).
     "anchor/**",
+    // Vendored third-party bundle (rrweb UMD), copied in at build time.
+    "public/vendor/**",
   ]),
 ]);
 

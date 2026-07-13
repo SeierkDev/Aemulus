@@ -43,3 +43,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Vendored at build time from node_modules (predev/prebuild)
+/public/vendor/

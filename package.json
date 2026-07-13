@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/vendor-rrweb.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/vendor-rrweb.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
@@ -26,6 +28,7 @@
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "rrweb": "^2.1.0",
     "tweetnacl": "^1.0.3",
     "zod": "^4.4.3"
   },
