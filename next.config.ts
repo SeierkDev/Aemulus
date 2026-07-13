@@ -64,7 +64,14 @@ const SECURITY_HEADERS = [
 
 const nextConfig: NextConfig = {
   // Playwright must run as a real Node dependency, never bundled by Next.
-  serverExternalPackages: ["playwright", "playwright-core"],
+  // The Light + Anchor SDKs are only dynamically imported when the (gated)
+  // ZK-compressed receipt path runs, so keep them external too.
+  serverExternalPackages: [
+    "playwright",
+    "playwright-core",
+    "@lightprotocol/stateless.js",
+    "@coral-xyz/anchor",
+  ],
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },

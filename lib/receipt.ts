@@ -208,6 +208,8 @@ export interface ReceiptVerification {
   commitmentRoot?: string | null;
   /** On-chain registry record (aemulus-registry program), if anchored. */
   registry?: { sig: string; cluster: string; url: string };
+  /** ZK-compressed receipt (aemulus-zk-receipts Light program), if anchored. */
+  zk?: { sig: string; address: string; cluster: string; url: string };
   /** Merkle batch this run was anchored in, if batched. */
   batch?: {
     id: string;
@@ -277,6 +279,15 @@ export async function verifyReceipt(
       sig: run.registrySig,
       cluster: run.registryCluster,
       url: explorerUrl(run.registrySig, run.registryCluster),
+    };
+  }
+
+  if (run.zkSig && run.zkCluster) {
+    verification.zk = {
+      sig: run.zkSig,
+      address: run.zkAddress ?? "",
+      cluster: run.zkCluster,
+      url: explorerUrl(run.zkSig, run.zkCluster),
     };
   }
 

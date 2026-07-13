@@ -56,6 +56,9 @@ export async function createRun(input: {
     commitmentRoot: null,
     registrySig: null,
     registryCluster: null,
+    zkSig: null,
+    zkAddress: null,
+    zkCluster: null,
     steps: [],
     createdAt: now,
     updatedAt: now,
@@ -324,6 +327,20 @@ export async function setRunRegistryAnchor(
   });
 }
 
+/** Record that this run's receipt was anchored as a ZK-compressed account. */
+export async function setRunZkAnchor(
+  runId: string,
+  sig: string,
+  address: string,
+  cluster: string,
+): Promise<void> {
+  await ready();
+  await db.execute({
+    sql: `UPDATE runs SET zk_sig = ?, zk_address = ?, zk_cluster = ? WHERE id = ?`,
+    args: [sig, address, cluster, runId],
+  });
+}
+
 /** Record operator (Claude) token usage for a run - cost transparency. */
 export async function setRunUsage(
   runId: string,
@@ -440,6 +457,9 @@ function rowToRun(row: Record<string, unknown>, steps: RunStepRecord[]): Run {
     registrySig: row.registry_sig == null ? null : String(row.registry_sig),
     registryCluster:
       row.registry_cluster == null ? null : String(row.registry_cluster),
+    zkSig: row.zk_sig == null ? null : String(row.zk_sig),
+    zkAddress: row.zk_address == null ? null : String(row.zk_address),
+    zkCluster: row.zk_cluster == null ? null : String(row.zk_cluster),
     steps,
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),

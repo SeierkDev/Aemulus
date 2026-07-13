@@ -271,6 +271,10 @@ export interface Run {
   /** On-chain registry anchor (aemulus-registry program), if recorded. */
   registrySig: string | null;
   registryCluster: string | null;
+  /** ZK-compressed receipt anchor (aemulus-zk-receipts Light program), if recorded. */
+  zkSig: string | null;
+  zkAddress: string | null;
+  zkCluster: string | null;
   steps: RunStepRecord[];
   createdAt: number;
   updatedAt: number;

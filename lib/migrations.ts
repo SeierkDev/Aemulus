@@ -420,4 +420,17 @@ export const MIGRATIONS: Migration[] = [
       { table: "runs", column: "registry_cluster", def: "TEXT" },
     ],
   },
+
+  // 28 - ZK-compressed receipt anchor: the tx + derived compressed-account
+  // address that recorded this run's receipt via the aemulus-zk-receipts Light
+  // program (cheap, ZK-validity-proven; separate from the rent-bearing registry).
+  {
+    id: 28,
+    name: "run_zk_anchor",
+    addColumns: [
+      { table: "runs", column: "zk_sig", def: "TEXT" },
+      { table: "runs", column: "zk_address", def: "TEXT" },
+      { table: "runs", column: "zk_cluster", def: "TEXT" },
+    ],
+  },
 ];

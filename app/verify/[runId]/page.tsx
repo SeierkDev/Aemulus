@@ -144,6 +144,33 @@ export default async function VerifyPage({
             </Card>
           )}
 
+          {v.zk && (
+            <Card className="p-5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold">ZK-compressed receipt</h2>
+                <a
+                  href={v.zk.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-ink hover:underline"
+                >
+                  View on explorer →
+                </a>
+              </div>
+              <p className="mt-2 text-sm text-ink-2">
+                This receipt is also recorded as a ZK-compressed account via Light
+                Protocol - the same immutable proof at ~1/100th the on-chain cost,
+                backed by a zero-knowledge validity proof rather than rent-paid
+                account state.
+              </p>
+              {v.zk.address && (
+                <code className="mono mt-2 block truncate text-xs text-ink-3">
+                  {v.zk.address}
+                </code>
+              )}
+            </Card>
+          )}
+
           {v.commitmentRoot && (
             <Card className="p-5">
               <h2 className="text-sm font-semibold">Private commitment</h2>

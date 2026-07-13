@@ -98,6 +98,10 @@ CREATE TABLE IF NOT EXISTS runs (
   -- on-chain registry anchor (aemulus-registry program), separate from the Memo batch
   registry_sig     TEXT,
   registry_cluster TEXT,
+  -- ZK-compressed receipt anchor (aemulus-zk-receipts Light program)
+  zk_sig      TEXT,
+  zk_address  TEXT,
+  zk_cluster  TEXT,
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL
 );

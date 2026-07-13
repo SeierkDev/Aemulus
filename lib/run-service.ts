@@ -1,10 +1,17 @@
 import { executeRun } from "./runner";
-import { createRun, getRun, claimRunBookkeeping, setRunRegistryAnchor } from "./runs";
+import {
+  createRun,
+  getRun,
+  claimRunBookkeeping,
+  setRunRegistryAnchor,
+  setRunZkAnchor,
+} from "./runs";
 import { incrementRunCount } from "./skills";
 import { invalidateReputation } from "./reputation";
 import { creditEarningOnce } from "./earnings";
 import { dispatchRunEvent, eventForStatus } from "./webhooks";
 import { recordRunOnChain, registryEnabled } from "./registry";
+import { recordRunCompressed, zkReceiptsEnabled } from "./zk-receipts";
 import { enqueueRunJob } from "./jobs";
 import { SOLANA } from "./solana";
 import { incr } from "./metrics";
@@ -131,5 +138,16 @@ export async function completeRun(runId: string, args: RunArgs): Promise<void> {
         if (res) return setRunRegistryAnchor(runId, res.sig, res.cluster);
       })
       .catch((e) => logError("registry.record", e));
+  }
+
+  // ZK-compressed receipt anchor (gated/inert unless configured): the same
+  // receipt recorded ~100x cheaper as a Light compressed account. Independent
+  // of the registry above; also best-effort + fire-and-forget.
+  if (final.status === "completed" && final.receiptHash && zkReceiptsEnabled()) {
+    void recordRunCompressed(final)
+      .then((res) => {
+        if (res) return setRunZkAnchor(runId, res.sig, res.address, res.cluster);
+      })
+      .catch((e) => logError("zk.record", e));
   }
 }

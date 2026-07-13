@@ -179,6 +179,16 @@ export default async function RunPage({
                 Recorded in the on-chain registry →
               </a>
             )}
+            {run.zkSig && run.zkCluster && (
+              <a
+                href={explorerUrl(run.zkSig, run.zkCluster)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 ml-3 inline-block text-xs text-ink hover:underline"
+              >
+                ZK-compressed receipt →
+              </a>
+            )}
           </Card>
         )}
 
