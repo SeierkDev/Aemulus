@@ -140,6 +140,22 @@ export function evaluateAutoSubmit(input: AutoSubmitInput): EvalResult {
   };
 }
 
+/**
+ * Validate a proposed second approver: must be a different person from both the
+ * preparer and the actor (maker-checker), and must hold `approve.second`. Shared
+ * by the evaluator and the append-only override-log writer.
+ */
+export function checkSecondApprover(
+  config: ApControlConfig,
+  actor: Actor,
+  preparerId: string,
+  second: Actor,
+): "ok" | "maker_checker" | "not_authorized" {
+  if (second.userId === preparerId || second.userId === actor.userId) return "maker_checker";
+  if (!permsFor(config, second.role).includes("approve.second")) return "not_authorized";
+  return "ok";
+}
+
 // ── evaluateOverride ────────────────────────────────────────────────────────
 /**
  * Decide whether a reviewer's override may proceed: allow, require_second (needs
@@ -190,11 +206,12 @@ export function evaluateOverride(input: OverrideInput): EvalResult {
       return mk("require_second", [{ code: "SECOND_REQUIRED" }], ruleIds,
         `A second approver is required to override ${label(type)}${forcedSecondByCap ? " above the limit" : ""}.`);
     }
-    if (secondApprover.userId === preparerId || secondApprover.userId === actor.userId) {
+    const check = checkSecondApprover(config, actor, preparerId, secondApprover);
+    if (check === "maker_checker") {
       return mk("block", [{ code: "MAKER_CHECKER_VIOLATION" }], [...ruleIds, "OVERRIDE.MAKER_CHECKER"],
         `This can't be the second approver — the same person prepared or made this change. A different person must approve.`);
     }
-    if (!permsFor(config, secondApprover.role).includes("approve.second")) {
+    if (check === "not_authorized") {
       return mk("block", [{ code: "SECOND_APPROVER_NOT_AUTHORIZED", detail: { role: secondApprover.role } }],
         [...ruleIds, "OVERRIDE.SECOND_AUTH"], `A ${secondApprover.role} isn't authorized to give a second approval.`);
     }
