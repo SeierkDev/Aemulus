@@ -12,6 +12,7 @@ import { appendApEvent, readAggregate } from "./store";
  */
 
 export const DEMO_INVOICE_ID = "ap_demo_acme";
+export const DEMO_ORG = "Northwind Books";
 export const DEMO_ACTOR = { userId: "u_jane", role: "clerk" as const, name: "Jane D." };
 // $5,000 ceiling → a $1,842 duplicate override is a clean single-approver `allow`.
 export const DEMO_CONFIG = LARGE_TEAM;
@@ -59,7 +60,8 @@ export const DEMO_FIXTURE = {
     invoiceNumber: "INV-2025-0391",
     amount: "$1,842.00",
     date: "2025-03-02",
-    enteredAt: "Mar 2, 2025 by Jane D.",
+    dateDelta: "6 weeks earlier",
+    enteredAt: "Entered Mar 2, 2025 by Jane D.",
   },
   reasonCodes: ["DUPLICATE"],
   topReasonCode: "DUPLICATE",

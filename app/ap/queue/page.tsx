@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { Card, Label } from "@/components/ui";
 import { ResetButton } from "@/components/ap/ResetButton";
-import { seedApDemo, DEMO_INVOICE_ID } from "@/lib/ap-controls/demo";
+import { seedApDemo, DEMO_INVOICE_ID, DEMO_FIXTURE } from "@/lib/ap-controls/demo";
 import { liveInvoiceQueue } from "@/lib/ap-controls/projections";
 
 export const dynamic = "force-dynamic";
@@ -12,79 +11,87 @@ function fmtAge(ms: number): string {
   const h = Math.floor(m / 60);
   return `${h}h ${m % 60}m`;
 }
-function fmtMoney(n: number | null, ccy: string | null): string {
+function money(n: number | null): string {
   if (n == null) return "—";
-  return `${ccy === "USD" || !ccy ? "$" : ccy + " "}${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
-
-const REASON_LABELS: Record<string, string> = {
-  DUPLICATE: "Possible duplicate",
-  NEW_VENDOR: "Unknown vendor",
-  TOTALS_MISMATCH: "Totals don’t match",
-  OVER_CEILING: "Over auto-entry limit",
-};
+function reasonLabel(code: string | null): string {
+  if (code === "DUPLICATE") return `Possible duplicate of ${DEMO_FIXTURE.duplicateOf.billNumber}`;
+  if (code === "NEW_VENDOR") return "Unknown vendor";
+  if (code === "TOTALS_MISMATCH") return "Totals don’t match";
+  return code ?? "Needs review";
+}
 
 export default async function ApQueuePage() {
   await seedApDemo();
   const queue = await liveInvoiceQueue([DEMO_INVOICE_ID]);
 
+  const atRisk = queue.reduce((s, q) => s + (q.amount ?? 0), 0);
+  const oldest = queue.reduce((m, q) => Math.max(m, q.ageMs), 0);
+
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-6">
-      <header className="flex items-center justify-between py-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Review queue</h1>
-          <p className="mt-1 text-sm text-ink-3">Invoices Aemulus held for a human — it won’t guess on your money.</p>
-        </div>
-        <ResetButton />
+      <header className="pt-8">
+        <h1 className="text-2xl font-semibold tracking-tight">Needs your review</h1>
+        <p className="mt-1 text-sm text-ink-3">
+          Invoices Aemulus wouldn’t enter without you. It never guesses on your money.
+        </p>
+        {queue.length > 0 && (
+          <p className="mt-3 text-sm text-ink-2">
+            <span className="font-semibold text-ink">{queue.length}</span> held ·{" "}
+            <span className="font-semibold tabular-nums text-ink">{money(atRisk)}</span> at risk ·{" "}
+            oldest <span className="text-ink">{fmtAge(oldest)}</span>
+          </p>
+        )}
       </header>
 
-      <div className="border-t border-border pt-6">
+      <div className="mt-6">
         {queue.length === 0 ? (
-          <Card className="p-8 text-center">
-            <p className="text-lg font-semibold tracking-tight">Queue clear ✓</p>
-            <p className="mt-1 text-sm text-ink-3">Every invoice has been entered. Reset the demo to run it again.</p>
-            <div className="mt-4 flex justify-center">
-              <ResetButton label="Replay the demo" />
-            </div>
-          </Card>
+          <div className="rounded-lg border border-border p-10 text-center">
+            <p className="text-lg font-semibold tracking-tight">All clear</p>
+            <p className="mt-1 text-sm text-ink-3">Every invoice has been entered and sealed.</p>
+          </div>
         ) : (
-          <div className="grid gap-3">
-            {queue.map((q) => (
-              <Link key={q.invoiceId} href={`/ap/invoice/${q.invoiceId}`}>
-                <Card className="flex items-center gap-4 p-4 transition hover:border-border-strong">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold tracking-tight">{q.vendor}</span>
-                      <span className="text-ink-3">·</span>
-                      <span className="mono text-sm">{fmtMoney(q.amount, q.currency)}</span>
-                    </div>
-                    <div className="mt-1 flex items-center gap-2 text-xs text-ink-3">
-                      <span className="rounded-full border border-border-strong bg-surface-2 px-2 py-0.5 text-ink">
-                        ⚑ {REASON_LABELS[q.topReason ?? ""] ?? q.topReason ?? "Needs review"}
-                      </span>
-                      {q.pendingSecondApproval && (
-                        <span className="rounded-full border border-border-strong bg-surface-2 px-2 py-0.5">
-                          needs 2nd approval
-                        </span>
-                      )}
-                      <span>· in queue {fmtAge(q.ageMs)}</span>
-                    </div>
-                  </div>
-                  <span className="mono text-sm text-ink">Review →</span>
-                </Card>
+          <div className="overflow-hidden rounded-lg border border-border">
+            {/* header row */}
+            <div className="grid grid-cols-[1.5fr_0.9fr_1.6fr_0.6fr_auto] items-center gap-4 border-b border-border bg-surface-2 px-4 py-2.5 text-xs text-ink-3">
+              <span>Vendor</span>
+              <span className="text-right">Amount</span>
+              <span>Why held</span>
+              <span>Age</span>
+              <span className="w-16" />
+            </div>
+            {queue.map((q, i) => (
+              <Link
+                key={q.invoiceId}
+                href={`/ap/invoice/${q.invoiceId}`}
+                className={`grid grid-cols-[1.5fr_0.9fr_1.6fr_0.6fr_auto] items-center gap-4 px-4 py-3.5 text-sm transition hover:bg-surface-2 ${i > 0 ? "border-t border-border" : ""}`}
+              >
+                <span className="font-medium text-ink">{q.vendor}</span>
+                <span className="text-right font-medium tabular-nums text-ink">{money(q.amount)}</span>
+                <span className="flex items-center gap-1.5 text-ink-2">
+                  <span aria-hidden>⚑</span>
+                  {reasonLabel(q.topReason)}
+                </span>
+                <span className="text-ink-3">{fmtAge(q.ageMs)}</span>
+                <span className="w-16 text-right text-ink">Open →</span>
               </Link>
             ))}
           </div>
         )}
 
-        <div className="mt-8">
-          <Label>Control core</Label>
-          <p className="mt-1 text-xs text-ink-3">
-            This list is <span className="mono text-ink">projectInvoiceQueue()</span> folding the live{" "}
-            <span className="mono text-ink">ap_events</span> stream — no mock. OCR, duplicate detection, the
-            replay, auth, and QuickBooks keying are mocked; the decision + audit spine is real.
+        {queue.length > 0 && (
+          <p className="mt-4 text-xs text-ink-3">
+            Every decision here is sealed to a tamper-evident audit log.
           </p>
-        </div>
+        )}
+      </div>
+
+      {/* Demo controls — deliberately quiet, out of the primary flow. */}
+      <div className="mt-auto flex items-center gap-3 py-8 text-xs text-ink-3">
+        <span>Demo controls</span>
+        <span>·</span>
+        <ResetButton label={queue.length === 0 ? "Replay the walkthrough" : "Reset"} />
       </div>
     </div>
   );

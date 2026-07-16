@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { TokenBanner } from "@/components/TokenBanner";
+import { HideOnAp } from "@/components/ChromeGate";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,7 +39,9 @@ export default function RootLayout({
           Skip to content
         </a>
         <Providers>
-          <TokenBanner />
+          <HideOnAp>
+            <TokenBanner />
+          </HideOnAp>
           <main id="main-content" className="flex flex-1 flex-col">
             {children}
           </main>

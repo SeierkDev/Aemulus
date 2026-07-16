@@ -19,7 +19,7 @@ export function ResetButton({ label = "Reset demo" }: { label?: string }) {
           setBusy(false);
         }
       }}
-      className="rounded-md border border-border-strong bg-surface-2 px-3 py-1.5 text-sm text-ink hover:border-ink-3 disabled:opacity-50"
+      className="text-ink-2 underline decoration-border-strong underline-offset-2 hover:text-ink disabled:opacity-50"
     >
       {busy ? "Resetting…" : label}
     </button>
