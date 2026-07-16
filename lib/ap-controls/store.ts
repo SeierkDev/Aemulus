@@ -28,7 +28,15 @@ export type ApEventType =
 // Payload shapes (documentation + call-site typing; stored as JSON).
 export interface InvoiceOverridePayload { type: string; field: string; originalValue: unknown; newValue: unknown; reasonCode: string; overrideEventId?: string }
 export interface InvoiceSubmittedPayload { billNumber: string; total: number; currency: string; auto: boolean } // v2
-export interface InvoiceReviewPausedPayload { reasonCodes: string[]; banner: string }
+export interface InvoiceReviewPausedPayload {
+  reasonCodes: string[];
+  topReasonCode: string;
+  banner: string;
+  amount: number;
+  currency: string;
+  vendor: string; // display name or id, for the queue
+  requiresSecondApproval: boolean;
+}
 export interface VendorRequestedPayload { name: string; taxId?: string; hasBankDetails: boolean }
 export interface VendorApprovedPayload { firstInvoiceReview: boolean }
 export interface VendorBankVerifiedPayload { method: "callback" | "portal" | "reference"; verifiedBy: string }
