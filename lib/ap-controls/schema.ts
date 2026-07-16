@@ -81,7 +81,7 @@ export interface ActorRef { userId: string; role: Role; at: number }
 export type EvidenceView =
   | { artifact: "sourceInvoice"; at: number }
   | { artifact: "replay"; at: number; watchedMs?: number }
-  | { artifact: "duplicateComparison"; comparedTo: string; at: number }
+  | { artifact: "duplicateComparison"; comparedTo?: string; at: number }
   | { artifact: "vendorMatch"; at: number };
 
 export interface OverrideEvent {

@@ -223,3 +223,8 @@ export async function projectInvoiceQueue(
   const states = await Promise.all(invoiceIds.map((id) => projectInvoiceEntry(id)));
   return buildInvoiceQueue(states, now);
 }
+
+/** Live queue at the current time (impure boundary — reads the clock here). */
+export async function liveInvoiceQueue(invoiceIds: string[]): Promise<InvoiceQueueItem[]> {
+  return projectInvoiceQueue(invoiceIds, Date.now());
+}
