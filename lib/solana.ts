@@ -107,8 +107,13 @@ export async function getAemulusBalance(owner: string): Promise<number> {
       );
       let total = 0;
       for (const { account } of res.value) {
-        const amt = account.data.parsed?.info?.tokenAmount?.uiAmount;
-        if (typeof amt === "number") total += amt;
+        // Use uiAmountString, not the uiAmount float: the RPC spec allows
+        // uiAmount to be null (unrepresentable) and it loses precision past 2^53
+        // base units, either of which would silently undercount and misclassify
+        // the wallet to a lower tier. The string is always present + exact.
+        const s = account.data.parsed?.info?.tokenAmount?.uiAmountString;
+        const amt = typeof s === "string" ? Number(s) : NaN;
+        if (Number.isFinite(amt)) total += amt;
       }
       return total;
     })();

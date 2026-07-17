@@ -1,5 +1,8 @@
 import { lookup } from "node:dns/promises";
-import net from "node:net";
+import { lookup as lookupCb } from "node:dns";
+import { request as httpsRequest } from "node:https";
+import { request as httpRequest } from "node:http";
+import net, { type LookupFunction } from "node:net";
 
 /**
  * SSRF guard. Aemulus navigates a server-side browser to user/skill-supplied
@@ -17,12 +20,18 @@ const BLOCKED_HOSTS = new Set([
 
 function isPrivateIp(ip: string): boolean {
   if (net.isIPv4(ip)) {
-    const [a, b] = ip.split(".").map(Number);
+    const [a, b, c] = ip.split(".").map(Number);
     if (a === 0 || a === 10 || a === 127) return true;
     if (a === 169 && b === 254) return true; // link-local + cloud metadata
     if (a === 172 && b >= 16 && b <= 31) return true;
     if (a === 192 && b === 168) return true;
     if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
+    if (a >= 240) return true; // 240.0.0.0/4 reserved + 255.255.255.255 broadcast
+    if (a === 198 && (b === 18 || b === 19)) return true; // 198.18.0.0/15 benchmark
+    if (a === 192 && b === 0 && c === 2) return true; // 192.0.2.0/24 TEST-NET-1
+    if (a === 198 && b === 51 && c === 100) return true; // 198.51.100.0/24 TEST-NET-2
+    if (a === 203 && b === 0 && c === 113) return true; // 203.0.113.0/24 TEST-NET-3
+    if (a === 192 && b === 88 && c === 99) return true; // 192.88.99.0/24 6to4 anycast
     return false;
   }
   if (net.isIPv6(ip)) {
@@ -120,6 +129,76 @@ export async function navHostResolvesPrivate(raw: string): Promise<boolean> {
   }
   navDnsCache.set(host, { priv, exp: now + NAV_DNS_TTL_MS });
   return priv;
+}
+
+/**
+ * A DNS lookup hook that REJECTS any resolution to a private/internal address.
+ * Passed as the socket's `lookup`, so the address that gets validated is exactly
+ * the address the request connects to — closing the DNS-rebinding TOCTOU where a
+ * separate assertSafeUrl() check and the connection resolve the host independently
+ * (an attacker controlling their own DNS could return public then private).
+ */
+const guardedLookup: LookupFunction = (hostname, options, callback) => {
+  type Cb = (
+    err: NodeJS.ErrnoException | null,
+    address: string | { address: string; family: number }[],
+    family?: number,
+  ) => void;
+  const cb = callback as Cb;
+  (lookupCb as unknown as (h: string, o: unknown, c: Cb) => void)(hostname, options, (err, address, family) => {
+    if (err) return cb(err, address, family);
+    const addrs = Array.isArray(address) ? address.map((a) => a.address) : [address as string];
+    if (addrs.some((a) => isPrivateIp(a))) {
+      return cb(Object.assign(new Error("Blocked private address."), { code: "EBLOCKED" }), [], family);
+    }
+    cb(err, address, family);
+  });
+};
+
+/**
+ * SSRF-safe JSON POST to a user-supplied URL (e.g. an outbound webhook). Unlike
+ * `fetch(url)` — which resolves DNS a second time, independently of any prior
+ * assertSafeUrl() — this pins resolution through guardedLookup, so the validated
+ * IP IS the connected IP. Never follows redirects (node http doesn't auto-follow),
+ * discards the response body (a hostile endpoint can't stream an unbounded body),
+ * and enforces a hard timeout. Resolves { status } or rejects on a connect/timeout
+ * /blocked-address error.
+ */
+export function safePostJson(
+  raw: string,
+  opts: { body: string; headers: Record<string, string>; timeoutMs: number },
+): Promise<{ status: number }> {
+  return new Promise((resolve, reject) => {
+    let u: URL;
+    try {
+      u = new URL(raw);
+    } catch {
+      return reject(new Error("Invalid URL."));
+    }
+    if (u.protocol !== "http:" && u.protocol !== "https:") {
+      return reject(new Error("Blocked URL scheme."));
+    }
+    const requestFn = u.protocol === "https:" ? httpsRequest : httpRequest;
+    const req = requestFn(
+      raw,
+      {
+        method: "POST",
+        headers: { ...opts.headers, "content-length": Buffer.byteLength(opts.body) },
+        lookup: guardedLookup,
+        timeout: opts.timeoutMs,
+      },
+      (res) => {
+        const status = res.statusCode ?? 0;
+        res.resume(); // drain + discard — never buffer a hostile response body
+        res.on("end", () => resolve({ status }));
+        res.on("error", () => resolve({ status })); // have the status; ignore body errors
+      },
+    );
+    req.on("timeout", () => req.destroy(new Error("Delivery timed out.")));
+    req.on("error", (e) => reject(e));
+    req.write(opts.body);
+    req.end();
+  });
 }
 
 /** Throws if `raw` is unsafe to navigate to. data: URLs are inline (no fetch). */

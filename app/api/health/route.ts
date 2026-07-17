@@ -8,26 +8,37 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Liveness/readiness probe + in-process counters. Public and unauthenticated
- * (returns no private data) so a load balancer / uptime monitor can poll it.
- * Returns 503 if the database isn't reachable.
+ * Liveness/readiness probe. The PUBLIC body is minimal (ok/db/uptime) so a load
+ * balancer can poll it without exposing internal state. The detailed telemetry
+ * (throughput/error counters, queue depth, whether gating is on) is recon-useful
+ * — an anonymous caller learning gating is off could time an attack — so it's
+ * returned ONLY to an ops caller presenting AEMULUS_METRICS_TOKEN. Returns 503 if
+ * the database isn't reachable.
  */
-export async function GET() {
+export async function GET(req: Request) {
   let dbOk = true;
-  let jobs: Record<string, number> = {};
   try {
     await db.execute("SELECT 1");
-    jobs = await jobCounts();
   } catch {
     dbOk = false;
   }
-  const body = {
+  const body: Record<string, unknown> = {
     ok: dbOk,
-    uptimeMs: Date.now() - bootAt,
     db: dbOk ? "ok" : "unreachable",
-    gating: gatingEnabled(),
-    jobs, // queue depth by status
-    metrics: metricsSnapshot(),
+    uptimeMs: Date.now() - bootAt,
   };
+
+  const opsToken = process.env.AEMULUS_METRICS_TOKEN;
+  if (opsToken && req.headers.get("x-metrics-token") === opsToken) {
+    if (dbOk) {
+      try {
+        body.jobs = await jobCounts();
+      } catch {
+        /* db went away between the ping and here */
+      }
+    }
+    body.gating = gatingEnabled();
+    body.metrics = metricsSnapshot();
+  }
   return NextResponse.json(body, { status: dbOk ? 200 : 503 });
 }

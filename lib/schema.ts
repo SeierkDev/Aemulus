@@ -270,7 +270,7 @@ CREATE TABLE IF NOT EXISTS webhooks (
   id          TEXT PRIMARY KEY,
   owner       TEXT NOT NULL,
   url         TEXT NOT NULL,
-  secret      TEXT NOT NULL,   -- HMAC signing secret (whsec_…)
+  secret      TEXT NOT NULL,   -- HMAC signing secret (encrypted at rest, enc1:…)
   active      INTEGER NOT NULL DEFAULT 1,
   -- comma-sep RunEvents this hook subscribes to (run.output carries extracted data)
   events      TEXT NOT NULL DEFAULT 'run.completed,run.needs_review,run.failed',
@@ -278,6 +278,7 @@ CREATE TABLE IF NOT EXISTS webhooks (
   last_at     INTEGER,
   last_attempts INTEGER,       -- attempts on the last delivery (retry/backoff)
   last_error  TEXT,            -- last delivery error (null = delivered ok)
+  fail_streak INTEGER NOT NULL DEFAULT 0, -- consecutive failed deliveries; auto-disables at a threshold
   created_at  INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_webhooks_owner ON webhooks(owner);

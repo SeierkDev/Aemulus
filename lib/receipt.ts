@@ -77,7 +77,12 @@ async function hashScreenshot(rel: string): Promise<string> {
 }
 
 function explorerCluster(): string {
-  return process.env.AEMULUS_RECEIPT_CLUSTER || "devnet";
+  // Default to mainnet-beta to MATCH the registry + zk anchor paths. With the old
+  // "devnet" default, an operator who configured a signer but left
+  // AEMULUS_RECEIPT_CLUSTER unset would anchor the Memo batch to devnet while the
+  // registry/zk receipts went to mainnet — the same run's proofs split across two
+  // chains, and explorer links pointing at the wrong one.
+  return process.env.AEMULUS_RECEIPT_CLUSTER || "mainnet-beta";
 }
 
 /**

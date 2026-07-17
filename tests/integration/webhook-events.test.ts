@@ -1,13 +1,16 @@
 import { beforeAll, afterEach, describe, expect, it, vi } from "vitest";
 import { ready } from "../../lib/db";
-import { createWebhook, listWebhooks, dispatchRunEvent } from "../../lib/webhooks";
+import { createWebhook, listWebhooks, dispatchRunEvent, __setWebhookPoster } from "../../lib/webhooks";
 
 const PUBLIC_URL = "http://93.184.216.34/hook"; // literal public IP, no DNS
 
 beforeAll(async () => {
   await ready();
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  __setWebhookPoster(null);
+});
 
 describe("webhook event subscriptions (output destinations)", () => {
   it("only delivers events a webhook is subscribed to", async () => {
@@ -17,10 +20,10 @@ describe("webhook event subscriptions (output destinations)", () => {
     expect(list[0].events).toEqual(["run.output"]);
 
     let calls = 0;
-    globalThis.fetch = vi.fn(async () => {
+    __setWebhookPoster(async () => {
       calls++;
-      return { ok: true, status: 200, json: async () => ({}) } as Response;
-    }) as typeof fetch;
+      return { status: 200 };
+    });
 
     // not subscribed -> no delivery
     await dispatchRunEvent(owner, "run.completed", { runId: "r1", status: "completed" });

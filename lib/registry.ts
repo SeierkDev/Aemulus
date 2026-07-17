@@ -79,52 +79,61 @@ export async function recordRunOnChain(
     programId,
   );
 
-  const ixs: TransactionInstruction[] = [];
-  // register_skill once (skip if the Skill PDA already exists).
-  if (!(await conn.getAccountInfo(skillPda).catch(() => null))) {
-    ixs.push(
-      new TransactionInstruction({
-        programId,
-        keys: [
-          { pubkey: payer.publicKey, isSigner: true, isWritable: true },
-          { pubkey: skillPda, isSigner: false, isWritable: true },
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-        ],
-        data: Buffer.concat([REGISTER_DISC, skillId, metaHash]),
-      }),
-    );
-  }
-  // record_receipt (skip if this receipt is already on-chain — PDA is unique).
-  if (!(await conn.getAccountInfo(receiptPda).catch(() => null))) {
-    ixs.push(
-      new TransactionInstruction({
-        programId,
-        keys: [
-          { pubkey: payer.publicKey, isSigner: true, isWritable: true },
-          { pubkey: skillPda, isSigner: false, isWritable: true },
-          { pubkey: receiptPda, isSigner: false, isWritable: true },
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-        ],
-        data: Buffer.concat([
-          RECORD_DISC,
-          receiptHash,
-          commitmentRoot,
-          Buffer.from([outcomeCode(run.outcomeStatus)]),
-        ]),
-      }),
-    );
-  }
-  if (ixs.length === 0) return null; // already fully recorded
-
-  const tx = new Transaction().add(...ixs);
-  // Bound the confirm so a slow RPC can't pin the worker (best-effort recorder).
+  // Bound the WHOLE best-effort recorder — the pre-send existence reads AND the
+  // send/confirm — so a connected-but-unresponsive RPC can't pin the worker (a
+  // hung getAccountInfo would otherwise never settle, since web3.js has no
+  // per-request timeout and only the confirm was previously bounded).
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<null>((res) => {
     timer = setTimeout(() => res(null), SEND_TIMEOUT_MS);
   });
-  try {
-    const sig = await Promise.race([sendAndConfirmTransaction(conn, tx, [payer]), timeout]);
+  const work = (async (): Promise<{ sig: string; cluster: string } | null> => {
+    const ixs: TransactionInstruction[] = [];
+    // register_skill once (skip if the Skill PDA already exists).
+    if (!(await conn.getAccountInfo(skillPda).catch(() => null))) {
+      ixs.push(
+        new TransactionInstruction({
+          programId,
+          keys: [
+            { pubkey: payer.publicKey, isSigner: true, isWritable: true },
+            { pubkey: skillPda, isSigner: false, isWritable: true },
+            { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+          ],
+          data: Buffer.concat([REGISTER_DISC, skillId, metaHash]),
+        }),
+      );
+    }
+    // record_receipt (skip if this receipt is already on-chain — PDA is unique).
+    if (!(await conn.getAccountInfo(receiptPda).catch(() => null))) {
+      ixs.push(
+        new TransactionInstruction({
+          programId,
+          keys: [
+            { pubkey: payer.publicKey, isSigner: true, isWritable: true },
+            { pubkey: skillPda, isSigner: false, isWritable: true },
+            { pubkey: receiptPda, isSigner: false, isWritable: true },
+            { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+          ],
+          data: Buffer.concat([
+            RECORD_DISC,
+            receiptHash,
+            commitmentRoot,
+            Buffer.from([outcomeCode(run.outcomeStatus)]),
+          ]),
+        }),
+      );
+    }
+    if (ixs.length === 0) return null; // already fully recorded
+    const tx = new Transaction().add(...ixs);
+    const sig = await sendAndConfirmTransaction(conn, tx, [payer]);
     return sig ? { sig, cluster } : null;
+  })();
+  // If the timeout wins, `work` keeps running and later rejects (blockhash
+  // expiry) with nothing awaiting it — swallow that so it can't surface as an
+  // unhandledRejection and crash the worker (same guard zk-receipts uses).
+  work.catch(() => {});
+  try {
+    return await Promise.race([work, timeout]);
   } finally {
     clearTimeout(timer);
   }

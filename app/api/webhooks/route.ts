@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
 import { logError } from "@/lib/log";
-import { createWebhook, listWebhooks } from "@/lib/webhooks";
+import { createWebhook, listWebhooks, WebhookLimitError } from "@/lib/webhooks";
 import { readJson, WebhookBody } from "@/lib/validate";
 
 export const runtime = "nodejs";
@@ -31,11 +31,13 @@ export async function POST(req: Request) {
     );
     return NextResponse.json({ id, secret });
   } catch (err) {
-    // assertSafeUrl throws on unsafe/private/unreachable URLs
+    if (err instanceof WebhookLimitError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    // assertSafeUrl throws on unsafe/private/unreachable URLs — return a GENERIC
+    // message so this endpoint isn't a DNS oracle (distinct "private address" vs
+    // "could not resolve" errors would leak whether an internal host exists).
     logError("api/webhooks", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Invalid webhook URL" },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "That webhook URL isn't allowed." }, { status: 400 });
   }
 }

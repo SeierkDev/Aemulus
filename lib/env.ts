@@ -70,6 +70,23 @@ export const env = {
     // Always touch authSecret — it throws for a weak/default secret in any
     // non-dev/test runtime, so even a deploy that forgot NODE_ENV fails at boot.
     void this.authSecret;
+
+    // Token gating fails OPEN when AEMULUS_MINT is unset (every wallet resolves to
+    // the top "Open" tier, unlimited). That's intended PRE-LAUNCH, but a prod
+    // deploy that simply forgot the mint would silently run with all access
+    // control disabled. Make it impossible to miss: warn loudly, and support an
+    // opt-in fail-closed so the launched config can't regress to wide-open.
+    const mint = (process.env.AEMULUS_MINT ?? "").trim();
+    if (!mint) {
+      if (process.env.AEMULUS_REQUIRE_GATING === "1") {
+        throw new Error(
+          "AEMULUS_REQUIRE_GATING=1 but AEMULUS_MINT is unset — refusing to boot with token gating disabled.",
+        );
+      }
+      console.warn(
+        "[aemulus] WARNING: AEMULUS_MINT is unset — token gating is OFF and every wallet gets top-tier, unlimited access. This is expected pre-launch; set AEMULUS_MINT to enable gating, or AEMULUS_REQUIRE_GATING=1 to fail closed.",
+      );
+    }
   },
 
   get isProd(): boolean {

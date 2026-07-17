@@ -471,4 +471,14 @@ export const MIGRATIONS: Migration[] = [
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_earn_skill_runner_uniq ON earnings(skill_id, runner);`,
     ],
   },
+
+  // 32 - webhook consecutive-failure counter (auto-disable dead/hostile sinks).
+  // Baseline carries it, so this is a no-op on fresh DBs and adds it on older ones.
+  {
+    id: 32,
+    name: "webhook_fail_streak",
+    addColumns: [
+      { table: "webhooks", column: "fail_streak", def: "INTEGER NOT NULL DEFAULT 0" },
+    ],
+  },
 ];

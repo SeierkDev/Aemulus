@@ -19,15 +19,32 @@ describe("metrics", () => {
 });
 
 describe("GET /api/health", () => {
-  it("reports ok + db reachable + a metrics object", async () => {
+  const req = (headers?: Record<string, string>) =>
+    new Request("http://test/api/health", { headers });
+
+  it("public probe: reports ok + db but NO internal telemetry", async () => {
     incr("runs.started");
-    const res = await GET();
+    const res = await GET(req());
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
     expect(body.db).toBe("ok");
     expect(typeof body.uptimeMs).toBe("number");
+    // Anonymous callers must NOT see metrics / job depth / gating state.
+    expect(body.metrics).toBeUndefined();
+    expect(body.jobs).toBeUndefined();
+    expect(body.gating).toBeUndefined();
+  });
+
+  it("exposes detailed telemetry only with the ops token", async () => {
+    process.env.AEMULUS_METRICS_TOKEN = "ops-secret";
+    incr("runs.started");
+    // Wrong/absent token → still minimal.
+    expect((await (await GET(req({ "x-metrics-token": "wrong" }))).json()).metrics).toBeUndefined();
+    // Correct token → detailed body.
+    const body = await (await GET(req({ "x-metrics-token": "ops-secret" }))).json();
     expect(body.metrics).toBeTypeOf("object");
     expect(body.metrics["runs.started"]).toBeGreaterThanOrEqual(1);
+    delete process.env.AEMULUS_METRICS_TOKEN;
   });
 });
