@@ -81,9 +81,20 @@ export interface WriteInvoiceInput {
   docNumber: string;
   txnDate: string; // YYYY-MM-DD
   amount: number;
+  currency?: string;
   config: QboConfig;
   now: number;
   workspaceId?: string;
+}
+
+// Adopt an existing Bill as "already posted" for this invoice ONLY if its total
+// matches — DocNumber is not unique in QBO, so two DISTINCT invoices sharing a
+// vendor doc number must not be deduped onto the same Bill (which would mark the
+// second posted with no Bill of its own). A crash-recovered SAME invoice still
+// matches (same amount), so legitimate dedup is preserved.
+function billMatchesAmount(billTotal: number | undefined, amount: number): boolean {
+  if (typeof billTotal !== "number") return false; // unknown total → don't assume it's ours
+  return Math.abs(billTotal - amount) < 0.005;
 }
 
 export async function readQboWrite(invoiceId: string, workspaceId: string = DEFAULT_WORKSPACE): Promise<QboWriteRow | null> {
@@ -138,9 +149,11 @@ export async function writeInvoiceToQbo(input: WriteInvoiceInput): Promise<Write
     if (row.status === "posted" && row.qboBillId) {
       return { status: "posted", billId: row.qboBillId, alreadyPosted: true };
     }
-    // Reconcile: a prior attempt may already have created the bill.
+    // Reconcile: a prior attempt may already have created the bill. Only adopt it
+    // if the amount matches (see billMatchesAmount) so a different invoice with
+    // the same doc number isn't marked posted against it.
     const existing = await client.findBillByDocNumber(docNumber).catch(() => null);
-    if (existing?.Id) {
+    if (existing?.Id && billMatchesAmount(existing.TotalAmt, input.amount)) {
       await setPosted(workspaceId, invoiceId, existing.Id, now);
       return { status: "posted", billId: existing.Id };
     }
@@ -165,9 +178,11 @@ export async function writeInvoiceToQbo(input: WriteInvoiceInput): Promise<Write
 
   // We own the write.
   try {
-    // Belt-and-suspenders: never create a second bill for the same document.
+    // Belt-and-suspenders: never create a second bill for the SAME document+amount
+    // (a crash-recovered post of this invoice). A same-docNumber/different-amount
+    // bill belongs to a different invoice, so don't adopt it.
     const pre = await client.findBillByDocNumber(docNumber);
-    if (pre?.Id) {
+    if (pre?.Id && billMatchesAmount(pre.TotalAmt, input.amount)) {
       await setPosted(workspaceId, invoiceId, pre.Id, now);
       return { status: "posted", billId: pre.Id };
     }
@@ -187,6 +202,7 @@ export async function writeInvoiceToQbo(input: WriteInvoiceInput): Promise<Write
       docNumber,
       txnDate: input.txnDate,
       amount: input.amount,
+      currency: input.currency,
     });
     await setPosted(workspaceId, invoiceId, bill.Id, now);
     return { status: "posted", billId: bill.Id };

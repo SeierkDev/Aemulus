@@ -23,9 +23,14 @@ function safeHost(url: string): string {
 }
 
 /** The signing secret is encrypted at rest; recover it (tolerating a legacy
- *  plaintext row) to compute the HMAC. */
-function resolveSecret(stored: string): string {
-  return stored.startsWith("enc1:") ? decryptJSON<string>(stored, "") : stored;
+ *  plaintext row) to compute the HMAC. Returns null when an encrypted secret
+ *  WON'T decrypt (AUTH_SECRET rotated / row corrupted) so the caller can fail
+ *  CLOSED — signing with the "" decrypt-failure fallback would emit deliveries
+ *  under an empty, forgeable key that no receiver could verify. */
+function resolveSecret(stored: string): string | null {
+  if (!stored.startsWith("enc1:")) return stored || null; // legacy plaintext
+  const s = decryptJSON<string>(stored, "");
+  return s.startsWith("whsec_") ? s : null; // "" (or garbage) → decrypt failed
 }
 
 /**
@@ -200,12 +205,21 @@ async function deliver(
 ): Promise<void> {
   {
     const url = String(w.url);
-    const signature = sign(resolveSecret(String(w.secret)), ts, body);
+    const secret = resolveSecret(String(w.secret));
     let status = 0;
     let lastError: string | null = null;
     let attempts = 0;
 
-    for (let i = 0; i < MAX_ATTEMPTS; i++) {
+    // Fail CLOSED on an unreadable secret: don't send anything signed with an
+    // empty key. Recorded as a failed delivery below, so the fail_streak guard
+    // eventually auto-disables a hook whose secret can no longer be decrypted.
+    const signature = secret === null ? null : sign(secret, ts, body);
+    if (signature === null) {
+      lastError = "signing secret unreadable";
+      logError("webhook.deliver", new Error(lastError), { host: safeHost(url) });
+    }
+
+    for (let i = 0; signature !== null && i < MAX_ATTEMPTS; i++) {
       if (BACKOFF_MS[i]) await sleep(BACKOFF_MS[i]);
       attempts = i + 1;
       try {
@@ -218,7 +232,7 @@ async function deliver(
           headers: {
             "content-type": "application/json",
             "x-aemulus-event": event,
-            "x-aemulus-signature": signature,
+            "x-aemulus-signature": signature!, // loop only runs when non-null
           },
           timeoutMs: 8000,
         });

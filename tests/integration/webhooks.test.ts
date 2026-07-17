@@ -81,6 +81,22 @@ describe("webhooks", () => {
     expect(sig.split(",")[1]).toBe("sha256=" + createHmac("sha256", secret).update(`${t}.${body}`).digest("hex"));
   });
 
+  it("fails closed on an unreadable secret — never signs with an empty key", async () => {
+    const O = "WALLET_WH_BADSECRET";
+    const { id } = await createWebhook(O, PUBLIC_URL);
+    // Simulate a rotated AUTH_SECRET / corrupted row: an enc1: blob that won't decrypt.
+    await db.execute({ sql: `UPDATE webhooks SET secret = 'enc1:not-real-ciphertext' WHERE id = ?`, args: [id] });
+    let sent = false;
+    __setWebhookPoster(async () => {
+      sent = true;
+      return { status: 200 };
+    });
+    await dispatchRunEvent(O, "run.completed", { runId: "x", status: "completed" });
+    expect(sent).toBe(false); // nothing delivered under a bad/empty key
+    const h = (await listWebhooks(O))[0];
+    expect(h.lastError).toMatch(/secret/i);
+  });
+
   it("caps webhooks per owner", async () => {
     const O = "WALLET_WH_CAP";
     for (let i = 0; i < 20; i++) await createWebhook(O, PUBLIC_URL);

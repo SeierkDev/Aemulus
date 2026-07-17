@@ -82,9 +82,12 @@ async function tokenRequest(body: URLSearchParams): Promise<TokenResponse> {
       Accept: "application/json",
     },
     body: body.toString(),
+    signal: AbortSignal.timeout(15_000), // don't let a hung token endpoint pin the caller
   });
   if (!r.ok) throw new Error(`token endpoint returned ${r.status}`);
-  const j = (await r.json()) as Partial<TokenResponse>;
+  // Guard the parse (a 200 with a non-JSON body shouldn't throw a raw SyntaxError);
+  // the missing-fields check below turns an empty/garbage body into a clean error.
+  const j = (await r.json().catch(() => ({}))) as Partial<TokenResponse>;
   if (!j.access_token || !j.refresh_token || typeof j.expires_in !== "number") {
     throw new Error("token response missing fields");
   }

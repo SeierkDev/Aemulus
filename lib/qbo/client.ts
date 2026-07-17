@@ -46,13 +46,22 @@ export interface CreateBillInput {
   /** YYYY-MM-DD */
   txnDate: string;
   amount: number;
+  /** ISO-4217 code; sets the Bill's CurrencyRef so a foreign invoice isn't
+   *  silently booked in the company's home currency. */
+  currency?: string;
 }
 
 const esc = (s: string) => s.replace(/'/g, "''");
+// Bound every Intuit call so a hung endpoint can't pin the request/worker (and
+// so a slow-but-alive owner can't overrun the stale-reclaim window → double-post).
+const QBO_TIMEOUT_MS = 15_000;
 
 export function qboClient(cfg: QboConfig) {
   const mv = cfg.minorVersion ?? "73";
   const base = cfg.base.replace(/\/+$/, "");
+  // Encode the realm (company id) into the URL path — it comes from the OAuth
+  // callback query, so don't interpolate it raw.
+  const realm = encodeURIComponent(cfg.realm);
   const authHeaders = () => ({
     Authorization: `Bearer ${cfg.token}`,
     Accept: "application/json",
@@ -60,10 +69,10 @@ export function qboClient(cfg: QboConfig) {
   });
 
   async function query<T>(sql: string, entity: string): Promise<T[]> {
-    const u = new URL(`${base}/v3/company/${cfg.realm}/query`);
+    const u = new URL(`${base}/v3/company/${realm}/query`);
     u.searchParams.set("query", sql);
     u.searchParams.set("minorversion", mv);
-    const r = await fetch(u, { headers: authHeaders() });
+    const r = await fetch(u, { headers: authHeaders(), signal: AbortSignal.timeout(QBO_TIMEOUT_MS) });
     if (r.status === 401) throw new QboError(401, "QuickBooks authorization failed");
     if (!r.ok) throw new QboError(r.status, `QuickBooks query failed (${r.status})`);
     const j = (await r.json().catch(() => ({}))) as {
@@ -99,22 +108,28 @@ export function qboClient(cfg: QboConfig) {
     },
 
     async createBill(input: CreateBillInput): Promise<QboBill> {
-      const body = {
+      const body: Record<string, unknown> = {
         VendorRef: { value: input.vendorId },
         TxnDate: input.txnDate,
         DocNumber: input.docNumber,
         Line: [
           {
             DetailType: "AccountBasedExpenseLineDetail",
-            Amount: input.amount,
+            Amount: Math.round(input.amount * 100) / 100, // round to currency precision
             AccountBasedExpenseLineDetail: { AccountRef: { value: input.accountId } },
           },
         ],
       };
-      const r = await fetch(`${base}/v3/company/${cfg.realm}/bill?minorversion=${mv}`, {
+      // Book in the invoice's currency, not the company home currency, when given
+      // a valid ISO-4217 code (requires multicurrency enabled in the QBO company).
+      if (input.currency && /^[A-Za-z]{3}$/.test(input.currency)) {
+        body.CurrencyRef = { value: input.currency.toUpperCase() };
+      }
+      const r = await fetch(`${base}/v3/company/${realm}/bill?minorversion=${mv}`, {
         method: "POST",
         headers: authHeaders(),
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(QBO_TIMEOUT_MS),
       });
       const j = (await r.json().catch(() => ({}))) as { Bill?: QboBill };
       if (r.status === 401) throw new QboError(401, "QuickBooks authorization failed", j);

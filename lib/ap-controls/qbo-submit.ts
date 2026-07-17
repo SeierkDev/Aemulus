@@ -62,6 +62,7 @@ export async function enterInvoice(input: EnterInvoiceInput): Promise<EnterResul
       docNumber: input.docNumber,
       txnDate: input.txnDate,
       amount: input.amount,
+      currency: input.currency,
       config,
       now: input.now,
       workspaceId,
