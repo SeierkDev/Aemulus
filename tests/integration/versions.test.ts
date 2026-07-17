@@ -78,6 +78,30 @@ describe("skill versioning", () => {
     expect(restored!.version).toBe(3);
     expect(await listSkillVersions(skill.id)).toHaveLength(3);
   });
+
+  it("restoring a version reproduces that version's egress allowlist", async () => {
+    const skill = await createSkill({
+      owner: OWNER,
+      generalized: gen("Hosts v1"),
+      sourceDemoId: null,
+      allowedHosts: ["v1.example.com"],
+    });
+    expect(skill.allowedHosts).toEqual(["v1.example.com"]);
+
+    // v2 widens the allowlist.
+    await updateSkill(skill.id, {
+      name: skill.name,
+      description: skill.description,
+      plan: skill.plan,
+      inputSchema: skill.inputSchema,
+      allowedHosts: ["v1.example.com", "widened.example.com"],
+    });
+    expect((await getSkill(skill.id))!.allowedHosts).toEqual(["v1.example.com", "widened.example.com"]);
+
+    // Restoring v1 must bring back v1's NARROWER allowlist, not keep the widened one.
+    expect(await restoreSkillVersion(skill.id, 1)).toBe(true);
+    expect((await getSkill(skill.id))!.allowedHosts).toEqual(["v1.example.com"]);
+  });
 });
 
 describe("creator analytics", () => {

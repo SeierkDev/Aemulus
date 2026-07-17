@@ -481,4 +481,13 @@ export const MIGRATIONS: Migration[] = [
       { table: "webhooks", column: "fail_streak", def: "INTEGER NOT NULL DEFAULT 0" },
     ],
   },
+
+  // 33 - snapshot the egress allowlist in version history so a restore returns the
+  // skill's allowed_hosts as they were, not the current ones. NULL on old snapshots
+  // means "pre-snapshot version" → restore keeps the current allowlist.
+  {
+    id: 33,
+    name: "skill_versions_allowed_hosts",
+    addColumns: [{ table: "skill_versions", column: "allowed_hosts", def: "TEXT" }],
+  },
 ];

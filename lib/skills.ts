@@ -30,10 +30,11 @@ async function snapshotVersion(s: {
   description: string;
   plan: SkillStep[];
   inputSchema: { fields: SkillInputField[] };
+  allowedHosts?: string[];
 }): Promise<void> {
   await db.execute({
-    sql: `INSERT INTO skill_versions (id, skill_id, version, name, description, plan, input_schema, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO skill_versions (id, skill_id, version, name, description, plan, input_schema, allowed_hosts, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       id("skv"),
       s.id,
@@ -42,6 +43,9 @@ async function snapshotVersion(s: {
       s.description,
       JSON.stringify(s.plan),
       JSON.stringify(s.inputSchema),
+      // Snapshot the egress allowlist so a restore reproduces it (an empty array
+      // is a real value — "unrestricted" — distinct from a legacy NULL snapshot).
+      JSON.stringify(s.allowedHosts ?? []),
       Date.now(),
     ],
   });
@@ -279,7 +283,7 @@ export async function updateSkill(
       skillId,
     ],
   });
-  await snapshotVersion({ id: skillId, version, ...patch });
+  await snapshotVersion({ id: skillId, version, ...patch, allowedHosts });
 }
 
 /**
@@ -339,12 +343,17 @@ export async function restoreSkillVersion(
 ): Promise<boolean> {
   await ready();
   const r = await db.execute({
-    sql: `SELECT name, description, plan, input_schema FROM skill_versions
+    sql: `SELECT name, description, plan, input_schema, allowed_hosts FROM skill_versions
           WHERE skill_id = ? AND version = ?`,
     args: [skillId, version],
   });
   const row = r.rows[0];
   if (!row) return false;
+  // Restore the snapshotted egress allowlist too. A legacy snapshot (NULL) predates
+  // the column, so leave it undefined → updateSkill keeps the current allowlist
+  // rather than wrongly clearing it.
+  const restoredHosts =
+    row.allowed_hosts == null ? undefined : parseJson<string[]>(String(row.allowed_hosts), []);
   await updateSkill(skillId, {
     name: String(row.name),
     description: row.description == null ? "" : String(row.description),
@@ -352,6 +361,7 @@ export async function restoreSkillVersion(
     // can't throw an uncaught 500 out of a restore.
     plan: parseJson<SkillStep[]>(row.plan, []),
     inputSchema: parseJson<{ fields: SkillInputField[] }>(row.input_schema, { fields: [] }),
+    ...(restoredHosts !== undefined ? { allowedHosts: restoredHosts } : {}),
   });
   return true;
 }

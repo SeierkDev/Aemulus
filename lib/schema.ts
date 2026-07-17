@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS skill_versions (
   description  TEXT,
   plan         TEXT NOT NULL,
   input_schema TEXT NOT NULL,
+  allowed_hosts TEXT,              -- egress allowlist snapshot (null = pre-snapshot version → keep current on restore)
   created_at   INTEGER NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_skill_versions ON skill_versions(skill_id, version);
