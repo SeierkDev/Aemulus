@@ -20,7 +20,7 @@ export default async function ApLayout({ children }: { children: React.ReactNode
             <>
               <span className="text-ink-3">·</span>
               <span className="text-ink-2">{viewer.name}</span>
-              {viewer.kind === "wallet" && viewer.tier && <span className="mono text-ink-3">{viewer.tier}</span>}
+              {viewer.tier && <span className="mono text-ink-3">{viewer.tier}</span>}
             </>
           )}
         </Link>
@@ -38,7 +38,7 @@ export default async function ApLayout({ children }: { children: React.ReactNode
             <span>·</span>
             <span className="text-ink-2">🔒 Sealed audit on</span>
             <span>·</span>
-            <LogoutButton kind={viewer.kind} />
+            <LogoutButton />
           </div>
         )}
       </header>
