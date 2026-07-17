@@ -5,6 +5,7 @@ import { id as newId } from "../ids";
 import { appendApEvent, verifyAggregate } from "./store";
 import { projectInvoiceEntry } from "./projections";
 import { DEFAULT_WORKSPACE } from "./workspace";
+import { entitlement } from "./billing";
 
 // Enter one reviewed invoice into QuickBooks and seal the real Bill id into the
 // invoice's audit stream. Idempotent at both layers: writeInvoiceToQbo guards
@@ -34,11 +35,17 @@ export type EnterResult =
 export async function enterInvoice(input: EnterInvoiceInput): Promise<EnterResult> {
   const workspaceId = input.workspaceId ?? DEFAULT_WORKSPACE;
 
-  // Already entered? Return the existing bill (idempotent at the AP layer).
+  // Already entered? Return the existing bill (idempotent at the AP layer) — a
+  // re-entry never consumes quota.
   const pre = await projectInvoiceEntry(input.invoiceId, workspaceId);
   if (pre.status === "submitted" && pre.billNumber) {
     const verify = await verifyAggregate("invoice", input.invoiceId, workspaceId);
     return { ok: true, billNumber: pre.billNumber, target: pre.enterTarget ?? "ledger", verify, seal: pre.latestSeal ?? "" };
+  }
+
+  // Plan enforcement (inert unless Stripe is configured).
+  if (!(await entitlement(workspaceId, input.now)).canEnter) {
+    return { ok: false, error: "limit_reached" };
   }
 
   // Enter into QuickBooks when connected, otherwise the built-in ledger. Both

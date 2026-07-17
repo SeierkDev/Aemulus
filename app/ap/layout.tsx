@@ -33,6 +33,8 @@ export default async function ApLayout({ children }: { children: React.ReactNode
               </a>
             )}
             <span>·</span>
+            <Link href="/ap/billing" className="text-ink-3 hover:text-ink">Billing</Link>
+            <span>·</span>
             <span className="text-ink-2">🔒 Sealed audit on</span>
             <span>·</span>
             <LogoutButton />

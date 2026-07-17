@@ -55,7 +55,9 @@ export function GenericReview({
       });
       const data = await res.json();
       if (!data.ok) {
-        setError(data.error || "That couldn’t be recorded.");
+        setError(data.error === "limit_reached"
+          ? "You’ve reached your monthly entry limit. Upgrade in Billing to continue."
+          : data.error || "That couldn’t be recorded.");
         return;
       }
       setDone(data.status === "submitted"

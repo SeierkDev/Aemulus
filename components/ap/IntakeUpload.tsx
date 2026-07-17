@@ -58,7 +58,13 @@ export function IntakeUpload() {
       });
       const data = await res.json();
       if (!data.ok) {
-        setError(data.error === "vendor_not_found" ? "That vendor isn’t in QuickBooks yet." : "The invoice couldn’t be entered.");
+        setError(
+          data.error === "vendor_not_found"
+            ? "That vendor isn’t in QuickBooks yet."
+            : data.error === "limit_reached"
+              ? "You’ve reached your monthly entry limit. Upgrade in Billing to continue."
+              : "The invoice couldn’t be entered.",
+        );
         setPhase("review");
         return;
       }

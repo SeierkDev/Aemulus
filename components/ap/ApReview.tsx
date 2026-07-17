@@ -330,6 +330,7 @@ function submitError(code: string): string {
   if (code === "not_connected") return "Connect QuickBooks before entering.";
   if (code === "in_progress") return "This invoice is already being entered.";
   if (code === "vendor_not_found") return "This vendor isn’t in QuickBooks yet.";
+  if (code === "limit_reached") return "You’ve reached your monthly entry limit. Upgrade in Billing to continue.";
   return "QuickBooks didn’t accept the entry. Try again.";
 }
 
