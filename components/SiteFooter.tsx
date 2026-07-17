@@ -29,6 +29,12 @@ export function SiteFooter() {
           <Link href="/org" className="hover:text-ink">
             Teams
           </Link>
+          <Link href="/terms" className="hover:text-ink">
+            Terms
+          </Link>
+          <Link href="/privacy" className="hover:text-ink">
+            Privacy
+          </Link>
           {SOLANA.xUrl && (
             <a href={SOLANA.xUrl} target="_blank" rel="noopener noreferrer" className="hover:text-ink">
               X
