@@ -115,6 +115,53 @@ describe("tamper detection", () => {
   });
 });
 
+describe("keyed seal + tail-truncation anchor", () => {
+  it("seals new events at version 2 and verifies", async () => {
+    const id = uid("inv");
+    await appendApEvent(ev({ aggregateId: id, eventType: "invoice.review_paused" }));
+    await appendApEvent(ev({ aggregateId: id, eventType: "invoice.submitted", payload: { billNumber: "B", total: 1, currency: "USD", auto: true } }));
+    const rows = await readAggregate("invoice", id);
+    expect(rows.every((r) => r.sealVersion === 2)).toBe(true);
+    // A v2 seal is a keyed HMAC, not the public sha256 of the envelope, so it's a
+    // 64-hex digest AND (proven below) can't be recomputed without the key.
+    expect(rows[0].seal).toMatch(/^[0-9a-f]{64}$/);
+    expect(await verifyAggregate("invoice", id)).toEqual({ valid: true, length: 2 });
+  });
+
+  it("detects a truncated tail (which the backward seal-chain alone cannot)", async () => {
+    const id = uid("inv");
+    await appendApEvent(ev({ aggregateId: id, eventType: "invoice.review_paused" }));
+    await appendApEvent(ev({ aggregateId: id, eventType: "invoice.override", payload: { field: "total", newValue: 1, reasonCode: "X" } }));
+    await appendApEvent(ev({ aggregateId: id, eventType: "invoice.submitted", payload: { billNumber: "B", total: 1, currency: "USD", auto: true } }));
+    expect((await verifyAggregate("invoice", id)).valid).toBe(true);
+
+    // Drop the highest-seq row. The remaining 0..1 are still contiguous with intact
+    // seal links, so the chain alone looks fine — the head anchor catches it.
+    await db.execute({ sql: `DELETE FROM ap_events WHERE aggregate_id = ? AND seq = 2`, args: [id] });
+    expect(await verifyAggregate("invoice", id)).toMatchObject({ valid: false, reason: "truncated_tail" });
+  });
+
+  it("detects deletion of the head anchor on a v2 chain", async () => {
+    const id = uid("inv");
+    await appendApEvent(ev({ aggregateId: id, eventType: "invoice.review_paused" }));
+    await appendApEvent(ev({ aggregateId: id, eventType: "invoice.submitted", payload: { billNumber: "B", total: 1, currency: "USD", auto: true } }));
+    expect((await verifyAggregate("invoice", id)).valid).toBe(true);
+
+    await db.execute({ sql: `DELETE FROM ap_aggregate_head WHERE aggregate_id = ?`, args: [id] });
+    expect(await verifyAggregate("invoice", id)).toMatchObject({ valid: false, reason: "missing_head" });
+  });
+
+  it("detects a forged head_mac (recomputing it needs the seal key)", async () => {
+    const id = uid("inv");
+    await appendApEvent(ev({ aggregateId: id, eventType: "invoice.review_paused" }));
+    await appendApEvent(ev({ aggregateId: id, eventType: "invoice.submitted", payload: { billNumber: "B", total: 1, currency: "USD", auto: true } }));
+    // Attacker deletes the tail AND tries to fake a matching head with a guessed mac.
+    await db.execute({ sql: `DELETE FROM ap_events WHERE aggregate_id = ? AND seq = 1`, args: [id] });
+    await db.execute({ sql: `UPDATE ap_aggregate_head SET seq_count = 1, head_mac = 'forged' WHERE aggregate_id = ?`, args: [id] });
+    expect(await verifyAggregate("invoice", id)).toMatchObject({ valid: false, reason: "truncated_tail" });
+  });
+});
+
 describe("backward-compatible event versioning", () => {
   it("upcasts a v1 invoice.submitted payload (amount → total) on read, and still verifies", async () => {
     const id = uid("inv");

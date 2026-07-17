@@ -1,5 +1,6 @@
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { db, ready } from "../db";
+import { env } from "../env";
 import { canonicalize } from "./override-log";
 import { DEFAULT_WORKSPACE } from "./workspace";
 
@@ -98,6 +99,8 @@ export interface ApEventRow {
   actor: { userId: string; role: string };
   createdAt: number;
   sealPrev: string;
+  /** Which seal formula sealed this row (1 = legacy keyless sha256, 2 = keyed HMAC). */
+  sealVersion: number;
   seal: string;
 }
 
@@ -145,9 +148,24 @@ const DDL_TABLE = `
     created_at     INTEGER NOT NULL,
     seal_prev      TEXT NOT NULL,
     seal           TEXT NOT NULL,
+    seal_version   INTEGER NOT NULL DEFAULT 1,
     UNIQUE (workspace_id, aggregate_type, aggregate_id, seq)
   )`;
 const DDL_INDEX = `CREATE INDEX IF NOT EXISTS idx_ap_events_agg ON ap_events (workspace_id, aggregate_type, aggregate_id, seq)`;
+// Keyed per-aggregate head anchor: length + a MAC over the latest seal. Lets the
+// verifier detect a truncated TAIL (which the backward-only seal chain can't) —
+// deleting trailing rows leaves the stored head unmatched, and forging a new head
+// needs the seal key. One row per aggregate, upserted inside the append batch.
+const DDL_HEAD = `
+  CREATE TABLE IF NOT EXISTS ap_aggregate_head (
+    workspace_id   TEXT NOT NULL,
+    aggregate_type TEXT NOT NULL,
+    aggregate_id   TEXT NOT NULL,
+    seq_count      INTEGER NOT NULL,
+    head_mac       TEXT NOT NULL,
+    updated_at     INTEGER NOT NULL,
+    PRIMARY KEY (workspace_id, aggregate_type, aggregate_id)
+  )`;
 
 let ensured: Promise<void> | null = null;
 export function ensureApEventsSchema(): Promise<void> {
@@ -177,7 +195,13 @@ export function ensureApEventsSchema(): Promise<void> {
         } else {
           await db.execute(DDL_TABLE);
         }
+        // Add seal_version to a pre-existing table (older rows are v1 by default).
+        const cols2 = await db.execute(`PRAGMA table_info(ap_events)`);
+        if (!cols2.rows.some((r) => String((r as Record<string, unknown>).name) === "seal_version")) {
+          await db.execute(`ALTER TABLE ap_events ADD COLUMN seal_version INTEGER NOT NULL DEFAULT 1`);
+        }
         await db.execute(DDL_INDEX);
+        await db.execute(DDL_HEAD);
       } catch (e) {
         ensured = null; // don't cache a rejection — allow a later retry
         throw e;
@@ -188,18 +212,43 @@ export function ensureApEventsSchema(): Promise<void> {
 }
 
 // ── Sealing ─────────────────────────────────────────────────────────────────
+// Seal versioning lets us strengthen the seal formula without a destructive
+// re-seal of existing rows: each row records the version that sealed it, and the
+// verifier recomputes with that same version. v1 was a keyless sha256 (any DB-
+// write attacker could recompute a fully consistent replacement chain). v2 is a
+// keyed HMAC over AUTH_SECRET, so forging/altering-and-resealing a row now
+// requires the server secret, and it binds workspace_id (safe to add now that
+// old rows stay pinned to v1).
+export const CURRENT_SEAL_VERSION = 2;
+
 function sha256hex(s: string): string {
   return createHash("sha256").update(s).digest("hex");
 }
 function genesisFor(type: string, id: string): string {
   return `genesis:${type}:${id}`;
 }
-/** The seal of an event = sha256 over its canonical envelope (everything but seal).
- *  NOTE: workspace_id is intentionally NOT in the seal — changing the seal formula
- *  on an append-only log needs a seal-version + re-seal migration (follow-up).
- *  Cross-workspace moves are already prevented by query-level scoping; every read
- *  filters workspace_id. */
-function sealOf(e: Omit<ApEventRow, "seal">): string {
+/** HMAC key for v2 seals — domain-separated from the at-rest encryption key so
+ *  the two never share bytes even though both derive from AUTH_SECRET. */
+function sealKey(): Buffer {
+  return createHash("sha256").update(`aemulus:ap-seal:v2:${env.authSecret}`).digest();
+}
+
+/** Compute an event's seal under a specific seal version. */
+function sealForVersion(version: number, e: Omit<ApEventRow, "seal">): string {
+  if (version >= 2) {
+    // v2: keyed HMAC, with workspace_id bound into the envelope.
+    return createHmac("sha256", sealKey())
+      .update(
+        canonicalize({
+          workspaceId: e.workspaceId,
+          id: e.id, aggregateType: e.aggregateType, aggregateId: e.aggregateId, seq: e.seq,
+          eventType: e.eventType, eventVersion: e.eventVersion, payload: e.payload, actor: e.actor,
+          createdAt: e.createdAt, sealPrev: e.sealPrev,
+        }),
+      )
+      .digest("hex");
+  }
+  // v1: legacy keyless sha256, workspace_id NOT bound (unchanged so old rows verify).
   return sha256hex(
     canonicalize({
       id: e.id, aggregateType: e.aggregateType, aggregateId: e.aggregateId, seq: e.seq,
@@ -207,6 +256,22 @@ function sealOf(e: Omit<ApEventRow, "seal">): string {
       createdAt: e.createdAt, sealPrev: e.sealPrev,
     }),
   );
+}
+
+/** Keyed MAC over an aggregate's head (row count + latest seal) — the truncation
+ *  anchor. Forging one for a shortened chain requires the seal key. */
+function headMac(
+  workspaceId: string,
+  type: string,
+  id: string,
+  count: number,
+  lastSeal: string,
+): string {
+  return createHmac("sha256", sealKey())
+    .update(
+      canonicalize({ kind: "ap-head", workspaceId, aggregateType: type, aggregateId: id, count, lastSeal }),
+    )
+    .digest("hex");
 }
 
 // ── Append ──────────────────────────────────────────────────────────────────
@@ -233,23 +298,42 @@ export async function appendApEvent(input: AppendInput): Promise<ApEventRow> {
   }
 
   const eventVersion = input.eventVersion ?? CURRENT_VERSIONS[input.eventType] ?? 1;
+  const sealVersion = CURRENT_SEAL_VERSION;
   const unsealed: Omit<ApEventRow, "seal"> = {
     id: input.id, workspaceId, aggregateType: input.aggregateType, aggregateId: input.aggregateId, seq,
     eventType: input.eventType, eventVersion, payload: input.payload, actor: input.actor,
-    createdAt: input.now, sealPrev,
+    createdAt: input.now, sealPrev, sealVersion,
   };
-  const seal = sealOf(unsealed);
+  const seal = sealForVersion(sealVersion, unsealed);
+  const count = seq + 1;
+  const mac = headMac(workspaceId, input.aggregateType, input.aggregateId, count, seal);
 
   try {
-    await db.execute({
-      sql: `INSERT INTO ap_events
-        (id, workspace_id, aggregate_type, aggregate_id, seq, event_type, event_version, payload, actor, created_at, seal_prev, seal)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [
-        input.id, workspaceId, input.aggregateType, input.aggregateId, seq, input.eventType, eventVersion,
-        JSON.stringify(input.payload), JSON.stringify(input.actor), input.now, sealPrev, seal,
+    // Insert the event AND advance the keyed head anchor atomically. If the event
+    // INSERT loses the (aggregate, seq) race, the whole batch rolls back — the head
+    // never advances past a row that wasn't stored, so verify stays consistent.
+    await db.batch(
+      [
+        {
+          sql: `INSERT INTO ap_events
+            (id, workspace_id, aggregate_type, aggregate_id, seq, event_type, event_version, payload, actor, created_at, seal_prev, seal, seal_version)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          args: [
+            input.id, workspaceId, input.aggregateType, input.aggregateId, seq, input.eventType, eventVersion,
+            JSON.stringify(input.payload), JSON.stringify(input.actor), input.now, sealPrev, seal, sealVersion,
+          ],
+        },
+        {
+          sql: `INSERT INTO ap_aggregate_head (workspace_id, aggregate_type, aggregate_id, seq_count, head_mac, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT (workspace_id, aggregate_type, aggregate_id)
+                DO UPDATE SET seq_count = excluded.seq_count, head_mac = excluded.head_mac, updated_at = excluded.updated_at
+                WHERE excluded.seq_count > ap_aggregate_head.seq_count`,
+          args: [workspaceId, input.aggregateType, input.aggregateId, count, mac, input.now],
+        },
       ],
-    });
+      "write",
+    );
   } catch (e) {
     if (/unique/i.test(String((e as Error)?.message))) {
       // A concurrent writer took this seq between our read and insert.
@@ -274,8 +358,23 @@ function rowToEvent(r: Record<string, unknown>): ApEventRow {
     actor: JSON.parse(String(r.actor)) as { userId: string; role: string },
     createdAt: Number(r.created_at),
     sealPrev: String(r.seal_prev),
+    sealVersion: r.seal_version == null ? 1 : Number(r.seal_version),
     seal: String(r.seal),
   };
+}
+
+/** The stored head anchor for an aggregate, or null if none was ever written. */
+async function loadHead(
+  aggregateType: ApAggregateType,
+  aggregateId: string,
+  workspaceId: string,
+): Promise<{ seqCount: number; headMac: string } | null> {
+  const r = await db.execute({
+    sql: `SELECT seq_count, head_mac FROM ap_aggregate_head WHERE workspace_id = ? AND aggregate_type = ? AND aggregate_id = ?`,
+    args: [workspaceId, aggregateType, aggregateId],
+  });
+  const row = r.rows[0] as Record<string, unknown> | undefined;
+  return row ? { seqCount: Number(row.seq_count), headMac: String(row.head_mac) } : null;
 }
 
 /** Raw stored events for an aggregate, ordered by seq ascending. */
@@ -323,13 +422,15 @@ export interface VerifyResult {
   valid: boolean;
   length: number;
   brokenAt?: number;
-  reason?: "non_contiguous_sequence" | "broken_seal_link" | "seal_mismatch";
+  reason?: "non_contiguous_sequence" | "broken_seal_link" | "seal_mismatch" | "truncated_tail" | "missing_head";
 }
 
 /**
  * Replay an aggregate's stream and prove: seqs are 0..N-1 contiguous (ordering),
- * each row's seal_prev links the previous seal (continuity), and every seal
- * recomputes (integrity — no row was altered). Returns the first failing index.
+ * each row's seal_prev links the previous seal (continuity), every seal recomputes
+ * under its own seal version (integrity — no row was altered), and the keyed head
+ * anchor matches the current length + latest seal (no tail was truncated). Returns
+ * the first failing index.
  */
 export async function verifyAggregate(
   aggregateType: ApAggregateType,
@@ -343,8 +444,26 @@ export async function verifyAggregate(
     if (r.seq !== i) return { valid: false, length: rows.length, brokenAt: i, reason: "non_contiguous_sequence" };
     if (r.sealPrev !== prevSeal) return { valid: false, length: rows.length, brokenAt: i, reason: "broken_seal_link" };
     const { seal, ...unsealed } = r;
-    if (sealOf(unsealed) !== seal) return { valid: false, length: rows.length, brokenAt: i, reason: "seal_mismatch" };
+    if (sealForVersion(r.sealVersion, unsealed) !== seal) {
+      return { valid: false, length: rows.length, brokenAt: i, reason: "seal_mismatch" };
+    }
     prevSeal = r.seal;
   }
+
+  // Tail-truncation check. A v2-sealed chain must have a head anchor matching its
+  // current length + latest seal; a missing head on a v2 tail, or a mismatch,
+  // means rows were dropped (or the head forged, which needs the seal key). Legacy
+  // all-v1 chains predate the anchor, so a missing head is tolerated there.
+  const head = await loadHead(aggregateType, aggregateId, workspaceId);
+  const lastSeal = rows.length ? rows[rows.length - 1].seal : "";
+  if (head) {
+    const expected = headMac(workspaceId, aggregateType, aggregateId, rows.length, lastSeal);
+    if (head.seqCount !== rows.length || head.headMac !== expected) {
+      return { valid: false, length: rows.length, brokenAt: rows.length, reason: "truncated_tail" };
+    }
+  } else if (rows.length > 0 && rows[rows.length - 1].sealVersion >= 2) {
+    return { valid: false, length: rows.length, brokenAt: rows.length, reason: "missing_head" };
+  }
+
   return { valid: true, length: rows.length };
 }

@@ -26,7 +26,7 @@ function row(
   return {
     id: `${aggregateId}-${seq}`, workspaceId: "default", aggregateType, aggregateId, seq, eventType,
     eventVersion: 1, payload, actor, createdAt: NOW + seq * 1_000,
-    sealPrev: seq === 0 ? "genesis" : `s${seq - 1}`, seal: `s${seq}`,
+    sealPrev: seq === 0 ? "genesis" : `s${seq - 1}`, sealVersion: 2, seal: `s${seq}`,
   };
 }
 
