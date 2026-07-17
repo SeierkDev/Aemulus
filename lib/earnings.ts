@@ -1,6 +1,6 @@
 import { db, ready } from "./db";
 import { id } from "./ids";
-import { sendPayout } from "./payout";
+import { sendPayout, PayoutPrepError } from "./payout";
 import { incr } from "./metrics";
 import type { EarningsSummary } from "./types";
 
@@ -145,6 +145,13 @@ export async function claimEarnings(
   try {
     res = await send(owner, amount);
   } catch (e) {
+    if (e instanceof PayoutPrepError) {
+      // Nothing was broadcast (bad config / decimals mismatch / build error) →
+      // fully roll back so the creator's earnings aren't locked as claimed.
+      await db.execute({ sql: `UPDATE earnings SET claim_id = NULL WHERE claim_id = ?`, args: [claimId] });
+      await db.execute({ sql: `DELETE FROM claims WHERE id = ?`, args: [claimId] });
+      throw new Error(`Payout is misconfigured — no funds moved and your earnings are intact: ${e.message}`);
+    }
     // The transfer may already have broadcast (e.g. confirm timed out). Do NOT
     // un-claim - that could cause a double payout. Leave the claim pending
     // (sig null) for reconciliation.

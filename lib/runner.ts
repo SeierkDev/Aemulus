@@ -417,7 +417,18 @@ export async function executeRun(
     finalStatus === "completed"
       ? `Completed ${skill.plan.length} steps.`
       : null;
-  await finishRun(runId, { status: finalStatus, result, error });
+  // Persist the terminal status resiliently. A transient DB error here must NOT
+  // leave the run "running" — the job would retry and re-execute the entire
+  // browser run, double-firing real side effects against the target site.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await finishRun(runId, { status: finalStatus, result, error });
+      break;
+    } catch (e) {
+      if (attempt >= 4) throw e;
+      await new Promise((r) => setTimeout(r, 200 * (attempt + 1)));
+    }
+  }
   // Output + receipt are best-effort: a failure here must NOT throw out of
   // executeRun, or completeRun's catch would wrongly re-mark a completed run as
   // failed. The finalized status above is the source of truth.

@@ -69,7 +69,7 @@ export async function POST(req: Request) {
   } catch (err) {
     logError("api/skills/synthesize", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to synthesize" },
+      { error: "Failed to synthesize a skill." },
       { status: 500 },
     );
   }

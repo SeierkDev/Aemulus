@@ -82,8 +82,14 @@ export function csvToRows(
 
 /** Serialize rows of objects into CSV text (columns from the given headers). */
 export function toCsv(headers: string[], rows: Record<string, string>[]): string {
-  const esc = (v: string) =>
-    /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  // Neutralize spreadsheet formula injection: a cell that begins with = + - @ (or
+  // a tab/CR before them) is executed as a formula by Excel/Sheets, so prefix a
+  // single quote. Values here can be attacker-controlled extracted page content.
+  const neutralize = (v: string) => (/^[=+\-@\t\r]/.test(v) ? `'${v}` : v);
+  const esc = (v: string) => {
+    const s = neutralize(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
   const lines = [headers.map(esc).join(",")];
   for (const r of rows) lines.push(headers.map((h) => esc(r[h] ?? "")).join(","));
   return lines.join("\n");

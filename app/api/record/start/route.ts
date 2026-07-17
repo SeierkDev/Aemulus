@@ -51,9 +51,9 @@ export async function POST(req: Request) {
       session.pubkey,
     );
     return NextResponse.json(state);
-  } catch (err) {
+  } catch {
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to start" },
+      { error: "Couldn’t start the recording." },
       { status: 409 },
     );
   }

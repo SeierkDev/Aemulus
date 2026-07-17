@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     logError("api/skills/generalize", err);
     return NextResponse.json(
       {
-        error: err instanceof Error ? err.message : "Failed to generalize",
+        error: "Failed to generalize the demonstration.",
       },
       { status: 500 },
     );

@@ -86,7 +86,18 @@ export function buildPayoutInstructions(
   ];
 }
 
-/** Transfer `amount` (UI units) of $AEMU from treasury → wallet. Null if off. */
+/** A failure BEFORE the transaction is broadcast (bad secret/pubkey, decimals
+ *  mismatch, tx build). The caller can safely roll a claim back — nothing was sent. */
+export class PayoutPrepError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PayoutPrepError";
+  }
+}
+
+/** Transfer `amount` (UI units) of $AEMU from treasury → wallet. Null if off.
+ *  Throws PayoutPrepError for any pre-broadcast failure (rollback-safe); other
+ *  throws mean the send may have happened (leave the claim pending). */
 export async function sendPayout(
   toWallet: string,
   amount: number,
@@ -97,13 +108,35 @@ export async function sendPayout(
   const cluster = process.env.AEMULUS_RECEIPT_CLUSTER || "mainnet-beta";
   const rpc = process.env.AEMULUS_RECEIPT_RPC || SOLANA.rpcUrl;
   const conn = new Connection(rpc, "confirmed");
-  const treasury = Keypair.fromSecretKey(bs58.decode(secret));
-  const mint = new PublicKey(SOLANA.mint);
-  const to = new PublicKey(toWallet);
 
-  const tx = new Transaction();
-  for (const ix of buildPayoutInstructions(treasury.publicKey, to, mint, toBaseUnits(amount))) {
-    tx.add(ix);
+  let treasury: Keypair;
+  let tx: Transaction;
+  try {
+    treasury = Keypair.fromSecretKey(bs58.decode(secret));
+    const mint = new PublicKey(SOLANA.mint);
+    const to = new PublicKey(toWallet);
+
+    // Refuse to pay if the configured decimals disagree with the live mint —
+    // otherwise every payout is off by orders of magnitude.
+    const info = await conn.getParsedAccountInfo(mint);
+    const data = info.value?.data;
+    const dec =
+      data && typeof data === "object" && "parsed" in data
+        ? (data as { parsed?: { info?: { decimals?: number } } }).parsed?.info?.decimals
+        : undefined;
+    if (typeof dec === "number" && dec !== DECIMALS) {
+      throw new PayoutPrepError(
+        `AEMULUS_DECIMALS=${DECIMALS} but the $AEMU mint reports ${dec} decimals — refusing to pay to avoid a mis-payment.`,
+      );
+    }
+
+    tx = new Transaction();
+    for (const ix of buildPayoutInstructions(treasury.publicKey, to, mint, toBaseUnits(amount))) {
+      tx.add(ix);
+    }
+  } catch (e) {
+    if (e instanceof PayoutPrepError) throw e;
+    throw new PayoutPrepError(e instanceof Error ? e.message : "payout preparation failed");
   }
 
   const sig = await sendAndConfirmTransaction(conn, tx, [treasury]);

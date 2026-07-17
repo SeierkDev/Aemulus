@@ -9,6 +9,15 @@ import { NextResponse } from "next/server";
 
 const ACTIONS = ["navigate", "click", "input", "select", "key", "submit", "extract", "run_skill"] as const;
 
+// A skill's input map. Bounds key/value length AND the number of fields, so a
+// single request can't store an arbitrarily large object (memory/DB pressure).
+const MAX_INPUT_FIELDS = 200;
+const inputRecord = z
+  .record(z.string().max(200), z.string().max(5000))
+  .refine((r) => Object.keys(r).length <= MAX_INPUT_FIELDS, {
+    message: `at most ${MAX_INPUT_FIELDS} fields`,
+  });
+
 export const VerifyBody = z.object({
   pubkey: z.string().min(32).max(64),
   signature: z.string().min(1).max(200),
@@ -42,7 +51,7 @@ export const SynthesizeBody = z.object({
 
 export const BulkBody = z.object({
   rows: z
-    .array(z.record(z.string().max(200), z.string().max(5000)))
+    .array(inputRecord)
     .min(1)
     .max(1000),
 });
@@ -132,7 +141,7 @@ export const WebhookBody = z.object({
 
 export const RunBody = z.object({
   skillId: z.string().min(1).max(64),
-  input: z.record(z.string().max(200), z.string().max(5000)).optional(),
+  input: inputRecord.optional(),
 });
 
 export const ResolveBody = z.object({
@@ -151,7 +160,7 @@ export const ScheduleCreateBody = z.object({
     "weekdays",
     "weekly",
   ]),
-  input: z.record(z.string().max(200), z.string().max(5000)).optional(),
+  input: inputRecord.optional(),
 });
 
 export const ScheduleToggleBody = z.object({ active: z.boolean() });

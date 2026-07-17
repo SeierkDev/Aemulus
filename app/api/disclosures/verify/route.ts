@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { verifyDisclosure } from "@/lib/commitment";
+import { enforceRateLimit } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const clientIp = (req: Request) => (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unknown";
 
 /**
  * Public: verify a selective-disclosure bundle against a committed root. No
@@ -15,6 +18,12 @@ const str = (s: unknown, max: number): s is string =>
   typeof s === "string" && s.length <= max;
 
 export async function POST(req: Request) {
+  // Unauthenticated: rate-limit and cap the body BEFORE buffering it.
+  const limited = enforceRateLimit(`disclose-verify:${clientIp(req)}`, 30, 60_000, "Too many requests");
+  if (limited) return limited;
+  if (Number(req.headers.get("content-length") || 0) > 512 * 1024) {
+    return NextResponse.json({ error: "Body too large." }, { status: 413 });
+  }
   try {
     const b = await req.json();
     const proof = b?.proof;

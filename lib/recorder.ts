@@ -43,6 +43,9 @@ const RawActionSchema = z.object({
 
 const RECORDINGS_DIR = path.join(process.cwd(), ".data", "recordings");
 const VIEWPORT = { width: 1280, height: 800 };
+// Auto-stop an abandoned recording (tab closed / network lost) so it can't leak a
+// headless browser or wedge the wallet's recorder slot forever.
+const IDLE_MS = Math.max(30_000, Number(process.env.AEMULUS_RECORD_IDLE_MS) || 120_000);
 
 /** Payload the in-page script sends; Node enriches it into a RecordedAction. */
 type RawAction = Omit<RecordedAction, "idx" | "ts" | "url" | "screenshot">;
@@ -63,6 +66,7 @@ class RecorderSession {
   private cdp: CDPSession | null = null;
   private lastFrame: string | null = null;
   private frameSeq = 0;
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
   /** Serializes screenshot+trace writes so indexes never race. */
   private tail: Promise<void> = Promise.resolve();
 
@@ -89,6 +93,7 @@ class RecorderSession {
       startedAt: Date.now(),
     };
 
+    try {
     await mkdir(path.join(RECORDINGS_DIR, owner, sid), { recursive: true });
 
     // Headless - the user drives it remotely via the streamed view.
@@ -124,7 +129,7 @@ class RecorderSession {
     await this.context.addInitScript(recorderInitScript);
 
     this.page = await this.context.newPage();
-    this.context.on("close", () => this.markStopped());
+    this.context.on("close", () => { this.markStopped(); void this.closeBrowser(); });
 
     // Stream the page to the client via CDP screencast.
     this.cdp = await this.context.newCDPSession(this.page);
@@ -151,11 +156,29 @@ class RecorderSession {
     // Seed the trace with the opening navigation + its screenshot.
     this.enqueue(this.page, { type: "navigate", value: startUrl });
 
+    this.touch();
     return this.snapshot();
+    } catch (e) {
+      // Setup failed (bad/blocked startUrl, nav timeout, launch error): free the
+      // browser and clear the session so the wallet isn't wedged and nothing leaks.
+      await this.closeBrowser();
+      this.state = null;
+      throw e;
+    }
+  }
+
+  /** Reset the idle timer on any activity; fires an auto-stop when it lapses. */
+  private touch() {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    this.idleTimer = setTimeout(() => {
+      this.markStopped();
+      void this.closeBrowser();
+    }, IDLE_MS);
   }
 
   /** Latest screencast frame for the live view (base64 jpeg). */
   getFrame(): { seq: number; data: string | null; url: string } {
+    if (this.state?.status === "recording") this.touch(); // client is watching → keep alive
     return {
       seq: this.frameSeq,
       data: this.lastFrame,
@@ -235,6 +258,10 @@ class RecorderSession {
   }
 
   private async closeBrowser() {
+    if (this.idleTimer) {
+      clearTimeout(this.idleTimer);
+      this.idleTimer = null;
+    }
     try {
       await this.browser?.close();
     } catch {

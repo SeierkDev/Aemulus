@@ -16,7 +16,8 @@ const MAX_LIMIT = 100;
 export function parseLimit(raw: string | null): number {
   const n = raw ? Number(raw) : DEFAULT_LIMIT;
   if (!Number.isFinite(n) || n <= 0) return DEFAULT_LIMIT;
-  return Math.min(Math.floor(n), MAX_LIMIT);
+  // Floor first so a fractional limit in (0,1) can't collapse to 0 (empty page).
+  return Math.max(1, Math.min(Math.floor(n), MAX_LIMIT));
 }
 
 export function encodeCursor(createdAt: number, id: string): string {

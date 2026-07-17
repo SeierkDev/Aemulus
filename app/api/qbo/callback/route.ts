@@ -27,7 +27,8 @@ export async function GET(req: Request) {
 
   try {
     const viewer = await getApViewer().catch(() => null);
-    await exchangeCode(code, realmId, Date.now(), viewer?.workspaceId);
+    if (!viewer) throw new Error("no_session"); // session lapsed mid-flow → don't bind tokens to undefined
+    await exchangeCode(code, realmId, Date.now(), viewer.workspaceId);
     back.searchParams.set("qbo", "connected");
   } catch {
     back.searchParams.set("qbo", "error");

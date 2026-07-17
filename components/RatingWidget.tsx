@@ -21,10 +21,12 @@ export function RatingWidget({
   const [comment, setComment] = useState(initialComment || "");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
 
   async function submit() {
     if (stars < 1) return;
     setBusy(true);
+    setError("");
     try {
       const r = await fetch(`/api/skills/${skillId}/rate`, {
         method: "POST",
@@ -34,7 +36,11 @@ export function RatingWidget({
       if (r.ok) {
         setDone(true);
         router.refresh();
+      } else {
+        setError("Couldn’t save your rating. Try again.");
       }
+    } catch {
+      setError("Couldn’t save your rating. Try again.");
     } finally {
       setBusy(false);
     }
@@ -82,6 +88,7 @@ export function RatingWidget({
               {busy ? "Saving…" : initialStars ? "Update rating" : "Submit rating"}
             </Button>
             {done && <span className="text-xs text-ink-3">Saved</span>}
+            {error && <span className="text-xs text-ink-2">{error}</span>}
           </div>
         </>
       )}
