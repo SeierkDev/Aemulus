@@ -30,13 +30,14 @@ export default async function ApInvoicePage({
   const { id } = await params;
   const session = await getApSession();
   if (!session) redirect("/ap/login");
-  const conn = await loadConnection().catch(() => null);
+  const ws = session.workspaceId;
+  const conn = await loadConnection(ws).catch(() => null);
   const connected = !!conn && conn.status === "connected" && !!conn.accessToken;
 
   // The demo invoice keeps its richer, story-driven walkthrough.
   if (id === DEMO_INVOICE_ID) {
-    await seedApDemo();
-    const state = await projectInvoiceEntry(id);
+    await seedApDemo(ws);
+    const state = await projectInvoiceEntry(id, ws);
     return (
       <ApReview
         invoiceId={id}
@@ -50,7 +51,7 @@ export default async function ApInvoicePage({
   }
 
   // Any other workspace invoice: generic review from its sealed stream.
-  const state = await projectInvoiceEntry(id);
+  const state = await projectInvoiceEntry(id, ws);
   if (state.lastSeq < 0) notFound(); // no such invoice
 
   if (state.status === "needs_review") {

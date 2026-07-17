@@ -1,6 +1,7 @@
 import { id as newId } from "../ids";
 import { appendApEvent } from "./store";
 import { enterInvoice, type EnterResult } from "./qbo-submit";
+import { DEFAULT_WORKSPACE } from "./workspace";
 
 // Turn a reviewed, extracted invoice into a real workspace invoice: seal its
 // provenance (invoice.received, with the extracted fields + source), then enter
@@ -24,6 +25,7 @@ export async function intakeEnter(
   source: string,
   now: number,
   actor: { userId: string; role: string } = CLERK,
+  workspaceId: string = DEFAULT_WORKSPACE,
 ): Promise<IntakeResult> {
   const invoiceId = newId("inv");
   const vendor = fields.vendor.trim() || "Unknown vendor";
@@ -34,6 +36,7 @@ export async function intakeEnter(
     : new Date(now).toISOString().slice(0, 10);
 
   await appendApEvent({
+    workspaceId,
     aggregateType: "invoice",
     aggregateId: invoiceId,
     eventType: "invoice.received",
@@ -54,6 +57,7 @@ export async function intakeEnter(
     actor,
     auto: false,
     now,
+    workspaceId,
   });
   return { invoiceId, ...r };
 }

@@ -5,6 +5,7 @@ import { appendApEvent, verifyAggregate } from "@/lib/ap-controls/store";
 import { projectInvoiceEntry } from "@/lib/ap-controls/projections";
 import { enterInvoice } from "@/lib/ap-controls/qbo-submit";
 import { getApSession } from "@/lib/ap-controls/ap-session";
+import { DEFAULT_WORKSPACE } from "@/lib/ap-controls/workspace";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +20,13 @@ export async function POST(
   const { id } = await params;
   if (id === DEMO_INVOICE_ID) return NextResponse.json({ ok: false, error: "Use the walkthrough for this invoice." }, { status: 404 });
 
-  const state = await projectInvoiceEntry(id);
+  const session = await getApSession().catch(() => null);
+  const workspaceId = session?.workspaceId ?? DEFAULT_WORKSPACE;
+  const actor = session
+    ? { userId: session.userId, role: "clerk" as const }
+    : { userId: DEMO_ACTOR.userId, role: DEMO_ACTOR.role };
+
+  const state = await projectInvoiceEntry(id, workspaceId);
   if (state.status !== "needs_review") {
     return NextResponse.json({ ok: false, error: `This invoice is already ${state.status}.` }, { status: 409 });
   }
@@ -31,14 +38,10 @@ export async function POST(
   if (!reasonCode) return NextResponse.json({ ok: false, error: "Pick a reason for your decision." }, { status: 400 });
 
   const now = Date.now();
-  const session = await getApSession().catch(() => null);
-  const actor = session
-    ? { userId: session.userId, role: "clerk" as const }
-    : { userId: DEMO_ACTOR.userId, role: DEMO_ACTOR.role };
 
   if (action === "reject") {
     await appendApEvent({
-      aggregateType: "invoice", aggregateId: id, eventType: "invoice.rejected",
+      workspaceId, aggregateType: "invoice", aggregateId: id, eventType: "invoice.rejected",
       payload: { reasonCode, note }, actor, now, id: newId("evt"),
     });
     return NextResponse.json({ ok: true, status: "rejected" });
@@ -46,7 +49,7 @@ export async function POST(
 
   // Approve: seal the override, then enter.
   await appendApEvent({
-    aggregateType: "invoice", aggregateId: id, eventType: "invoice.override",
+    workspaceId, aggregateType: "invoice", aggregateId: id, eventType: "invoice.override",
     payload: { type: "review", field: "review", originalValue: "flagged", newValue: "cleared", reasonCode, note },
     actor, now, id: newId("evt"),
   });
@@ -62,10 +65,11 @@ export async function POST(
     actor,
     auto: false,
     now,
+    workspaceId,
   });
   if (!r.ok) {
     return NextResponse.json({ ok: false, error: r.error }, { status: r.error === "in_progress" ? 409 : 400 });
   }
-  const verify = await verifyAggregate("invoice", id);
+  const verify = await verifyAggregate("invoice", id, workspaceId);
   return NextResponse.json({ ok: true, status: "submitted", billNumber: r.billNumber, target: r.target, verify, seal: r.seal });
 }

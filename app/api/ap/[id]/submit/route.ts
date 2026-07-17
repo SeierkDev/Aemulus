@@ -32,6 +32,7 @@ export async function POST(
     currency: DEMO_FIXTURE.currency,
     actor,
     now: Date.now(),
+    workspaceId: session?.workspaceId,
   });
 
   if (!r.ok) {

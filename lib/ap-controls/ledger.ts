@@ -1,19 +1,22 @@
 import { db, ready } from "../db";
+import { DEFAULT_WORKSPACE } from "./workspace";
 
-// Aemulus's own lightweight ledger. When QuickBooks isn't connected, entered
-// invoices are recorded here as real, inspectable bills (and still sealed +
-// verifiable via the audit stream). One bill per invoice (invoice_id UNIQUE), so
-// re-entering the same invoice returns the existing bill.
+// Aemulus's own lightweight ledger, scoped per workspace. When QuickBooks isn't
+// connected, entered invoices are recorded here as real, inspectable bills (and
+// still sealed + verifiable via the audit stream). One bill per invoice within a
+// workspace, so re-entering the same invoice returns the existing bill.
 
 const DDL = `
   CREATE TABLE IF NOT EXISTS ledger_bill (
-    bill_no     INTEGER PRIMARY KEY AUTOINCREMENT,
-    invoice_id  TEXT NOT NULL UNIQUE,
-    vendor      TEXT NOT NULL,
-    doc_number  TEXT NOT NULL,
-    amount      REAL NOT NULL,
-    currency    TEXT NOT NULL,
-    entered_at  INTEGER NOT NULL
+    bill_no      INTEGER PRIMARY KEY AUTOINCREMENT,
+    workspace_id TEXT NOT NULL DEFAULT '${DEFAULT_WORKSPACE}',
+    invoice_id   TEXT NOT NULL,
+    vendor       TEXT NOT NULL,
+    doc_number   TEXT NOT NULL,
+    amount       REAL NOT NULL,
+    currency     TEXT NOT NULL,
+    entered_at   INTEGER NOT NULL,
+    UNIQUE (workspace_id, invoice_id)
   )`;
 
 let ensured: Promise<void> | null = null;
@@ -21,7 +24,20 @@ export function ensureLedgerSchema(): Promise<void> {
   if (!ensured) {
     ensured = (async () => {
       await ready();
-      await db.execute(DDL);
+      const cols = await db.execute(`PRAGMA table_info(ledger_bill)`);
+      const exists = cols.rows.length > 0;
+      const hasWorkspace = cols.rows.some((r) => String((r as Record<string, unknown>).name) === "workspace_id");
+      if (exists && !hasWorkspace) {
+        await db.execute(`ALTER TABLE ledger_bill RENAME TO ledger_bill_legacy`);
+        await db.execute(DDL);
+        await db.execute(
+          `INSERT INTO ledger_bill (bill_no, workspace_id, invoice_id, vendor, doc_number, amount, currency, entered_at)
+           SELECT bill_no, '${DEFAULT_WORKSPACE}', invoice_id, vendor, doc_number, amount, currency, entered_at FROM ledger_bill_legacy`,
+        );
+        await db.execute(`DROP TABLE ledger_bill_legacy`);
+      } else {
+        await db.execute(DDL);
+      }
     })();
   }
   return ensured;
@@ -34,6 +50,7 @@ export interface LedgerBillInput {
   amount: number;
   currency: string;
   now: number;
+  workspaceId?: string;
 }
 
 export interface LedgerBill {
@@ -48,33 +65,40 @@ export interface LedgerBill {
 
 const billNumber = (no: number) => `AEM-${no}`;
 
-/** Record (or return the existing) ledger bill for an invoice. Idempotent. */
+/** Record (or return the existing) ledger bill for an invoice in a workspace. Idempotent. */
 export async function recordLedgerBill(input: LedgerBillInput): Promise<{ billNumber: string }> {
   await ensureLedgerSchema();
+  const workspaceId = input.workspaceId ?? DEFAULT_WORKSPACE;
   const ins = await db.execute({
-    sql: `INSERT OR IGNORE INTO ledger_bill (invoice_id, vendor, doc_number, amount, currency, entered_at)
-          VALUES (?, ?, ?, ?, ?, ?)`,
-    args: [input.invoiceId, input.vendor, input.docNumber, input.amount, input.currency, input.now],
+    sql: `INSERT OR IGNORE INTO ledger_bill (workspace_id, invoice_id, vendor, doc_number, amount, currency, entered_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    args: [workspaceId, input.invoiceId, input.vendor, input.docNumber, input.amount, input.currency, input.now],
   });
   if (ins.rowsAffected === 1) return { billNumber: billNumber(Number(ins.lastInsertRowid)) };
-  const r = await db.execute({ sql: `SELECT bill_no FROM ledger_bill WHERE invoice_id = ?`, args: [input.invoiceId] });
+  const r = await db.execute({
+    sql: `SELECT bill_no FROM ledger_bill WHERE workspace_id = ? AND invoice_id = ?`,
+    args: [workspaceId, input.invoiceId],
+  });
   return { billNumber: billNumber(Number(r.rows[0].bill_no)) };
 }
 
-/** Count and total value of all ledger bills. */
-export async function ledgerStats(): Promise<{ count: number; total: number }> {
+/** Count and total value of a workspace's ledger bills. */
+export async function ledgerStats(workspaceId: string = DEFAULT_WORKSPACE): Promise<{ count: number; total: number }> {
   await ensureLedgerSchema();
-  const r = await db.execute(`SELECT COUNT(*) AS c, COALESCE(SUM(amount), 0) AS t FROM ledger_bill`);
+  const r = await db.execute({
+    sql: `SELECT COUNT(*) AS c, COALESCE(SUM(amount), 0) AS t FROM ledger_bill WHERE workspace_id = ?`,
+    args: [workspaceId],
+  });
   const row = r.rows[0] as Record<string, unknown>;
   return { count: Number(row.c), total: Number(row.t) };
 }
 
-/** Recent ledger bills, newest first. */
-export async function listLedgerBills(limit = 50): Promise<LedgerBill[]> {
+/** Recent ledger bills for a workspace, newest first. */
+export async function listLedgerBills(limit = 50, workspaceId: string = DEFAULT_WORKSPACE): Promise<LedgerBill[]> {
   await ensureLedgerSchema();
   const r = await db.execute({
-    sql: `SELECT * FROM ledger_bill ORDER BY bill_no DESC LIMIT ?`,
-    args: [limit],
+    sql: `SELECT * FROM ledger_bill WHERE workspace_id = ? ORDER BY bill_no DESC LIMIT ?`,
+    args: [workspaceId, limit],
   });
   return r.rows.map((row) => ({
     billNumber: billNumber(Number(row.bill_no)),

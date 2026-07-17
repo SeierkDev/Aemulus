@@ -27,9 +27,10 @@ function reasonLabel(code: string | null): string {
 }
 
 export default async function ApQueuePage() {
-  if (!(await getApSession())) redirect("/ap/login");
-  await seedApDemo();
-  const queue = await liveInvoiceQueueAll();
+  const session = await getApSession();
+  if (!session) redirect("/ap/login");
+  await seedApDemo(session.workspaceId);
+  const queue = await liveInvoiceQueueAll(session.workspaceId);
 
   const atRisk = queue.reduce((s, q) => s + (q.amount ?? 0), 0);
   const oldest = queue.reduce((m, q) => Math.max(m, q.ageMs), 0);

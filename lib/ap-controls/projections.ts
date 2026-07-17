@@ -1,5 +1,6 @@
 import type { ApEventRow } from "./store";
 import { loadAggregate, listAggregateIds } from "./store";
+import { DEFAULT_WORKSPACE } from "./workspace";
 
 /**
  * AP read models (projections). The `fold*` functions are PURE and deterministic:
@@ -217,29 +218,30 @@ export function buildInvoiceQueue(states: InvoiceEntryState[], now: number): Inv
 }
 
 // ── Live projection helpers (impure: read store → fold) ─────────────────────
-export async function projectInvoiceEntry(invoiceId: string): Promise<InvoiceEntryState> {
-  return foldInvoiceEntryState(await loadAggregate("invoice", invoiceId));
+export async function projectInvoiceEntry(invoiceId: string, workspaceId: string = DEFAULT_WORKSPACE): Promise<InvoiceEntryState> {
+  return foldInvoiceEntryState(await loadAggregate("invoice", invoiceId, workspaceId));
 }
 
-export async function projectVendorMaster(vendorId: string): Promise<VendorMasterState> {
-  return foldVendorMasterState(await loadAggregate("vendor", vendorId));
+export async function projectVendorMaster(vendorId: string, workspaceId: string = DEFAULT_WORKSPACE): Promise<VendorMasterState> {
+  return foldVendorMasterState(await loadAggregate("vendor", vendorId, workspaceId));
 }
 
 export async function projectInvoiceQueue(
   invoiceIds: string[],
   now: number,
+  workspaceId: string = DEFAULT_WORKSPACE,
 ): Promise<InvoiceQueueItem[]> {
-  const states = await Promise.all(invoiceIds.map((id) => projectInvoiceEntry(id)));
+  const states = await Promise.all(invoiceIds.map((id) => projectInvoiceEntry(id, workspaceId)));
   return buildInvoiceQueue(states, now);
 }
 
 /** Live queue at the current time (impure boundary — reads the clock here). */
-export async function liveInvoiceQueue(invoiceIds: string[]): Promise<InvoiceQueueItem[]> {
-  return projectInvoiceQueue(invoiceIds, Date.now());
+export async function liveInvoiceQueue(invoiceIds: string[], workspaceId: string = DEFAULT_WORKSPACE): Promise<InvoiceQueueItem[]> {
+  return projectInvoiceQueue(invoiceIds, Date.now(), workspaceId);
 }
 
-/** Live queue across every invoice in the workspace. */
-export async function liveInvoiceQueueAll(): Promise<InvoiceQueueItem[]> {
-  const ids = await listAggregateIds("invoice");
-  return projectInvoiceQueue(ids, Date.now());
+/** Live queue across every invoice in a workspace. */
+export async function liveInvoiceQueueAll(workspaceId: string = DEFAULT_WORKSPACE): Promise<InvoiceQueueItem[]> {
+  const ids = await listAggregateIds("invoice", workspaceId);
+  return projectInvoiceQueue(ids, Date.now(), workspaceId);
 }

@@ -8,7 +8,7 @@ import { LogoutButton } from "@/components/ap/LogoutButton";
 // ledger environment, not a design canvas.
 export default async function ApLayout({ children }: { children: React.ReactNode }) {
   const session = await getApSession();
-  const conn = session ? await loadConnection().catch(() => null) : null;
+  const conn = session ? await loadConnection(session.workspaceId).catch(() => null) : null;
   const connected = !!conn && conn.status === "connected" && !!conn.accessToken;
 
   return (

@@ -4,6 +4,7 @@ import { recordLedgerBill } from "./ledger";
 import { id as newId } from "../ids";
 import { appendApEvent, verifyAggregate } from "./store";
 import { projectInvoiceEntry } from "./projections";
+import { DEFAULT_WORKSPACE } from "./workspace";
 
 // Enter one reviewed invoice into QuickBooks and seal the real Bill id into the
 // invoice's audit stream. Idempotent at both layers: writeInvoiceToQbo guards
@@ -22,6 +23,7 @@ export interface EnterInvoiceInput {
   /** true when auto-entered (no human review); false when a reviewer entered it. */
   auto?: boolean;
   now: number;
+  workspaceId?: string;
 }
 
 export type EnterTarget = "quickbooks" | "ledger";
@@ -30,10 +32,12 @@ export type EnterResult =
   | { ok: false; error: string };
 
 export async function enterInvoice(input: EnterInvoiceInput): Promise<EnterResult> {
+  const workspaceId = input.workspaceId ?? DEFAULT_WORKSPACE;
+
   // Already entered? Return the existing bill (idempotent at the AP layer).
-  const pre = await projectInvoiceEntry(input.invoiceId);
+  const pre = await projectInvoiceEntry(input.invoiceId, workspaceId);
   if (pre.status === "submitted" && pre.billNumber) {
-    const verify = await verifyAggregate("invoice", input.invoiceId);
+    const verify = await verifyAggregate("invoice", input.invoiceId, workspaceId);
     return { ok: true, billNumber: pre.billNumber, target: pre.enterTarget ?? "ledger", verify, seal: pre.latestSeal ?? "" };
   }
 
@@ -41,7 +45,7 @@ export async function enterInvoice(input: EnterInvoiceInput): Promise<EnterResul
   // paths produce a real bill number and are sealed identically.
   let billNumber: string;
   let target: EnterTarget;
-  const config = await qboConfigFromConnection(input.now);
+  const config = await qboConfigFromConnection(input.now, workspaceId);
   if (config) {
     const result = await writeInvoiceToQbo({
       invoiceId: input.invoiceId,
@@ -51,6 +55,7 @@ export async function enterInvoice(input: EnterInvoiceInput): Promise<EnterResul
       amount: input.amount,
       config,
       now: input.now,
+      workspaceId,
     });
     if (result.status !== "posted") {
       return { ok: false, error: result.status === "in_progress" ? "in_progress" : result.error };
@@ -65,6 +70,7 @@ export async function enterInvoice(input: EnterInvoiceInput): Promise<EnterResul
       amount: input.amount,
       currency: input.currency,
       now: input.now,
+      workspaceId,
     });
     billNumber = led.billNumber;
     target = "ledger";
@@ -72,6 +78,7 @@ export async function enterInvoice(input: EnterInvoiceInput): Promise<EnterResul
 
   // Seal the real bill id into the audit stream.
   const row = await appendApEvent({
+    workspaceId,
     aggregateType: "invoice",
     aggregateId: input.invoiceId,
     eventType: "invoice.submitted",
@@ -80,6 +87,6 @@ export async function enterInvoice(input: EnterInvoiceInput): Promise<EnterResul
     now: input.now,
     id: newId("evt"),
   });
-  const verify = await verifyAggregate("invoice", input.invoiceId);
+  const verify = await verifyAggregate("invoice", input.invoiceId, workspaceId);
   return { ok: true, billNumber, target, verify, seal: row.seal };
 }

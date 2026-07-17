@@ -12,6 +12,7 @@ import { writeOverrideEvent, OverrideWriteError } from "@/lib/ap-controls/overri
 import { appendApEvent, readAggregate } from "@/lib/ap-controls/store";
 import { projectInvoiceEntry } from "@/lib/ap-controls/projections";
 import { getApSession } from "@/lib/ap-controls/ap-session";
+import { DEFAULT_WORKSPACE } from "@/lib/ap-controls/workspace";
 import type { EvidenceView } from "@/lib/ap-controls/schema";
 
 export const runtime = "nodejs";
@@ -36,6 +37,7 @@ export async function POST(
   const evidenceViewed = Array.isArray(body.evidenceViewed) ? body.evidenceViewed : [];
   const now = Date.now();
   const session = await getApSession().catch(() => null);
+  const workspaceId = session?.workspaceId ?? DEFAULT_WORKSPACE;
   const actor = session
     ? { userId: session.userId, role: "clerk" as const }
     : { userId: DEMO_ACTOR.userId, role: DEMO_ACTOR.role };
@@ -60,7 +62,7 @@ export async function POST(
   const evidence = evidenceViewed.map(
     (a) => ({ artifact: a as EvidenceView["artifact"], at: now }) as EvidenceView,
   );
-  const prior = await readAggregate("invoice", id);
+  const prior = await readAggregate("invoice", id, workspaceId);
   const priorSeal = prior[prior.length - 1]?.seal ?? `genesis:invoice:${id}`;
   let sealed;
   try {
@@ -79,14 +81,14 @@ export async function POST(
 
   // 3) Append to the aggregate's stream (REAL).
   const row = await appendApEvent({
-    aggregateType: "invoice", aggregateId: id, eventType: "invoice.override",
+    workspaceId, aggregateType: "invoice", aggregateId: id, eventType: "invoice.override",
     payload: { type: "duplicate", field: "duplicate", originalValue: "flagged", newValue: "cleared", reasonCode, note, overrideSeal: sealed.seal },
     actor, now, id: newId("evt"),
   });
   trace.push({ call: "appendApEvent(invoice.override)", result: `seq ${row.seq}` });
 
   // 4) Projection refresh (REAL).
-  const state = await projectInvoiceEntry(id);
+  const state = await projectInvoiceEntry(id, workspaceId);
   trace.push({ call: "projectInvoiceEntry", result: `status ${state.status}` });
 
   return NextResponse.json({ ok: true, decision: "allow", state, trace });

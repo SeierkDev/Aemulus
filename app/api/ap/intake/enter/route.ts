@@ -30,7 +30,7 @@ export async function POST(req: Request) {
 
   const session = await getApSession().catch(() => null);
   const actor = session ? { userId: session.userId, role: "clerk" } : undefined;
-  const r = await intakeEnter(fields, "upload", Date.now(), actor);
+  const r = await intakeEnter(fields, "upload", Date.now(), actor, session?.workspaceId);
   if (!r.ok) {
     return NextResponse.json({ ok: false, error: r.error }, { status: r.error === "in_progress" ? 409 : 400 });
   }

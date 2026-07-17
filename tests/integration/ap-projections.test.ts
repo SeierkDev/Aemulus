@@ -24,7 +24,7 @@ function row(
   aggregateType: ApAggregateType = "invoice",
 ): ApEventRow {
   return {
-    id: `${aggregateId}-${seq}`, aggregateType, aggregateId, seq, eventType,
+    id: `${aggregateId}-${seq}`, workspaceId: "default", aggregateType, aggregateId, seq, eventType,
     eventVersion: 1, payload, actor, createdAt: NOW + seq * 1_000,
     sealPrev: seq === 0 ? "genesis" : `s${seq - 1}`, seal: `s${seq}`,
   };

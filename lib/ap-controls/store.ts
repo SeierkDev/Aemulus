@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { db, ready } from "../db";
 import { canonicalize } from "./override-log";
+import { DEFAULT_WORKSPACE } from "./workspace";
 
 /**
  * AP event store — a durable, append-only, per-aggregate sealed event log.
@@ -87,6 +88,7 @@ export function upcast(
 // ── Row + input types ───────────────────────────────────────────────────────
 export interface ApEventRow {
   id: string;
+  workspaceId: string;
   aggregateType: ApAggregateType;
   aggregateId: string;
   seq: number;
@@ -100,6 +102,8 @@ export interface ApEventRow {
 }
 
 export interface AppendInput {
+  /** Scopes the event to one account's workspace (defaults to the shared workspace). */
+  workspaceId?: string;
   aggregateType: ApAggregateType;
   aggregateId: string;
   eventType: ApEventType;
@@ -130,6 +134,7 @@ export class SequenceConflictError extends Error {
 const DDL_TABLE = `
   CREATE TABLE IF NOT EXISTS ap_events (
     id             TEXT PRIMARY KEY,
+    workspace_id   TEXT NOT NULL DEFAULT '${DEFAULT_WORKSPACE}',
     aggregate_type TEXT NOT NULL,
     aggregate_id   TEXT NOT NULL,
     seq            INTEGER NOT NULL,
@@ -140,16 +145,30 @@ const DDL_TABLE = `
     created_at     INTEGER NOT NULL,
     seal_prev      TEXT NOT NULL,
     seal           TEXT NOT NULL,
-    UNIQUE (aggregate_type, aggregate_id, seq)
+    UNIQUE (workspace_id, aggregate_type, aggregate_id, seq)
   )`;
-const DDL_INDEX = `CREATE INDEX IF NOT EXISTS idx_ap_events_agg ON ap_events (aggregate_type, aggregate_id, seq)`;
+const DDL_INDEX = `CREATE INDEX IF NOT EXISTS idx_ap_events_agg ON ap_events (workspace_id, aggregate_type, aggregate_id, seq)`;
 
 let ensured: Promise<void> | null = null;
 export function ensureApEventsSchema(): Promise<void> {
   if (!ensured) {
     ensured = (async () => {
       await ready();
-      await db.execute(DDL_TABLE);
+      const cols = await db.execute(`PRAGMA table_info(ap_events)`);
+      const exists = cols.rows.length > 0;
+      const hasWorkspace = cols.rows.some((r) => String((r as Record<string, unknown>).name) === "workspace_id");
+      if (exists && !hasWorkspace) {
+        // Legacy table (pre-scoping): rebuild with the new UNIQUE and backfill.
+        await db.execute(`ALTER TABLE ap_events RENAME TO ap_events_legacy`);
+        await db.execute(DDL_TABLE);
+        await db.execute(
+          `INSERT INTO ap_events (id, workspace_id, aggregate_type, aggregate_id, seq, event_type, event_version, payload, actor, created_at, seal_prev, seal)
+           SELECT id, '${DEFAULT_WORKSPACE}', aggregate_type, aggregate_id, seq, event_type, event_version, payload, actor, created_at, seal_prev, seal FROM ap_events_legacy`,
+        );
+        await db.execute(`DROP TABLE ap_events_legacy`);
+      } else {
+        await db.execute(DDL_TABLE);
+      }
       await db.execute(DDL_INDEX);
     })();
   }
@@ -183,10 +202,11 @@ function sealOf(e: Omit<ApEventRow, "seal">): string {
  */
 export async function appendApEvent(input: AppendInput): Promise<ApEventRow> {
   await ensureApEventsSchema();
+  const workspaceId = input.workspaceId ?? DEFAULT_WORKSPACE;
 
   const tail = await db.execute({
-    sql: `SELECT seq, seal FROM ap_events WHERE aggregate_type = ? AND aggregate_id = ? ORDER BY seq DESC LIMIT 1`,
-    args: [input.aggregateType, input.aggregateId],
+    sql: `SELECT seq, seal FROM ap_events WHERE workspace_id = ? AND aggregate_type = ? AND aggregate_id = ? ORDER BY seq DESC LIMIT 1`,
+    args: [workspaceId, input.aggregateType, input.aggregateId],
   });
   const last = tail.rows[0];
   const seq = last ? Number(last.seq) + 1 : 0;
@@ -198,7 +218,7 @@ export async function appendApEvent(input: AppendInput): Promise<ApEventRow> {
 
   const eventVersion = input.eventVersion ?? CURRENT_VERSIONS[input.eventType] ?? 1;
   const unsealed: Omit<ApEventRow, "seal"> = {
-    id: input.id, aggregateType: input.aggregateType, aggregateId: input.aggregateId, seq,
+    id: input.id, workspaceId, aggregateType: input.aggregateType, aggregateId: input.aggregateId, seq,
     eventType: input.eventType, eventVersion, payload: input.payload, actor: input.actor,
     createdAt: input.now, sealPrev,
   };
@@ -207,10 +227,10 @@ export async function appendApEvent(input: AppendInput): Promise<ApEventRow> {
   try {
     await db.execute({
       sql: `INSERT INTO ap_events
-        (id, aggregate_type, aggregate_id, seq, event_type, event_version, payload, actor, created_at, seal_prev, seal)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, workspace_id, aggregate_type, aggregate_id, seq, event_type, event_version, payload, actor, created_at, seal_prev, seal)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
-        input.id, input.aggregateType, input.aggregateId, seq, input.eventType, eventVersion,
+        input.id, workspaceId, input.aggregateType, input.aggregateId, seq, input.eventType, eventVersion,
         JSON.stringify(input.payload), JSON.stringify(input.actor), input.now, sealPrev, seal,
       ],
     });
@@ -228,6 +248,7 @@ export async function appendApEvent(input: AppendInput): Promise<ApEventRow> {
 function rowToEvent(r: Record<string, unknown>): ApEventRow {
   return {
     id: String(r.id),
+    workspaceId: String(r.workspace_id),
     aggregateType: String(r.aggregate_type) as ApAggregateType,
     aggregateId: String(r.aggregate_id),
     seq: Number(r.seq),
@@ -245,21 +266,25 @@ function rowToEvent(r: Record<string, unknown>): ApEventRow {
 export async function readAggregate(
   aggregateType: ApAggregateType,
   aggregateId: string,
+  workspaceId: string = DEFAULT_WORKSPACE,
 ): Promise<ApEventRow[]> {
   await ensureApEventsSchema();
   const res = await db.execute({
-    sql: `SELECT * FROM ap_events WHERE aggregate_type = ? AND aggregate_id = ? ORDER BY seq ASC`,
-    args: [aggregateType, aggregateId],
+    sql: `SELECT * FROM ap_events WHERE workspace_id = ? AND aggregate_type = ? AND aggregate_id = ? ORDER BY seq ASC`,
+    args: [workspaceId, aggregateType, aggregateId],
   });
   return res.rows.map((r) => rowToEvent(r as Record<string, unknown>));
 }
 
-/** Distinct aggregate ids of a given type (e.g. every invoice seen). */
-export async function listAggregateIds(aggregateType: ApAggregateType): Promise<string[]> {
+/** Distinct aggregate ids of a given type in a workspace (e.g. every invoice seen). */
+export async function listAggregateIds(
+  aggregateType: ApAggregateType,
+  workspaceId: string = DEFAULT_WORKSPACE,
+): Promise<string[]> {
   await ensureApEventsSchema();
   const r = await db.execute({
-    sql: `SELECT DISTINCT aggregate_id FROM ap_events WHERE aggregate_type = ? ORDER BY aggregate_id`,
-    args: [aggregateType],
+    sql: `SELECT DISTINCT aggregate_id FROM ap_events WHERE workspace_id = ? AND aggregate_type = ? ORDER BY aggregate_id`,
+    args: [workspaceId, aggregateType],
   });
   return r.rows.map((row) => String((row as Record<string, unknown>).aggregate_id));
 }
@@ -268,8 +293,9 @@ export async function listAggregateIds(aggregateType: ApAggregateType): Promise<
 export async function loadAggregate(
   aggregateType: ApAggregateType,
   aggregateId: string,
+  workspaceId: string = DEFAULT_WORKSPACE,
 ): Promise<ApEventRow[]> {
-  const rows = await readAggregate(aggregateType, aggregateId);
+  const rows = await readAggregate(aggregateType, aggregateId, workspaceId);
   return rows.map((r) => {
     const { version, payload } = upcast(r.eventType, r.eventVersion, r.payload);
     return { ...r, eventVersion: version, payload };
@@ -292,8 +318,9 @@ export interface VerifyResult {
 export async function verifyAggregate(
   aggregateType: ApAggregateType,
   aggregateId: string,
+  workspaceId: string = DEFAULT_WORKSPACE,
 ): Promise<VerifyResult> {
-  const rows = await readAggregate(aggregateType, aggregateId);
+  const rows = await readAggregate(aggregateType, aggregateId, workspaceId);
   let prevSeal = genesisFor(aggregateType, aggregateId);
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];

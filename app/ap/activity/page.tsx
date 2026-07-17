@@ -16,14 +16,16 @@ function fmtTime(ms: number): string {
 }
 
 export default async function ApActivityPage() {
-  if (!(await getApSession())) redirect("/ap/login");
-  await seedApDemo();
+  const session = await getApSession();
+  if (!session) redirect("/ap/login");
+  const ws = session.workspaceId;
+  await seedApDemo(ws);
   const [bills, stats, queue] = await Promise.all([
-    listLedgerBills(20),
-    ledgerStats(),
-    liveInvoiceQueueAll(),
+    listLedgerBills(20, ws),
+    ledgerStats(ws),
+    liveInvoiceQueueAll(ws),
   ]);
-  const verified = await Promise.all(bills.map((b) => verifyAggregate("invoice", b.invoiceId).then((v) => v.valid)));
+  const verified = await Promise.all(bills.map((b) => verifyAggregate("invoice", b.invoiceId, ws).then((v) => v.valid)));
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-6">

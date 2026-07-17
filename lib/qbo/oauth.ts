@@ -1,16 +1,17 @@
 import { randomUUID } from "node:crypto";
 import { db, ready } from "../db";
 import { encryptJSON, decryptJSON } from "../encrypt";
+import { DEFAULT_WORKSPACE } from "../ap-controls/workspace";
 import type { QboConfig } from "./client";
 
-// QuickBooks Online OAuth2 + encrypted token storage (single org, one connection).
-// Authorization is interactive (the Intuit consent redirect), but the token
-// exchange/refresh HTTP and the encrypted storage are plain functions, testable
-// against a stand-in token endpoint via QBO_TOKEN_URL.
+// QuickBooks Online OAuth2 + encrypted token storage — one connection per
+// workspace (row keyed by workspace id). Authorization is interactive (the Intuit
+// consent redirect), but the token exchange/refresh HTTP and the encrypted
+// storage are plain functions, testable against a stand-in token endpoint via
+// QBO_TOKEN_URL.
 
 const AUTH_URL = "https://appcenter.intuit.com/connect/oauth2";
 const SCOPE = "com.intuit.quickbooks.accounting";
-const CONN_ID = "default";
 const REFRESH_SKEW_MS = 60_000;
 
 const tokenUrl = () =>
@@ -90,7 +91,7 @@ async function tokenRequest(body: URLSearchParams): Promise<TokenResponse> {
   return j as TokenResponse;
 }
 
-async function save(realmId: string, tokens: StoredTokens, expiresIn: number, now: number) {
+async function save(realmId: string, tokens: StoredTokens, expiresIn: number, now: number, workspaceId: string) {
   await ensureQboConnectionSchema();
   const accessExpiresAt = now + expiresIn * 1000;
   await db.execute({
@@ -102,7 +103,7 @@ async function save(realmId: string, tokens: StoredTokens, expiresIn: number, no
             access_expires_at = excluded.access_expires_at,
             status = 'connected',
             updated_at = excluded.updated_at`,
-    args: [CONN_ID, realmId, encryptJSON(tokens), accessExpiresAt, now, now],
+    args: [workspaceId, realmId, encryptJSON(tokens), accessExpiresAt, now, now],
   });
 }
 
@@ -114,9 +115,9 @@ export interface QboConnection {
   status: string;
 }
 
-export async function loadConnection(): Promise<QboConnection | null> {
+export async function loadConnection(workspaceId: string = DEFAULT_WORKSPACE): Promise<QboConnection | null> {
   await ensureQboConnectionSchema();
-  const r = await db.execute({ sql: `SELECT * FROM qbo_connection WHERE id = ?`, args: [CONN_ID] });
+  const r = await db.execute({ sql: `SELECT * FROM qbo_connection WHERE id = ?`, args: [workspaceId] });
   const row = r.rows[0];
   if (!row) return null;
   const tokens = decryptJSON<StoredTokens>(String(row.tokens_enc), { access: "", refresh: "" });
@@ -130,28 +131,28 @@ export async function loadConnection(): Promise<QboConnection | null> {
 }
 
 /** Exchange the OAuth authorization code for tokens and store the connection. */
-export async function exchangeCode(code: string, realmId: string, now: number): Promise<void> {
+export async function exchangeCode(code: string, realmId: string, now: number, workspaceId: string = DEFAULT_WORKSPACE): Promise<void> {
   const t = await tokenRequest(
     new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: process.env.QBO_REDIRECT_URI ?? "" }),
   );
-  await save(realmId, { access: t.access_token, refresh: t.refresh_token }, t.expires_in, now);
+  await save(realmId, { access: t.access_token, refresh: t.refresh_token }, t.expires_in, now, workspaceId);
 }
 
 /** A valid access token (refreshing if expired), or null if not connected. */
-export async function getAccessToken(now: number): Promise<{ token: string; realm: string } | null> {
-  const conn = await loadConnection();
+export async function getAccessToken(now: number, workspaceId: string = DEFAULT_WORKSPACE): Promise<{ token: string; realm: string } | null> {
+  const conn = await loadConnection(workspaceId);
   if (!conn || conn.status !== "connected" || !conn.accessToken) return null;
   if (now < conn.accessExpiresAt - REFRESH_SKEW_MS) {
     return { token: conn.accessToken, realm: conn.realmId };
   }
   const t = await tokenRequest(new URLSearchParams({ grant_type: "refresh_token", refresh_token: conn.refreshToken }));
-  await save(conn.realmId, { access: t.access_token, refresh: t.refresh_token }, t.expires_in, now);
+  await save(conn.realmId, { access: t.access_token, refresh: t.refresh_token }, t.expires_in, now, workspaceId);
   return { token: t.access_token, realm: conn.realmId };
 }
 
 /** A ready-to-use client config from the stored connection, or null. */
-export async function qboConfigFromConnection(now: number): Promise<QboConfig | null> {
-  const at = await getAccessToken(now);
+export async function qboConfigFromConnection(now: number, workspaceId: string = DEFAULT_WORKSPACE): Promise<QboConfig | null> {
+  const at = await getAccessToken(now, workspaceId);
   if (!at) return null;
   return { base: apiBase(), realm: at.realm, token: at.token };
 }

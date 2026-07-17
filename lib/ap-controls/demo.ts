@@ -1,6 +1,7 @@
 import type { EvidenceView } from "./schema";
 import { LARGE_TEAM } from "./schema";
 import { appendApEvent, readAggregate } from "./store";
+import { DEFAULT_WORKSPACE } from "./workspace";
 
 /**
  * Fixtures + seed for the first AP review demo (Acme duplicate-suspicion invoice).
@@ -76,10 +77,11 @@ export const DEMO_FIXTURE = {
 } as const;
 
 /** Seed the demo invoice's paused-for-review event once (idempotent). */
-export async function seedApDemo(): Promise<void> {
-  const existing = await readAggregate("invoice", DEMO_INVOICE_ID);
+export async function seedApDemo(workspaceId: string = DEFAULT_WORKSPACE): Promise<void> {
+  const existing = await readAggregate("invoice", DEMO_INVOICE_ID, workspaceId);
   if (existing.length > 0) return;
   await appendApEvent({
+    workspaceId,
     aggregateType: "invoice",
     aggregateId: DEMO_INVOICE_ID,
     eventType: "invoice.review_paused",
@@ -94,6 +96,6 @@ export async function seedApDemo(): Promise<void> {
     },
     actor: { userId: "system", role: "system" },
     now: Date.now() - 12 * 60 * 1000, // entered the queue ~12 min ago
-    id: `${DEMO_INVOICE_ID}_paused`,
+    id: `${workspaceId}_${DEMO_INVOICE_ID}_paused`,
   });
 }
