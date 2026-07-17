@@ -27,13 +27,14 @@ function fmtDate(iso: string): string {
 type Phase = "review" | "done" | "rejected";
 
 export function ApReview({
-  invoiceId, initialState, fixture, reasons, reviewer,
+  invoiceId, initialState, fixture, reasons, reviewer, connected,
 }: {
   invoiceId: string;
   initialState: InvoiceEntryState;
   fixture: Fixture;
   reasons: Reason[];
   reviewer: string;
+  connected: boolean;
 }) {
   const initPhase: Phase = initialState.status === "submitted" ? "done" : "review";
 
@@ -46,6 +47,7 @@ export function ApReview({
   const [replayOpen, setReplayOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
+  const [overrideApplied, setOverrideApplied] = useState(initialState.overrides.length > 0);
   const [reasonCode, setReasonCode] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -70,20 +72,24 @@ export function ApReview({
     setBusy(true);
     setError("");
     try {
-      const o = await fetch(`/api/ap/${invoiceId}/override`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ reasonCode, note, evidenceViewed: [...viewed] }),
-      });
-      const od = await o.json();
-      if (!od.ok) { setError(od.banner || "This couldn’t be confirmed."); return; }
+      // Record the override once; a retry after a failed submit only re-submits.
+      if (!overrideApplied) {
+        const o = await fetch(`/api/ap/${invoiceId}/override`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ reasonCode, note, evidenceViewed: [...viewed] }),
+        });
+        const od = await o.json();
+        if (!od.ok) { setError(od.banner || "This couldn’t be confirmed."); return; }
+        setOverrideApplied(true);
+      }
       const s = await fetch(`/api/ap/${invoiceId}/submit`, { method: "POST" });
       const sd = await s.json();
       if (sd.ok) {
         setBill(sd.billNumber); setVerify(sd.verify); setSeal(sd.seal);
         setModalOpen(false); setPhase("done");
       } else {
-        setError("The invoice couldn’t be entered.");
+        setError(submitError(sd.error));
       }
     } finally {
       setBusy(false);
@@ -206,16 +212,24 @@ export function ApReview({
           {/* Decision */}
           <div className="mt-8">
             <div className="flex flex-wrap items-center gap-3">
-              <button type="button" disabled={!canEnter} onClick={() => setModalOpen(true)}
-                className="rounded-md bg-ink px-5 py-2.5 text-sm font-semibold text-bg hover:opacity-90 disabled:opacity-30">
-                It’s a new charge — enter it →
-              </button>
+              {connected ? (
+                <button type="button" disabled={!canEnter} onClick={() => setModalOpen(true)}
+                  className="rounded-md bg-ink px-5 py-2.5 text-sm font-semibold text-bg hover:opacity-90 disabled:opacity-30">
+                  It’s a new charge — enter it →
+                </button>
+              ) : (
+                <a href="/api/qbo/connect"
+                  className="rounded-md bg-ink px-5 py-2.5 text-sm font-semibold text-bg hover:opacity-90">
+                  Connect QuickBooks to enter invoices →
+                </a>
+              )}
               <button type="button" onClick={() => setPhase("rejected")}
                 className="text-sm text-ink-3 underline decoration-border-strong underline-offset-2 hover:text-ink">
                 Reject as duplicate
               </button>
             </div>
-            {!canEnter && <p className="mt-2 text-xs text-ink-3">Watch what Aemulus did to continue.</p>}
+            {connected && !canEnter && <p className="mt-2 text-xs text-ink-3">Watch what Aemulus did to continue.</p>}
+            {!connected && <p className="mt-2 text-xs text-ink-3">Entering an invoice posts it to your QuickBooks — connect it first.</p>}
             <p className="mt-2 text-xs text-ink-3">Your decision and reason are sealed to the audit log.</p>
           </div>
         </>
@@ -312,6 +326,13 @@ export function ApReview({
 
 function markView(setViewed: React.Dispatch<React.SetStateAction<Set<string>>>, a: string) {
   setViewed((v) => new Set(v).add(a));
+}
+
+function submitError(code: string): string {
+  if (code === "not_connected") return "Connect QuickBooks before entering.";
+  if (code === "in_progress") return "This invoice is already being entered.";
+  if (code === "vendor_not_found") return "This vendor isn’t in QuickBooks yet.";
+  return "QuickBooks didn’t accept the entry. Try again.";
 }
 
 function Collapsible({

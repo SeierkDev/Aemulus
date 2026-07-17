@@ -7,6 +7,7 @@ import {
   OVERRIDE_REASONS,
 } from "@/lib/ap-controls/demo";
 import { projectInvoiceEntry } from "@/lib/ap-controls/projections";
+import { loadConnection } from "@/lib/qbo/oauth";
 import { ApReview } from "@/components/ap/ApReview";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,8 @@ export default async function ApInvoicePage({
   if (id !== DEMO_INVOICE_ID) notFound();
   await seedApDemo();
   const state = await projectInvoiceEntry(id);
+  const conn = await loadConnection().catch(() => null);
+  const connected = !!conn && conn.status === "connected" && !!conn.accessToken;
 
   return (
     <ApReview
@@ -28,6 +31,7 @@ export default async function ApInvoicePage({
       fixture={DEMO_FIXTURE}
       reasons={[...OVERRIDE_REASONS]}
       reviewer={DEMO_ACTOR.name}
+      connected={connected}
     />
   );
 }
