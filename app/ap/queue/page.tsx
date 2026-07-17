@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ResetButton } from "@/components/ap/ResetButton";
 import { IntakeUpload } from "@/components/ap/IntakeUpload";
 import { seedApDemo } from "@/lib/ap-controls/demo";
 import { liveInvoiceQueueAll } from "@/lib/ap-controls/projections";
+import { getApSession } from "@/lib/ap-controls/ap-session";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,7 @@ function reasonLabel(code: string | null): string {
 }
 
 export default async function ApQueuePage() {
+  if (!(await getApSession())) redirect("/ap/login");
   await seedApDemo();
   const queue = await liveInvoiceQueueAll();
 

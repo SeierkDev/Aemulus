@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { intakeEnter } from "@/lib/ap-controls/intake";
+import { getApSession } from "@/lib/ap-controls/ap-session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,7 +28,9 @@ export async function POST(req: Request) {
     currency: String(body.currency ?? "USD"),
   };
 
-  const r = await intakeEnter(fields, "upload", Date.now());
+  const session = await getApSession().catch(() => null);
+  const actor = session ? { userId: session.userId, role: "clerk" } : undefined;
+  const r = await intakeEnter(fields, "upload", Date.now(), actor);
   if (!r.ok) {
     return NextResponse.json({ ok: false, error: r.error }, { status: r.error === "in_progress" ? 409 : 400 });
   }

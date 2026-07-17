@@ -4,6 +4,7 @@ import { DEMO_INVOICE_ID, DEMO_ACTOR } from "@/lib/ap-controls/demo";
 import { appendApEvent, verifyAggregate } from "@/lib/ap-controls/store";
 import { projectInvoiceEntry } from "@/lib/ap-controls/projections";
 import { enterInvoice } from "@/lib/ap-controls/qbo-submit";
+import { getApSession } from "@/lib/ap-controls/ap-session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,7 +31,10 @@ export async function POST(
   if (!reasonCode) return NextResponse.json({ ok: false, error: "Pick a reason for your decision." }, { status: 400 });
 
   const now = Date.now();
-  const actor = { userId: DEMO_ACTOR.userId, role: DEMO_ACTOR.role };
+  const session = await getApSession().catch(() => null);
+  const actor = session
+    ? { userId: session.userId, role: "clerk" as const }
+    : { userId: DEMO_ACTOR.userId, role: DEMO_ACTOR.role };
 
   if (action === "reject") {
     await appendApEvent({

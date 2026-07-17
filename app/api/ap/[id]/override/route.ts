@@ -11,6 +11,7 @@ import { evaluateOverride } from "@/lib/ap-controls/evaluate";
 import { writeOverrideEvent, OverrideWriteError } from "@/lib/ap-controls/override-log";
 import { appendApEvent, readAggregate } from "@/lib/ap-controls/store";
 import { projectInvoiceEntry } from "@/lib/ap-controls/projections";
+import { getApSession } from "@/lib/ap-controls/ap-session";
 import type { EvidenceView } from "@/lib/ap-controls/schema";
 
 export const runtime = "nodejs";
@@ -34,7 +35,10 @@ export async function POST(
   const note = body.note ? String(body.note) : undefined;
   const evidenceViewed = Array.isArray(body.evidenceViewed) ? body.evidenceViewed : [];
   const now = Date.now();
-  const actor = { userId: DEMO_ACTOR.userId, role: DEMO_ACTOR.role };
+  const session = await getApSession().catch(() => null);
+  const actor = session
+    ? { userId: session.userId, role: "clerk" as const }
+    : { userId: DEMO_ACTOR.userId, role: DEMO_ACTOR.role };
 
   // 1) Override decision (REAL).
   const decision = evaluateOverride({

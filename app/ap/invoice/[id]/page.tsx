@@ -1,14 +1,14 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import {
   seedApDemo,
   DEMO_INVOICE_ID,
   DEMO_FIXTURE,
-  DEMO_ACTOR,
   OVERRIDE_REASONS,
 } from "@/lib/ap-controls/demo";
 import { projectInvoiceEntry } from "@/lib/ap-controls/projections";
 import { loadConnection } from "@/lib/qbo/oauth";
+import { getApSession } from "@/lib/ap-controls/ap-session";
 import { ApReview } from "@/components/ap/ApReview";
 import { GenericReview } from "@/components/ap/GenericReview";
 
@@ -28,6 +28,8 @@ export default async function ApInvoicePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const session = await getApSession();
+  if (!session) redirect("/ap/login");
   const conn = await loadConnection().catch(() => null);
   const connected = !!conn && conn.status === "connected" && !!conn.accessToken;
 
@@ -41,7 +43,7 @@ export default async function ApInvoicePage({
         initialState={state}
         fixture={DEMO_FIXTURE}
         reasons={[...OVERRIDE_REASONS]}
-        reviewer={DEMO_ACTOR.name}
+        reviewer={session.name}
         connected={connected}
       />
     );

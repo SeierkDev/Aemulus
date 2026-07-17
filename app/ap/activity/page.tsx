@@ -1,8 +1,10 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { seedApDemo } from "@/lib/ap-controls/demo";
 import { listLedgerBills, ledgerStats } from "@/lib/ap-controls/ledger";
 import { liveInvoiceQueueAll } from "@/lib/ap-controls/projections";
 import { verifyAggregate } from "@/lib/ap-controls/store";
+import { getApSession } from "@/lib/ap-controls/ap-session";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +16,7 @@ function fmtTime(ms: number): string {
 }
 
 export default async function ApActivityPage() {
+  if (!(await getApSession())) redirect("/ap/login");
   await seedApDemo();
   const [bills, stats, queue] = await Promise.all([
     listLedgerBills(20),

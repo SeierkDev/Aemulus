@@ -19,7 +19,12 @@ export type IntakeResult = { invoiceId: string } & EnterResult;
 
 const CLERK = { userId: "u_jane", role: "clerk" };
 
-export async function intakeEnter(fields: IntakeFields, source: string, now: number): Promise<IntakeResult> {
+export async function intakeEnter(
+  fields: IntakeFields,
+  source: string,
+  now: number,
+  actor: { userId: string; role: string } = CLERK,
+): Promise<IntakeResult> {
   const invoiceId = newId("inv");
   const vendor = fields.vendor.trim() || "Unknown vendor";
   const docNumber = fields.invoiceNumber.trim() || `UPLOAD-${invoiceId}`;
@@ -33,7 +38,7 @@ export async function intakeEnter(fields: IntakeFields, source: string, now: num
     aggregateId: invoiceId,
     eventType: "invoice.received",
     payload: { vendor, invoiceNumber: docNumber, invoiceDate: txnDate, amount: fields.amount, currency, source },
-    actor: CLERK,
+    actor,
     now,
     id: newId("evt"),
   });
@@ -46,7 +51,7 @@ export async function intakeEnter(fields: IntakeFields, source: string, now: num
     amount: fields.amount,
     total: fields.amount,
     currency,
-    actor: CLERK,
+    actor,
     auto: false,
     now,
   });

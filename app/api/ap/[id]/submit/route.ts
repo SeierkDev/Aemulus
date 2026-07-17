@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { DEMO_INVOICE_ID, DEMO_FIXTURE, DEMO_ACTOR } from "@/lib/ap-controls/demo";
 import { enterInvoice } from "@/lib/ap-controls/qbo-submit";
+import { getApSession } from "@/lib/ap-controls/ap-session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +17,11 @@ export async function POST(
   const { id } = await params;
   if (id !== DEMO_INVOICE_ID) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  const session = await getApSession().catch(() => null);
+  const actor = session
+    ? { userId: session.userId, role: "clerk" as const }
+    : { userId: DEMO_ACTOR.userId, role: DEMO_ACTOR.role };
+
   const r = await enterInvoice({
     invoiceId: id,
     vendorName: DEMO_FIXTURE.vendor,
@@ -24,7 +30,7 @@ export async function POST(
     amount: DEMO_FIXTURE.amount,
     total: DEMO_FIXTURE.amount,
     currency: DEMO_FIXTURE.currency,
-    actor: { userId: DEMO_ACTOR.userId, role: DEMO_ACTOR.role },
+    actor,
     now: Date.now(),
   });
 
