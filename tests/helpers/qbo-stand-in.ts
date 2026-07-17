@@ -35,12 +35,31 @@ export async function startQboStandIn(): Promise<QboStandIn> {
   const accounts: Account[] = [{ Id: "60", Name: "Office Supplies", AccountType: "Expense" }];
   const bills: StoredBill[] = [];
   let nextId = 100;
+  let tokenSeq = 0;
 
   const server: Server = createServer((req, res) => {
     const send = (code: number, obj: unknown) => {
       res.writeHead(code, { "content-type": "application/json" });
       res.end(JSON.stringify(obj));
     };
+
+    const path0 = new URL(req.url ?? "", "http://localhost").pathname;
+
+    // OAuth token endpoint (Basic auth, not Bearer) — handle before the API auth.
+    if (req.method === "POST" && path0.endsWith("/tokens/bearer")) {
+      req.on("data", () => {});
+      req.on("end", () => {
+        tokenSeq += 1;
+        return send(200, {
+          access_token: `access-${tokenSeq}`,
+          refresh_token: `refresh-${tokenSeq}`,
+          expires_in: 3600,
+          x_refresh_token_expires_in: 8_640_000,
+          token_type: "bearer",
+        });
+      });
+      return;
+    }
 
     const auth = req.headers.authorization ?? "";
     if (!/^Bearer .+/.test(auth) || auth === "Bearer expired") {
