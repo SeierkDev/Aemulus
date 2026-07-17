@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ResetButton } from "@/components/ap/ResetButton";
-import { seedApDemo, DEMO_INVOICE_ID, DEMO_FIXTURE } from "@/lib/ap-controls/demo";
-import { liveInvoiceQueue } from "@/lib/ap-controls/projections";
+import { seedApDemo } from "@/lib/ap-controls/demo";
+import { liveInvoiceQueueAll } from "@/lib/ap-controls/projections";
 
 export const dynamic = "force-dynamic";
 
@@ -16,15 +16,16 @@ function money(n: number | null): string {
   return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 function reasonLabel(code: string | null): string {
-  if (code === "DUPLICATE") return `Possible duplicate of ${DEMO_FIXTURE.duplicateOf.billNumber}`;
+  if (code === "DUPLICATE") return "Possible duplicate";
   if (code === "NEW_VENDOR") return "Unknown vendor";
   if (code === "TOTALS_MISMATCH") return "Totals don’t match";
+  if (code === "OVER_CEILING") return "Over auto-entry limit";
   return code ?? "Needs review";
 }
 
 export default async function ApQueuePage() {
   await seedApDemo();
-  const queue = await liveInvoiceQueue([DEMO_INVOICE_ID]);
+  const queue = await liveInvoiceQueueAll();
 
   const atRisk = queue.reduce((s, q) => s + (q.amount ?? 0), 0);
   const oldest = queue.reduce((m, q) => Math.max(m, q.ageMs), 0);
@@ -32,7 +33,10 @@ export default async function ApQueuePage() {
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-6">
       <header className="pt-8">
-        <h1 className="text-2xl font-semibold tracking-tight">Needs your review</h1>
+        <div className="flex items-start justify-between">
+          <h1 className="text-2xl font-semibold tracking-tight">Needs your review</h1>
+          <Link href="/ap/activity" className="mt-1 text-sm text-ink hover:underline">Activity →</Link>
+        </div>
         <p className="mt-1 text-sm text-ink-3">
           Invoices Aemulus wouldn’t enter without you. It never guesses on your money.
         </p>

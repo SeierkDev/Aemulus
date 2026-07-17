@@ -248,6 +248,16 @@ export async function readAggregate(
   return res.rows.map((r) => rowToEvent(r as Record<string, unknown>));
 }
 
+/** Distinct aggregate ids of a given type (e.g. every invoice seen). */
+export async function listAggregateIds(aggregateType: ApAggregateType): Promise<string[]> {
+  await ensureApEventsSchema();
+  const r = await db.execute({
+    sql: `SELECT DISTINCT aggregate_id FROM ap_events WHERE aggregate_type = ? ORDER BY aggregate_id`,
+    args: [aggregateType],
+  });
+  return r.rows.map((row) => String((row as Record<string, unknown>).aggregate_id));
+}
+
 /** Events with payloads upcast to the current version for their event type. */
 export async function loadAggregate(
   aggregateType: ApAggregateType,

@@ -19,6 +19,8 @@ export interface EnterInvoiceInput {
   total: number;
   currency: string;
   actor: { userId: string; role: string };
+  /** true when auto-entered (no human review); false when a reviewer entered it. */
+  auto?: boolean;
   now: number;
 }
 
@@ -73,7 +75,7 @@ export async function enterInvoice(input: EnterInvoiceInput): Promise<EnterResul
     aggregateType: "invoice",
     aggregateId: input.invoiceId,
     eventType: "invoice.submitted",
-    payload: { billNumber, total: input.total, currency: input.currency, auto: false, target },
+    payload: { billNumber, total: input.total, currency: input.currency, auto: input.auto ?? false, target },
     actor: input.actor,
     now: input.now,
     id: newId("evt"),

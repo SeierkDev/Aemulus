@@ -38,6 +38,7 @@ export interface LedgerBillInput {
 
 export interface LedgerBill {
   billNumber: string;
+  invoiceId: string;
   vendor: string;
   docNumber: string;
   amount: number;
@@ -60,6 +61,14 @@ export async function recordLedgerBill(input: LedgerBillInput): Promise<{ billNu
   return { billNumber: billNumber(Number(r.rows[0].bill_no)) };
 }
 
+/** Count and total value of all ledger bills. */
+export async function ledgerStats(): Promise<{ count: number; total: number }> {
+  await ensureLedgerSchema();
+  const r = await db.execute(`SELECT COUNT(*) AS c, COALESCE(SUM(amount), 0) AS t FROM ledger_bill`);
+  const row = r.rows[0] as Record<string, unknown>;
+  return { count: Number(row.c), total: Number(row.t) };
+}
+
 /** Recent ledger bills, newest first. */
 export async function listLedgerBills(limit = 50): Promise<LedgerBill[]> {
   await ensureLedgerSchema();
@@ -69,6 +78,7 @@ export async function listLedgerBills(limit = 50): Promise<LedgerBill[]> {
   });
   return r.rows.map((row) => ({
     billNumber: billNumber(Number(row.bill_no)),
+    invoiceId: String(row.invoice_id),
     vendor: String(row.vendor),
     docNumber: String(row.doc_number),
     amount: Number(row.amount),

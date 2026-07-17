@@ -14,5 +14,7 @@ export async function register() {
     startScheduler();
     const { startBatcher } = await import("./lib/receipt-batch");
     startBatcher();
+    const { startApActivity } = await import("./lib/ap-controls/activity");
+    startApActivity();
   }
 }

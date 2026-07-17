@@ -1,5 +1,5 @@
 import type { ApEventRow } from "./store";
-import { loadAggregate } from "./store";
+import { loadAggregate, listAggregateIds } from "./store";
 
 /**
  * AP read models (projections). The `fold*` functions are PURE and deterministic:
@@ -229,4 +229,10 @@ export async function projectInvoiceQueue(
 /** Live queue at the current time (impure boundary — reads the clock here). */
 export async function liveInvoiceQueue(invoiceIds: string[]): Promise<InvoiceQueueItem[]> {
   return projectInvoiceQueue(invoiceIds, Date.now());
+}
+
+/** Live queue across every invoice in the workspace. */
+export async function liveInvoiceQueueAll(): Promise<InvoiceQueueItem[]> {
+  const ids = await listAggregateIds("invoice");
+  return projectInvoiceQueue(ids, Date.now());
 }
