@@ -43,6 +43,14 @@ export async function decideInvoice(input: DecideInput): Promise<DecideResult> {
 
   if (!input.canEnter) return { ok: false, error: "limit_reached", httpStatus: 400 };
 
+  // Don't seal/enter a bill with no real amount. If the amount never projected
+  // (a review_paused event with a missing/non-numeric amount), approving would
+  // otherwise enter a $0 bill (and default a real foreign currency to USD).
+  const amount = state.amount ?? 0;
+  if (!(amount > 0)) {
+    return { ok: false, error: "This invoice has no positive amount to enter — fix the amount first.", httpStatus: 400 };
+  }
+
   // Seal the review clearance once. If a prior attempt sealed it but the entry then
   // failed, a retry re-enters without a duplicate — but only THIS review override is
   // deduped, not an unrelated override (e.g. a duplicate-flag clearance).
@@ -60,8 +68,8 @@ export async function decideInvoice(input: DecideInput): Promise<DecideResult> {
     vendorName: state.vendor ?? "Unknown vendor",
     docNumber: invoiceId,
     txnDate: new Date(now).toISOString().slice(0, 10),
-    amount: state.amount ?? 0,
-    total: state.amount ?? 0,
+    amount,
+    total: amount,
     currency: state.currency ?? "USD",
     actor,
     auto: false,

@@ -1,6 +1,6 @@
 import { qboConfigFromConnection } from "../qbo/oauth";
 import { writeInvoiceToQbo } from "../qbo/write";
-import { recordLedgerBill } from "./ledger";
+import { recordLedgerBill, deleteLedgerBill } from "./ledger";
 import { id as newId } from "../ids";
 import { appendApEvent, verifyAggregate, SequenceConflictError } from "./store";
 import { projectInvoiceEntry } from "./projections";
@@ -107,6 +107,14 @@ export async function enterInvoice(input: EnterInvoiceInput): Promise<EnterResul
       if (after.status === "submitted" && after.billNumber) {
         const verify = await verifyAggregate("invoice", input.invoiceId, workspaceId);
         return { ok: true, billNumber: after.billNumber, target: after.enterTarget ?? target, verify, seal: after.latestSeal ?? "" };
+      }
+      // The invoice did NOT end up submitted (e.g. a concurrent reject took the
+      // slot). We already wrote a ledger bill above; roll it back so the ledger
+      // doesn't hold a bill for an invoice the sealed stream says was rejected.
+      // (A QBO post can't be un-posted here; that path is inert unless QBO is
+      // connected, and writeInvoiceToQbo is itself idempotent.)
+      if (target === "ledger") {
+        await deleteLedgerBill(input.invoiceId, workspaceId);
       }
       return { ok: false, error: "in_progress" };
     }

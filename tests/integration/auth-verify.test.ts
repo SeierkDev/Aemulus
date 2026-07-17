@@ -8,6 +8,8 @@ vi.mock("next/headers", () => ({ cookies: vi.fn() }));
 import { cookies } from "next/headers";
 import { POST } from "../../app/api/auth/verify/route";
 import { buildSignInMessage, NONCE_COOKIE } from "../../lib/auth";
+import { issueNonce } from "../../lib/nonce-store";
+import { ready } from "../../lib/db";
 
 const DOMAIN = "test.aemulus";
 const kp = nacl.sign.keyPair();
@@ -34,8 +36,9 @@ function post(body: unknown): Request {
   });
 }
 
-beforeAll(() => {
+beforeAll(async () => {
   process.env.AEMULUS_DOMAIN = DOMAIN;
+  await ready();
 });
 beforeEach(() => vi.mocked(cookies).mockReset());
 
@@ -43,6 +46,7 @@ describe("POST /api/auth/verify (SIWS)", () => {
   it("accepts a valid signature over the nonce-bound message and sets a session", async () => {
     const nonce = "nonce_ok";
     const issuedAt = Date.now();
+    await issueNonce(nonce, issuedAt); // nonce must exist server-side
     setNonceCookie(`${nonce}|${issuedAt}`);
     const msg = buildSignInMessage(nonce, DOMAIN, new Date(issuedAt).toISOString());
     const res = await POST(post({ pubkey, signature: sign(msg) }));
@@ -54,6 +58,20 @@ describe("POST /api/auth/verify (SIWS)", () => {
     expect(setCookie).toContain("aem_session=");
   });
 
+  it("rejects a replay of the same valid request — the nonce is single-use (400)", async () => {
+    const nonce = "nonce_replay";
+    const issuedAt = Date.now();
+    await issueNonce(nonce, issuedAt);
+    setNonceCookie(`${nonce}|${issuedAt}`);
+    const msg = buildSignInMessage(nonce, DOMAIN, new Date(issuedAt).toISOString());
+    const sig = sign(msg);
+    const first = await POST(post({ pubkey, signature: sig }));
+    expect(first.status).toBe(200);
+    // Replaying the identical cookie + body must NOT mint a second session.
+    const replay = await POST(post({ pubkey, signature: sig }));
+    expect(replay.status).toBe(400);
+  });
+
   it("rejects when the nonce cookie is missing (400)", async () => {
     setNonceCookie(undefined);
     const msg = buildSignInMessage("x", DOMAIN, new Date().toISOString());
@@ -61,9 +79,20 @@ describe("POST /api/auth/verify (SIWS)", () => {
     expect(res.status).toBe(400);
   });
 
+  it("rejects a nonce that was never issued server-side (400)", async () => {
+    // A forged cookie with a plausible nonce the server never handed out.
+    const nonce = "nonce_forged_never_issued";
+    const issuedAt = Date.now();
+    setNonceCookie(`${nonce}|${issuedAt}`);
+    const msg = buildSignInMessage(nonce, DOMAIN, new Date(issuedAt).toISOString());
+    const res = await POST(post({ pubkey, signature: sign(msg) }));
+    expect(res.status).toBe(400);
+  });
+
   it("rejects an expired challenge (issued > 5 min ago, 400)", async () => {
     const nonce = "nonce_old";
     const issuedAt = Date.now() - 6 * 60 * 1000;
+    await issueNonce(nonce, issuedAt);
     setNonceCookie(`${nonce}|${issuedAt}`);
     const msg = buildSignInMessage(nonce, DOMAIN, new Date(issuedAt).toISOString());
     const res = await POST(post({ pubkey, signature: sign(msg) }));
@@ -73,6 +102,7 @@ describe("POST /api/auth/verify (SIWS)", () => {
   it("rejects a signature over a different message (401)", async () => {
     const nonce = "nonce_bad";
     const issuedAt = Date.now();
+    await issueNonce(nonce, issuedAt);
     setNonceCookie(`${nonce}|${issuedAt}`);
     // Sign a message with the WRONG nonce → server rebuilds the real one → mismatch.
     const wrong = buildSignInMessage("attacker", DOMAIN, new Date(issuedAt).toISOString());

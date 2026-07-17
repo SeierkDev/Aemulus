@@ -19,9 +19,11 @@ beforeAll(async () => {
 });
 
 describe("claimEarnings", () => {
+  // earnings are UNIQUE per (skill_id, runner), so a creator's multiple earnings
+  // come from distinct skills/runners — seed distinct pairs accordingly.
   it("settles unclaimed earnings exactly once and is idempotent", async () => {
-    await creditEarning({ owner: OWNER, skillId: "a", runId: "c1", runner: "X", amount: 10 });
-    await creditEarning({ owner: OWNER, skillId: "a", runId: "c2", runner: "X", amount: 15 });
+    await creditEarning({ owner: OWNER, skillId: "clm1_a", runId: "c1", runner: "X", amount: 10 });
+    await creditEarning({ owner: OWNER, skillId: "clm1_b", runId: "c2", runner: "X", amount: 15 });
     expect(await getClaimable(OWNER)).toBe(25);
 
     const res = await claimEarnings(OWNER, okSend);
@@ -35,15 +37,15 @@ describe("claimEarnings", () => {
 
   it("only claims pre-existing earnings; later credits stay claimable", async () => {
     const O = "WALLET_CLAIM_2";
-    await creditEarning({ owner: O, skillId: "a", runId: "d1", runner: "X", amount: 10 });
+    await creditEarning({ owner: O, skillId: "clm2_a", runId: "d1", runner: "X", amount: 10 });
     await claimEarnings(O, okSend);
-    await creditEarning({ owner: O, skillId: "a", runId: "d2", runner: "X", amount: 7 });
+    await creditEarning({ owner: O, skillId: "clm2_b", runId: "d2", runner: "X", amount: 7 });
     expect(await getClaimable(O)).toBe(7);
   });
 
   it("leaves the claim pending (NOT reclaimable) when a broadcast may have happened", async () => {
     const O = "WALLET_CLAIM_3";
-    await creditEarning({ owner: O, skillId: "a", runId: "e1", runner: "X", amount: 12 });
+    await creditEarning({ owner: O, skillId: "clm3_a", runId: "e1", runner: "X", amount: 12 });
     await expect(claimEarnings(O, failSend)).rejects.toThrow();
     // earnings stay claimed (avoid double-pay) — nothing reclaimable
     expect(await getClaimable(O)).toBe(0);
@@ -51,7 +53,7 @@ describe("claimEarnings", () => {
 
   it("fully rolls back when payouts are disabled (no broadcast)", async () => {
     const O = "WALLET_CLAIM_4";
-    await creditEarning({ owner: O, skillId: "a", runId: "f1", runner: "X", amount: 8 });
+    await creditEarning({ owner: O, skillId: "clm4_a", runId: "f1", runner: "X", amount: 8 });
     await expect(claimEarnings(O, offSend)).rejects.toThrow();
     // safe to retry — still fully claimable
     expect(await getClaimable(O)).toBe(8);

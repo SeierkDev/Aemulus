@@ -51,23 +51,32 @@ export async function creditEarningOnce(input: {
 }): Promise<boolean> {
   await ready();
   if (!input.owner || !Number.isFinite(input.amount) || input.amount <= 0) return false;
-  const r = await db.execute({
-    sql: `INSERT INTO earnings (id, owner, skill_id, run_id, runner, amount, created_at)
-          SELECT ?, ?, ?, ?, ?, ?, ?
-          WHERE NOT EXISTS (SELECT 1 FROM earnings WHERE skill_id = ? AND runner = ?)`,
-    args: [
-      id("earn"),
-      input.owner,
-      input.skillId,
-      input.runId,
-      input.runner,
-      input.amount,
-      Date.now(),
-      input.skillId,
-      input.runner,
-    ],
-  });
-  return r.rowsAffected > 0;
+  try {
+    const r = await db.execute({
+      sql: `INSERT INTO earnings (id, owner, skill_id, run_id, runner, amount, created_at)
+            SELECT ?, ?, ?, ?, ?, ?, ?
+            WHERE NOT EXISTS (SELECT 1 FROM earnings WHERE skill_id = ? AND runner = ?)`,
+      args: [
+        id("earn"),
+        input.owner,
+        input.skillId,
+        input.runId,
+        input.runner,
+        input.amount,
+        Date.now(),
+        input.skillId,
+        input.runner,
+      ],
+    });
+    return r.rowsAffected > 0;
+  } catch (e) {
+    // The UNIQUE(skill_id, runner) index is the backstop if the NOT EXISTS check
+    // ever races (a future multi-writer setup): the losing insert violates the
+    // constraint. That means the credit already exists → treat as "not credited
+    // by us", exactly as a 0-row insert would. Re-throw anything else.
+    if (e instanceof Error && /UNIQUE constraint failed/i.test(e.message)) return false;
+    throw e;
+  }
 }
 
 /**
@@ -121,25 +130,38 @@ export async function claimEarnings(
   const claimId = id("clm");
   const now = Date.now();
 
-  // Atomically claim ALL of this owner's currently-unclaimed earnings. SQLite
-  // serializes writes, so a concurrent claim sees 0 unclaimed rows and pays
-  // nothing - no double-pay. We then read back exactly what we claimed.
-  await db.execute({
-    sql: `UPDATE earnings SET claim_id = ? WHERE owner = ? AND claim_id IS NULL`,
-    args: [claimId, owner],
-  });
-  const sumRow = await db.execute({
-    sql: `SELECT COALESCE(SUM(amount),0) AS total FROM earnings WHERE claim_id = ?`,
+  // Atomically claim ALL of this owner's currently-unclaimed earnings AND record
+  // the claim row in ONE write batch. Doing the mark and the claims-row insert
+  // together closes the gap where a crash between them left earnings flagged
+  // claimed with no claim row (getClaimable excludes them → silently lost). The
+  // INSERT computes the amount from the rows this call just marked, so it always
+  // matches. SQLite serializes writes, so a concurrent claim sees 0 unclaimed
+  // rows and pays nothing - no double-pay.
+  await db.batch(
+    [
+      {
+        sql: `UPDATE earnings SET claim_id = ? WHERE owner = ? AND claim_id IS NULL`,
+        args: [claimId, owner],
+      },
+      {
+        sql: `INSERT INTO claims (id, owner, amount, sig, cluster, created_at)
+              SELECT ?, ?, COALESCE(SUM(amount),0), NULL, NULL, ?
+              FROM earnings WHERE claim_id = ?`,
+        args: [claimId, owner, now, claimId],
+      },
+    ],
+    "write",
+  );
+  const claimRow = await db.execute({
+    sql: `SELECT amount FROM claims WHERE id = ?`,
     args: [claimId],
   });
-  const amount = Number(sumRow.rows[0]?.total ?? 0);
-  if (amount <= 0) return { claimed: 0, sig: null, cluster: null };
-
-  await db.execute({
-    sql: `INSERT INTO claims (id, owner, amount, sig, cluster, created_at)
-          VALUES (?, ?, ?, ?, ?, ?)`,
-    args: [claimId, owner, amount, null, null, now],
-  });
+  const amount = Number(claimRow.rows[0]?.amount ?? 0);
+  if (amount <= 0) {
+    // Nothing was unclaimed → the mark touched 0 rows; drop the empty claim row.
+    await db.execute({ sql: `DELETE FROM claims WHERE id = ?`, args: [claimId] });
+    return { claimed: 0, sig: null, cluster: null };
+  }
 
   let res: Awaited<ReturnType<Sender>>;
   try {

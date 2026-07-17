@@ -162,7 +162,9 @@ describe("creator earnings", () => {
       owner: CREATOR,
       skillId: skill.id,
       runId: "run_2",
-      runner: RUNNER,
+      // A distinct runner: a creator earns once per (skill, runner), so a second
+      // credit for the same skill comes from a different runner.
+      runner: `${RUNNER}_2`,
       amount: 10,
     });
     // zero/empty are no-ops

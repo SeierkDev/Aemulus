@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { intakeEnter } from "@/lib/ap-controls/intake";
+import { normalizeExtracted } from "@/lib/ap-controls/extract";
 import { getApViewer, viewerActor, viewerEntitlement } from "@/lib/ap-controls/ap-viewer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// A single invoice above this is almost certainly a parse/precision error (and
+// beyond it JS loses integer cents); reject rather than seal a bogus figure.
+const MAX_ENTER_AMOUNT = 1_000_000_000_000; // 1 trillion
 
 // Confirm the (possibly edited) extracted fields and enter the invoice: seals
 // provenance + enters via QuickBooks/ledger. Returns the real bill + verification.
@@ -18,17 +23,30 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const amount = Number(body.amount);
-  if (!Number.isFinite(amount) || amount <= 0) {
+  // Normalize the (client-editable) fields at the seal boundary exactly like the
+  // extraction path does: round the amount to 2dp, validate the date, and coerce
+  // the currency to a 3-letter code — so a client can't seal an unrounded amount
+  // or a bogus currency like "dollars".
+  const norm = normalizeExtracted({
+    vendor: body.vendor as string,
+    invoiceNumber: body.invoiceNumber as string,
+    invoiceDate: body.invoiceDate as string,
+    amount: Number(body.amount),
+    currency: body.currency as string,
+  });
+  if (!(norm.amount > 0)) {
     return NextResponse.json({ ok: false, error: "Amount must be a positive number." }, { status: 400 });
+  }
+  if (norm.amount > MAX_ENTER_AMOUNT) {
+    return NextResponse.json({ ok: false, error: "Amount is implausibly large — check the invoice." }, { status: 400 });
   }
 
   const fields = {
-    vendor: String(body.vendor ?? ""),
-    invoiceNumber: String(body.invoiceNumber ?? ""),
-    invoiceDate: String(body.invoiceDate ?? ""),
-    amount,
-    currency: String(body.currency ?? "USD"),
+    vendor: norm.vendor,
+    invoiceNumber: norm.invoiceNumber,
+    invoiceDate: norm.invoiceDate,
+    amount: norm.amount,
+    currency: norm.currency,
   };
 
   if (!(await viewerEntitlement(viewer, Date.now())).canEnter) {

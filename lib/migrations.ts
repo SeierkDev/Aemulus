@@ -447,4 +447,28 @@ export const MIGRATIONS: Migration[] = [
     addColumns: [{ table: "triggers", column: "token_enc", def: "TEXT" }],
     statements: [`DELETE FROM triggers WHERE token_enc IS NULL;`],
   },
+
+  // 30 - server-side single-use SIWS nonces (baseline already carries the table,
+  // so this is a no-op on fresh DBs and creates it on older ones).
+  {
+    id: 30,
+    name: "auth_nonces",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS auth_nonces (nonce TEXT PRIMARY KEY, issued_at INTEGER NOT NULL);`,
+    ],
+  },
+
+  // 31 - enforce the earnings exactly-once invariant in the DB (one credit per
+  // (skill_id, runner)) instead of relying solely on writer serialization. Drop
+  // any pre-existing duplicate (keep the earliest) so the unique index can build.
+  // Both statements are idempotent: with no dups the DELETE is a no-op and the
+  // index is IF NOT EXISTS.
+  {
+    id: 31,
+    name: "earnings_unique_skill_runner",
+    statements: [
+      `DELETE FROM earnings WHERE rowid NOT IN (SELECT MIN(rowid) FROM earnings GROUP BY skill_id, runner);`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_earn_skill_runner_uniq ON earnings(skill_id, runner);`,
+    ],
+  },
 ];

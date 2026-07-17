@@ -92,6 +92,23 @@ export async function recordLedgerBill(input: LedgerBillInput): Promise<{ billNu
   return { billNumber: billNumber(Number(r.rows[0].bill_no)) };
 }
 
+/**
+ * Remove a workspace's ledger bill for an invoice. Used to roll back a bill that
+ * was written just before its `invoice.submitted` seal lost the sequence slot to
+ * a concurrent terminal event (e.g. a reject) - otherwise the ledger would hold a
+ * bill for an invoice the sealed audit stream says was never submitted.
+ */
+export async function deleteLedgerBill(
+  invoiceId: string,
+  workspaceId: string = DEFAULT_WORKSPACE,
+): Promise<void> {
+  await ensureLedgerSchema();
+  await db.execute({
+    sql: `DELETE FROM ledger_bill WHERE workspace_id = ? AND invoice_id = ?`,
+    args: [workspaceId, invoiceId],
+  });
+}
+
 /** Count and total value of a workspace's ledger bills. */
 export async function ledgerStats(workspaceId: string = DEFAULT_WORKSPACE): Promise<{ count: number; total: number }> {
   await ensureLedgerSchema();

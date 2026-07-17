@@ -63,9 +63,11 @@ describe("getQuota", () => {
 
 describe("getEarningsSummary", () => {
   it("totals across skills + recent feed", async () => {
+    // Distinct (skill, runner) pairs — a creator earns once per pair, so skill
+    // "a"'s 20 comes from two different runners.
     await creditEarning({ owner: EO, skillId: "a", runId: "r1", runner: "X", amount: 10 });
-    await creditEarning({ owner: EO, skillId: "a", runId: "r2", runner: "X", amount: 10 });
-    await creditEarning({ owner: EO, skillId: "b", runId: "r3", runner: "Y", amount: 5 });
+    await creditEarning({ owner: EO, skillId: "a", runId: "r2", runner: "Y", amount: 10 });
+    await creditEarning({ owner: EO, skillId: "b", runId: "r3", runner: "Z", amount: 5 });
 
     const sum = await getEarningsSummary(EO);
     expect(sum.total).toBe(25);

@@ -9,6 +9,7 @@ import {
   type Session,
 } from "@/lib/auth";
 import { computeTier, getAemulusBalance } from "@/lib/solana";
+import { consumeNonce } from "@/lib/nonce-store";
 import { readJson, VerifyBody } from "@/lib/validate";
 import { env } from "@/lib/env";
 
@@ -21,17 +22,13 @@ export async function POST(req: Request) {
   const { pubkey, signature } = parsed.data;
 
   const cookie = (await cookies()).get(NONCE_COOKIE)?.value;
-  const [nonce, issuedStr] = (cookie ?? "").split("|");
-  const issuedAt = Number(issuedStr);
-  if (!nonce || !Number.isFinite(issuedAt)) {
+  const [nonce] = (cookie ?? "").split("|");
+  // Atomically consume the nonce (single-use + expiry) against the server store,
+  // NOT the client cookie's timestamp - a replayed request finds the nonce gone.
+  const issuedAt = await consumeNonce(nonce, Date.now());
+  if (issuedAt == null) {
     return NextResponse.json(
-      { error: "Missing nonce - request a new one." },
-      { status: 400 },
-    );
-  }
-  if (Date.now() - issuedAt > 5 * 60 * 1000) {
-    return NextResponse.json(
-      { error: "Sign-in challenge expired - request a new one." },
+      { error: "Sign-in challenge missing, expired, or already used - request a new one." },
       { status: 400 },
     );
   }

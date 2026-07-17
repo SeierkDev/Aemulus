@@ -192,6 +192,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_vault_uniq ON vault(owner, host, key);
 
 -- Inbound run triggers: a signed URL that starts a run when POSTed to (event-
 -- driven runs). The token is the secret in the URL.
+-- Single-use SIWS challenge nonces. Issued on GET /auth/nonce, atomically
+-- consumed on POST /auth/verify, so a captured challenge-response can't be
+-- replayed to mint extra sessions. Expired rows are GC'd opportunistically.
+CREATE TABLE IF NOT EXISTS auth_nonces (
+  nonce     TEXT PRIMARY KEY,
+  issued_at INTEGER NOT NULL
+);
+
 -- The token column stores the sha256 hash of the URL token (the lookup key);
 -- token_enc stores the token encrypted at rest (AUTH_SECRET-derived key) so the
 -- panel can re-display the URL. The raw token is never persisted - a DB-only read

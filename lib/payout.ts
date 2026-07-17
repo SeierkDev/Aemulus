@@ -124,7 +124,16 @@ export async function sendPayout(
       data && typeof data === "object" && "parsed" in data
         ? (data as { parsed?: { info?: { decimals?: number } } }).parsed?.info?.decimals
         : undefined;
-    if (typeof dec === "number" && dec !== DECIMALS) {
+    // Refuse to pay unless we can positively confirm the mint's decimals match
+    // AEMULUS_DECIMALS. An unreadable mint (wrong address, RPC returned a bare/
+    // unparsed account) leaves `dec` undefined — paying anyway would broadcast at
+    // an UNVERIFIED scale, off by orders of magnitude. Fail closed instead.
+    if (typeof dec !== "number") {
+      throw new PayoutPrepError(
+        "Could not read the $AEMU mint's decimals — refusing to pay to avoid a mis-payment.",
+      );
+    }
+    if (dec !== DECIMALS) {
       throw new PayoutPrepError(
         `AEMULUS_DECIMALS=${DECIMALS} but the $AEMU mint reports ${dec} decimals — refusing to pay to avoid a mis-payment.`,
       );
