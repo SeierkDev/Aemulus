@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { extractInvoice, type ExtractInput } from "@/lib/ap-controls/extract";
+import { getApViewer } from "@/lib/ap-controls/ap-viewer";
+import { enforceRateLimit } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,7 +11,13 @@ const MAX_BYTES = 12 * 1024 * 1024; // 12 MB
 // Read an uploaded invoice (PDF / PNG / JPEG) with Claude vision and return the
 // extracted fields for the user to confirm. Does not write anything — the
 // confirm step (POST /api/ap/intake/enter) creates the sealed record.
+// Auth-gated + rate-limited: this invokes a paid model call.
 export async function POST(req: Request) {
+  const viewer = await getApViewer().catch(() => null);
+  if (!viewer) return NextResponse.json({ ok: false, error: "Sign in first." }, { status: 401 });
+  const limited = enforceRateLimit(`ap-extract:${viewer.workspaceId}`, 10, 60_000, "Too many uploads");
+  if (limited) return NextResponse.json({ ok: false, error: "Too many uploads — slow down." }, { status: 429 });
+
   let form: FormData;
   try {
     form = await req.formData();

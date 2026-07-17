@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { DEMO_INVOICE_ID, DEMO_FIXTURE, DEMO_ACTOR } from "@/lib/ap-controls/demo";
+import { DEMO_INVOICE_ID, DEMO_FIXTURE } from "@/lib/ap-controls/demo";
 import { enterInvoice } from "@/lib/ap-controls/qbo-submit";
 import { getApViewer, viewerActor, viewerEntitlement } from "@/lib/ap-controls/ap-viewer";
 
@@ -18,8 +18,9 @@ export async function POST(
   if (id !== DEMO_INVOICE_ID) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const viewer = await getApViewer().catch(() => null);
-  const actor = viewer ? viewerActor(viewer) : { userId: DEMO_ACTOR.userId, role: DEMO_ACTOR.role };
-  if (viewer && !(await viewerEntitlement(viewer, Date.now())).canEnter) {
+  if (!viewer) return NextResponse.json({ ok: false, error: "Sign in first." }, { status: 401 });
+  const actor = viewerActor(viewer);
+  if (!(await viewerEntitlement(viewer, Date.now())).canEnter) {
     return NextResponse.json({ ok: false, error: "limit_reached" }, { status: 400 });
   }
 

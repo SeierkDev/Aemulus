@@ -3,12 +3,12 @@ import { db } from "../../lib/db";
 import { ensureQboConnectionSchema } from "../../lib/qbo/oauth";
 import { appendApEvent, verifyAggregate } from "../../lib/ap-controls/store";
 import { projectInvoiceEntry, liveInvoiceQueueAll } from "../../lib/ap-controls/projections";
-import { POST } from "../../app/api/ap/[id]/decide/route";
-import { DEMO_INVOICE_ID } from "../../lib/ap-controls/demo";
+import { decideInvoice } from "../../lib/ap-controls/decide";
 
 const NOW = 1_700_000_000_000;
 let n = 0;
 const uid = () => `ap_dec_${++n}`;
+const ACTOR = { userId: "u_jane", role: "clerk" as const };
 
 async function seedReview(id: string) {
   await appendApEvent({
@@ -17,13 +17,8 @@ async function seedReview(id: string) {
     actor: { userId: "system", role: "system" }, now: NOW, id: `${id}_p`,
   });
 }
-async function call(id: string, body: unknown) {
-  const req = new Request(`http://localhost/api/ap/${id}/decide`, {
-    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
-  });
-  const res = await POST(req, { params: Promise.resolve({ id }) });
-  return { status: res.status, json: (await res.json()) as Record<string, unknown> };
-}
+const decide = (id: string, action: "approve" | "reject", reasonCode: string, canEnter = true) =>
+  decideInvoice({ invoiceId: id, workspaceId: "default", actor: ACTOR, action, reasonCode, canEnter, now: NOW });
 const inQueue = async (id: string) => (await liveInvoiceQueueAll()).some((q) => q.invoiceId === id);
 
 beforeAll(async () => {
@@ -31,17 +26,17 @@ beforeAll(async () => {
   await db.execute({ sql: `DELETE FROM qbo_connection WHERE id = 'default'` }); // ledger path
 });
 
-describe("generic invoice decision", () => {
+describe("decideInvoice", () => {
   it("approves → seals an override + enters, and leaves the queue", async () => {
     const id = uid();
     await seedReview(id);
     expect(await inQueue(id)).toBe(true);
 
-    const { json } = await call(id, { action: "approve", reasonCode: "LEGITIMATE" });
-    expect(json.ok).toBe(true);
-    expect(json.status).toBe("submitted");
-    expect(String(json.billNumber)).toMatch(/^AEM-\d+$/);
-    expect(json.verify).toEqual({ valid: true, length: 3 }); // paused + override + submitted
+    const r = await decide(id, "approve", "LEGITIMATE");
+    expect(r.ok).toBe(true);
+    if (!r.ok || r.status !== "submitted") return;
+    expect(String(r.billNumber)).toMatch(/^AEM-\d+$/);
+    expect(r.verify).toEqual({ valid: true, length: 3 }); // paused + override + submitted
 
     expect((await projectInvoiceEntry(id)).status).toBe("submitted");
     expect(await inQueue(id)).toBe(false);
@@ -51,25 +46,20 @@ describe("generic invoice decision", () => {
     const id = uid();
     await seedReview(id);
 
-    const { json } = await call(id, { action: "reject", reasonCode: "DUPLICATE" });
-    expect(json.ok).toBe(true);
-    expect(json.status).toBe("rejected");
+    const r = await decide(id, "reject", "DUPLICATE");
+    expect(r).toEqual({ ok: true, status: "rejected" });
 
-    const state = await projectInvoiceEntry(id);
-    expect(state.status).toBe("rejected");
+    expect((await projectInvoiceEntry(id)).status).toBe("rejected");
     expect((await verifyAggregate("invoice", id)).valid).toBe(true);
     expect(await inQueue(id)).toBe(false);
   });
 
-  it("refuses a second decision (409) and a missing reason (400)", async () => {
+  it("refuses a missing reason (400), a second decision (409), and being over-limit", async () => {
     const id = uid();
     await seedReview(id);
-    expect((await call(id, { action: "approve", reasonCode: "" })).status).toBe(400);
-    await call(id, { action: "reject", reasonCode: "NOT_OURS" });
-    expect((await call(id, { action: "approve", reasonCode: "LEGITIMATE" })).status).toBe(409);
-  });
-
-  it("does not handle the demo invoice (404)", async () => {
-    expect((await call(DEMO_INVOICE_ID, { action: "approve", reasonCode: "LEGITIMATE" })).status).toBe(404);
+    expect(await decide(id, "approve", "")).toMatchObject({ ok: false, httpStatus: 400 });
+    expect(await decide(id, "approve", "LEGITIMATE", false)).toMatchObject({ ok: false, error: "limit_reached", httpStatus: 400 });
+    await decide(id, "reject", "NOT_OURS");
+    expect(await decide(id, "approve", "LEGITIMATE")).toMatchObject({ ok: false, httpStatus: 409 });
   });
 });

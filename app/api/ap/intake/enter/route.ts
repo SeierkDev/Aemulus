@@ -29,11 +29,11 @@ export async function POST(req: Request) {
   };
 
   const viewer = await getApViewer().catch(() => null);
-  if (viewer && !(await viewerEntitlement(viewer, Date.now())).canEnter) {
+  if (!viewer) return NextResponse.json({ ok: false, error: "Sign in first." }, { status: 401 });
+  if (!(await viewerEntitlement(viewer, Date.now())).canEnter) {
     return NextResponse.json({ ok: false, error: "limit_reached" }, { status: 400 });
   }
-  const actor = viewer ? viewerActor(viewer) : undefined;
-  const r = await intakeEnter(fields, "upload", Date.now(), actor, viewer?.workspaceId);
+  const r = await intakeEnter(fields, "upload", Date.now(), viewerActor(viewer), viewer.workspaceId);
   if (!r.ok) {
     return NextResponse.json({ ok: false, error: r.error }, { status: r.error === "in_progress" ? 409 : 400 });
   }

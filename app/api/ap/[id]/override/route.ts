@@ -4,7 +4,6 @@ import {
   DEMO_INVOICE_ID,
   DEMO_FIXTURE,
   DEMO_CONFIG,
-  DEMO_ACTOR,
   REQUIRED_EVIDENCE,
 } from "@/lib/ap-controls/demo";
 import { evaluateOverride } from "@/lib/ap-controls/evaluate";
@@ -12,7 +11,6 @@ import { writeOverrideEvent, OverrideWriteError } from "@/lib/ap-controls/overri
 import { appendApEvent, readAggregate } from "@/lib/ap-controls/store";
 import { projectInvoiceEntry } from "@/lib/ap-controls/projections";
 import { getApViewer, viewerActor } from "@/lib/ap-controls/ap-viewer";
-import { DEFAULT_WORKSPACE } from "@/lib/ap-controls/workspace";
 import type { EvidenceView } from "@/lib/ap-controls/schema";
 
 export const runtime = "nodejs";
@@ -37,8 +35,9 @@ export async function POST(
   const evidenceViewed = Array.isArray(body.evidenceViewed) ? body.evidenceViewed : [];
   const now = Date.now();
   const viewer = await getApViewer().catch(() => null);
-  const workspaceId = viewer?.workspaceId ?? DEFAULT_WORKSPACE;
-  const actor = viewer ? viewerActor(viewer) : { userId: DEMO_ACTOR.userId, role: DEMO_ACTOR.role };
+  if (!viewer) return NextResponse.json({ ok: false, error: "Sign in first." }, { status: 401 });
+  const workspaceId = viewer.workspaceId;
+  const actor = viewerActor(viewer);
 
   // 1) Override decision (REAL).
   const decision = evaluateOverride({
