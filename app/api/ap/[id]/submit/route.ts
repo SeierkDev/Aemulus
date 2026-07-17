@@ -29,8 +29,8 @@ export async function POST(
   });
 
   if (!r.ok) {
-    const status = r.error === "not_connected" || r.error === "in_progress" ? 409 : 400;
+    const status = r.error === "in_progress" ? 409 : 400;
     return NextResponse.json({ ok: false, error: r.error }, { status });
   }
-  return NextResponse.json({ ok: true, billNumber: r.billNumber, verify: r.verify, seal: r.seal });
+  return NextResponse.json({ ok: true, billNumber: r.billNumber, target: r.target, verify: r.verify, seal: r.seal });
 }

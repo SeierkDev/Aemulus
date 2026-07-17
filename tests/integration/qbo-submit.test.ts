@@ -5,6 +5,7 @@ import { exchangeCode, ensureQboConnectionSchema } from "../../lib/qbo/oauth";
 import { appendApEvent } from "../../lib/ap-controls/store";
 import { projectInvoiceEntry } from "../../lib/ap-controls/projections";
 import { enterInvoice } from "../../lib/ap-controls/qbo-submit";
+import { listLedgerBills } from "../../lib/ap-controls/ledger";
 
 const NOW = 1_700_000_000_000;
 let qbo: QboStandIn;
@@ -60,6 +61,7 @@ describe("enterInvoice (submit → QBO → seal)", () => {
     const r = await enterInvoice(input(id));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
+    expect(r.target).toBe("quickbooks");
     expect(r.billNumber).toMatch(/^\d+$/);
     expect(r.verify).toEqual({ valid: true, length: 3 }); // paused + override + submitted
     expect(r.seal).toBeTruthy();
@@ -84,12 +86,26 @@ describe("enterInvoice (submit → QBO → seal)", () => {
     expect(billsFor(doc)).toBe(1);
   });
 
-  it("fails with not_connected when there is no QuickBooks connection", async () => {
+  it("enters into the built-in ledger when QuickBooks isn't connected", async () => {
     await db.execute({ sql: `DELETE FROM qbo_connection WHERE id='default'` });
     const id = uid();
     await seedInvoice(id);
+
     const r = await enterInvoice(input(id));
-    expect(r).toEqual({ ok: false, error: "not_connected" });
-    expect((await projectInvoiceEntry(id)).status).toBe("needs_review"); // not sealed
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.target).toBe("ledger");
+    expect(r.billNumber).toMatch(/^AEM-\d+$/);
+    expect(r.verify).toEqual({ valid: true, length: 3 });
+
+    const state = await projectInvoiceEntry(id);
+    expect(state.status).toBe("submitted");
+    expect(state.enterTarget).toBe("ledger");
+    expect((await listLedgerBills()).some((b) => b.billNumber === r.billNumber)).toBe(true);
+
+    // Idempotent: a second enter returns the same ledger bill, no duplicate.
+    const again = await enterInvoice(input(id));
+    expect(again.ok && again.billNumber).toBe(r.billNumber);
+    expect((await listLedgerBills()).filter((b) => b.billNumber === r.billNumber)).toHaveLength(1);
   });
 });

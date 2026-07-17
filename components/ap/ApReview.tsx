@@ -53,6 +53,7 @@ export function ApReview({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [bill, setBill] = useState<string | null>(initialState.billNumber);
+  const [target, setTarget] = useState<string>(initialState.enterTarget ?? "ledger");
   const [verify, setVerify] = useState<{ valid: boolean; length: number } | null>(null);
   const [seal, setSeal] = useState<string | null>(initialState.latestSeal);
   const [copied, setCopied] = useState(false);
@@ -87,6 +88,7 @@ export function ApReview({
       const sd = await s.json();
       if (sd.ok) {
         setBill(sd.billNumber); setVerify(sd.verify); setSeal(sd.seal);
+        if (sd.target) setTarget(sd.target);
         setModalOpen(false); setPhase("done");
       } else {
         setError(submitError(sd.error));
@@ -212,25 +214,21 @@ export function ApReview({
           {/* Decision */}
           <div className="mt-8">
             <div className="flex flex-wrap items-center gap-3">
-              {connected ? (
-                <button type="button" disabled={!canEnter} onClick={() => setModalOpen(true)}
-                  className="rounded-md bg-ink px-5 py-2.5 text-sm font-semibold text-bg hover:opacity-90 disabled:opacity-30">
-                  It’s a new charge — enter it →
-                </button>
-              ) : (
-                <a href="/api/qbo/connect"
-                  className="rounded-md bg-ink px-5 py-2.5 text-sm font-semibold text-bg hover:opacity-90">
-                  Connect QuickBooks to enter invoices →
-                </a>
-              )}
+              <button type="button" disabled={!canEnter} onClick={() => setModalOpen(true)}
+                className="rounded-md bg-ink px-5 py-2.5 text-sm font-semibold text-bg hover:opacity-90 disabled:opacity-30">
+                It’s a new charge — enter it →
+              </button>
               <button type="button" onClick={() => setPhase("rejected")}
                 className="text-sm text-ink-3 underline decoration-border-strong underline-offset-2 hover:text-ink">
                 Reject as duplicate
               </button>
             </div>
-            {connected && !canEnter && <p className="mt-2 text-xs text-ink-3">Watch what Aemulus did to continue.</p>}
-            {!connected && <p className="mt-2 text-xs text-ink-3">Entering an invoice posts it to your QuickBooks — connect it first.</p>}
-            <p className="mt-2 text-xs text-ink-3">Your decision and reason are sealed to the audit log.</p>
+            {!canEnter && <p className="mt-2 text-xs text-ink-3">Watch what Aemulus did to continue.</p>}
+            <p className="mt-2 text-xs text-ink-3">
+              {connected
+                ? "This will be entered in QuickBooks and sealed to the audit log."
+                : "This will be entered in your ledger and sealed to the audit log."}
+            </p>
           </div>
         </>
       )}
@@ -254,7 +252,7 @@ export function ApReview({
           </div>
           <div className="px-6 py-5">
             <p className="text-sm text-ink-2">
-              Bill <span className="mono text-ink">{bill}</span> · <span className="tabular-nums text-ink">{money(fixture.amount)}</span> · {fixture.vendor} — entered in QuickBooks and sealed to the audit log.
+              Bill <span className="mono text-ink">{bill}</span> · <span className="tabular-nums text-ink">{money(fixture.amount)}</span> · {fixture.vendor} — entered in {target === "quickbooks" ? "QuickBooks" : "your ledger"} and sealed to the audit log.
             </p>
 
             <div className="mt-4 rounded-lg border border-border p-4 text-sm">

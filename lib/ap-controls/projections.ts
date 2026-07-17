@@ -47,6 +47,7 @@ export interface InvoiceEntryState {
   pendingSecondApproval: boolean;
   overrides: OverrideSummary[];
   billNumber: string | null;
+  enterTarget: "quickbooks" | "ledger" | null;
   submittedAuto: boolean | null;
   enteredReviewAt: number | null;
   lastSeq: number;
@@ -60,7 +61,7 @@ export function foldInvoiceEntryState(events: ApEventRow[]): InvoiceEntryState {
     invoiceId: events[0]?.aggregateId ?? "",
     status: "new", amount: null, currency: null, vendor: null,
     topReasonCode: null, reasonCodes: [], pendingSecondApproval: false,
-    overrides: [], billNumber: null, submittedAuto: null,
+    overrides: [], billNumber: null, enterTarget: null, submittedAuto: null,
     enteredReviewAt: null, lastSeq: -1, lastEventAt: null, latestSeal: null,
   };
 
@@ -102,6 +103,7 @@ export function foldInvoiceEntryState(events: ApEventRow[]): InvoiceEntryState {
         s.billNumber = str(p, "billNumber");
         s.amount = num(p, "total") ?? s.amount;
         s.currency = str(p, "currency") ?? s.currency;
+        s.enterTarget = (str(p, "target") as "quickbooks" | "ledger" | null) ?? "ledger";
         s.submittedAuto = bool(p, "auto");
         s.pendingSecondApproval = false;
         s.reasonCodes = [];
