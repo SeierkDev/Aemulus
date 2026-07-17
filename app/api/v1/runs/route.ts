@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { apiKeyAuth, hasScope } from "@/lib/api-keys";
 import { logError } from "@/lib/log";
-import { getQuota } from "@/lib/quota";
+import { getQuota, quotaReserve } from "@/lib/quota";
 import { getSkill, skillAccess } from "@/lib/skills";
-import { startRun } from "@/lib/run-service";
+import { startRun, QuotaExceededError } from "@/lib/run-service";
 import { computeTier, getAemulusBalance } from "@/lib/solana";
 import { rateLimit, RUNS_PER_MIN } from "@/lib/ratelimit";
 import { withIdempotency } from "@/lib/idempotency";
@@ -119,12 +119,15 @@ export async function POST(req: Request) {
       "v1/runs",
       req.headers.get("idempotency-key"),
       async () => {
-        const run = await startRun({ skill, input: input ?? {}, runner: owner });
+        const run = await startRun({ skill, input: input ?? {}, runner: owner, quota: quotaReserve(session) });
         return { status: 200, body: { id: run.id, status: run.status } };
       },
     );
     return NextResponse.json(body, { status, headers: rlHeaders });
   } catch (err) {
+    if (err instanceof QuotaExceededError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     logError("api/v1/runs", err);
     return NextResponse.json(
       { error: "Run failed" },

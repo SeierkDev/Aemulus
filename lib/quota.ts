@@ -1,5 +1,6 @@
 import { limitForLevel } from "./solana";
 import { countRecentRuns } from "./runs";
+import type { QuotaReserve } from "./runs";
 import type { Session } from "./auth";
 
 /**
@@ -33,4 +34,14 @@ export async function getQuota(session: Session): Promise<QuotaStatus> {
     unlimited,
     ok: unlimited || used < limit,
   };
+}
+
+/**
+ * The atomic reservation to hand startRun so the per-day quota can't be
+ * exceeded by a concurrent burst that races past the soft getQuota() check.
+ * Unlimited tiers (limit < 0) make the reserve a no-op. Same window/limit as
+ * getQuota, so the soft check and the hard reserve agree.
+ */
+export function quotaReserve(session: Session): QuotaReserve {
+  return { limit: limitForLevel(session.level), windowMs: QUOTA_WINDOW_MS };
 }

@@ -78,6 +78,32 @@ export function recorderInitScript() {
     };
   }
 
+  // A field is sensitive if it's a password OR carries any credential-shaped
+  // signal. Never trust type==="password" alone - a hostile or sloppy page can
+  // collect a secret in a type="text" box (or flip type before the change
+  // fires); those must still be redacted, not stored verbatim. Errs toward
+  // over-redaction: a false positive just makes the generalizer treat the field
+  // as a required per-run input, which is the safe default anyway.
+  function isSensitive(el: Element): boolean {
+    if (((el as HTMLInputElement).type || "").toLowerCase() === "password") return true;
+    const ac = (el.getAttribute("autocomplete") || "").toLowerCase();
+    if (/(^|\s)(current-password|new-password|one-time-code|cc-number|cc-csc|cc-exp)/.test(ac)) {
+      return true;
+    }
+    const hints = [
+      el.getAttribute("name"),
+      el.getAttribute("id"),
+      el.getAttribute("aria-label"),
+      el.getAttribute("placeholder"),
+      el.getAttribute("autocomplete"),
+    ]
+      .join(" ")
+      .toLowerCase();
+    return /pass|secret|token|otp|one[-\s]?time|passcode|cvv|cvc|ccv|card[-\s]?number|cardnumber|creditcard|security\s*code|\bssn\b|social.?security|routing|iban|\bpin\b|\bmfa\b|\b2fa\b|auth(?:entication)?[-\s]?code|api[-\s]?key/.test(
+      hints,
+    );
+  }
+
   const send = (a: unknown) => {
     try {
       w.__aemRecord!(a);
@@ -111,11 +137,11 @@ export function recorderInitScript() {
       if (tag === "select") {
         send({ type: "select", ...base(el), value: el.value });
       } else {
-        const type = (el as HTMLInputElement).type;
         // Never capture secrets - record an empty, flagged value so the
         // generalizer turns it into a required per-run input (never a baked-in
-        // constant, and never the raw/masked password text).
-        if (type === "password") {
+        // constant, and never the raw/masked secret text). Sensitivity is not
+        // limited to type="password" (see isSensitive).
+        if (isSensitive(el)) {
           send({ type: "input", ...base(el), value: "", sensitive: true });
         } else {
           send({ type: "input", ...base(el), value: el.value });

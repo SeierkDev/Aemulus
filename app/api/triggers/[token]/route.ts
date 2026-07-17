@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { resolveTrigger, recordTriggerFire } from "@/lib/triggers";
 import { getSkill, skillAccess } from "@/lib/skills";
-import { startRun } from "@/lib/run-service";
-import { getQuota } from "@/lib/quota";
+import { startRun, QuotaExceededError } from "@/lib/run-service";
+import { getQuota, quotaReserve } from "@/lib/quota";
 import { computeTier, getAemulusBalance } from "@/lib/solana";
 import { rateLimit, RUNS_PER_MIN } from "@/lib/ratelimit";
 import { incr } from "@/lib/metrics";
@@ -67,11 +67,14 @@ export async function POST(
       return NextResponse.json({ error: "Daily run quota reached" }, { status: 429 });
     }
 
-    const run = await startRun({ skill, input, runner: trig.owner });
+    const run = await startRun({ skill, input, runner: trig.owner, quota: quotaReserve(session) });
     await recordTriggerFire(trig.id);
     incr("triggers.fired");
     return NextResponse.json({ ok: true, runId: run.id });
   } catch (err) {
+    if (err instanceof QuotaExceededError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     logError("api/triggers", err);
     return NextResponse.json({ error: "Trigger failed" }, { status: 500 });
   }

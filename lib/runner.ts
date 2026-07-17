@@ -118,11 +118,14 @@ export async function executeRun(
       const req = route.request();
       const url = req.url();
       if (isUnsafeRequestUrl(url)) return route.abort();
+      // Block a hostname that RESOLVES private (the sync filter above only
+      // catches literal private IPs) for EVERY request, not just navigations -
+      // a subresource to a public host whose DNS points inside the network would
+      // otherwise reach internal services. Host-cached (60s) so it's one lookup
+      // per distinct host.
+      if (await navHostResolvesPrivate(url)) return route.abort();
       if (req.isNavigationRequest()) {
         if (!hostInAllowlist(url, allowedHosts)) return route.abort();
-        // Block a redirect/clicked-link to a hostname that RESOLVES private
-        // (the sync filter above only catches literal private IPs).
-        if (await navHostResolvesPrivate(url)) return route.abort();
       }
       return route.continue();
     });

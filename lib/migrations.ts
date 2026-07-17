@@ -433,4 +433,18 @@ export const MIGRATIONS: Migration[] = [
       { table: "runs", column: "zk_cluster", def: "TEXT" },
     ],
   },
+
+  // 29 - encrypt trigger tokens at rest. `token` now holds the sha256 hash (the
+  // lookup key); `token_enc` holds the encrypted plaintext for re-display. The
+  // raw token is no longer stored. Any legacy row still holding a plaintext
+  // token (token_enc IS NULL) can't be re-hashed/encrypted here (the key lives
+  // in Node, not SQL) and would no longer resolve, so drop it - the owner simply
+  // recreates the trigger. addColumns runs before statements, so token_enc
+  // exists when the DELETE references it. Both steps are idempotent.
+  {
+    id: 29,
+    name: "trigger_token_encrypted",
+    addColumns: [{ table: "triggers", column: "token_enc", def: "TEXT" }],
+    statements: [`DELETE FROM triggers WHERE token_enc IS NULL;`],
+  },
 ];

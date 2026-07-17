@@ -16,6 +16,7 @@ import { enqueueRunJob } from "./jobs";
 import { SOLANA } from "./solana";
 import { incr } from "./metrics";
 import { logError } from "./log";
+import type { QuotaReserve } from "./runs";
 import type { Run, RunOverrides, Skill } from "./types";
 
 interface RunArgs {
@@ -25,6 +26,21 @@ interface RunArgs {
   runner: string;
   bulkId?: string;
   rowIndex?: number;
+  /**
+   * Optional atomic daily-quota reservation. When set, the run is created only
+   * if the caller is still under the limit (race-free); over quota throws
+   * QuotaExceededError. Omit for paths that don't meter (the owner's own
+   * schedule, a bulk batch metered once upfront).
+   */
+  quota?: QuotaReserve;
+}
+
+/** The atomic quota reserve refused the run (caller already at the daily cap). */
+export class QuotaExceededError extends Error {
+  constructor() {
+    super("Daily run quota reached");
+    this.name = "QuotaExceededError";
+  }
 }
 
 /**
@@ -35,14 +51,22 @@ interface RunArgs {
  * progress. The creator is credited a run fee on external (non-owner) runs.
  */
 export async function startRun(args: RunArgs): Promise<Run> {
-  const run = await createRun({
+  const base = {
     owner: args.runner,
     skillId: args.skill.id,
     input: args.input,
     overrides: args.overrides ?? {},
     bulkId: args.bulkId,
     rowIndex: args.rowIndex,
-  });
+  };
+  // Branch so each call resolves a concrete createRun overload (metered → may
+  // return null; unmetered → always a Run).
+  const run = args.quota
+    ? await createRun({ ...base, reserve: args.quota })
+    : await createRun(base);
+  // Atomic reserve refused it: the caller passed getQuota()'s soft check but a
+  // concurrent burst filled the last slot(s) first. Nothing was inserted.
+  if (!run) throw new QuotaExceededError();
   incr("runs.started");
   // Durable: enqueue for the worker instead of executing in-request, so the run
   // survives a restart and retries transient failures.

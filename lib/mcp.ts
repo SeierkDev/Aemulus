@@ -1,7 +1,7 @@
 import { getSkill, listPublishedSkills, categorize, skillAccess } from "./skills";
 import { startRun } from "./run-service";
 import { getRun } from "./runs";
-import { getQuota } from "./quota";
+import { getQuota, quotaReserve } from "./quota";
 import { computeTier, getAemulusBalance } from "./solana";
 import { verifyReceipt } from "./receipt";
 import { rateLimit, RUNS_PER_MIN } from "./ratelimit";
@@ -134,7 +134,10 @@ async function callTool(
       if (!(await getQuota(session)).ok) {
         return textResult("Daily run quota reached.", true);
       }
-      const run = await startRun({ skill, input, runner: owner });
+      // The soft check above is a fast path; quotaReserve makes the actual
+      // reservation atomic (a concurrent MCP burst can't exceed the daily cap).
+      // A refusal throws QuotaExceededError, surfaced by tools/call's catch.
+      const run = await startRun({ skill, input, runner: owner, quota: quotaReserve(session) });
       const deadline = Date.now() + 25_000; // bounded wait for a quick answer
       let cur = run;
       while (!TERMINAL.includes(cur.status) && Date.now() < deadline) {

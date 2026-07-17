@@ -21,6 +21,20 @@ function safeParse<T>(raw: unknown, fallback: T): T {
   }
 }
 
+/**
+ * A daily-quota reservation. When present with a non-negative `limit`, the run
+ * is inserted ONLY if the caller is still under `limit` runs in the trailing
+ * `windowMs` - the count and the insert happen in one atomic SQL statement
+ * (SQLite serializes writers), which closes the check-then-act race between a
+ * soft getQuota() check and the insert. `limit < 0` (unlimited) skips the guard.
+ */
+export interface QuotaReserve {
+  limit: number;
+  windowMs: number;
+}
+
+// Overloads: without a reserve, createRun always returns a Run; with a reserve
+// it may return null (the reservation was refused - over quota).
 export async function createRun(input: {
   owner: string;
   skillId: string;
@@ -28,7 +42,26 @@ export async function createRun(input: {
   overrides?: RunOverrides;
   bulkId?: string;
   rowIndex?: number;
-}): Promise<Run> {
+  reserve?: undefined;
+}): Promise<Run>;
+export async function createRun(input: {
+  owner: string;
+  skillId: string;
+  input: Record<string, string>;
+  overrides?: RunOverrides;
+  bulkId?: string;
+  rowIndex?: number;
+  reserve: QuotaReserve;
+}): Promise<Run | null>;
+export async function createRun(input: {
+  owner: string;
+  skillId: string;
+  input: Record<string, string>;
+  overrides?: RunOverrides;
+  bulkId?: string;
+  rowIndex?: number;
+  reserve?: QuotaReserve;
+}): Promise<Run | null> {
   await ready();
   const now = Date.now();
   const run: Run = {
@@ -63,23 +96,41 @@ export async function createRun(input: {
     createdAt: now,
     updatedAt: now,
   };
+  const cols = `id, owner, skill_id, status, input, overrides, result, error, bulk_id, row_index, created_at, updated_at`;
+  const vals = [
+    run.id,
+    run.owner,
+    run.skillId,
+    run.status,
+    encryptJSON(run.input),
+    JSON.stringify(run.overrides),
+    null,
+    null,
+    run.bulkId,
+    run.rowIndex,
+    now,
+    now,
+  ];
+
+  if (input.reserve && input.reserve.limit >= 0) {
+    // Atomic reserve-and-insert: insert only while the owner is under the limit
+    // in the window. The COUNT subquery and the INSERT are one serialized write,
+    // so N concurrent requests can never each pass a stale count - the (limit+1)th
+    // sees the earlier committed rows and its INSERT affects 0 rows.
+    const sinceMs = now - input.reserve.windowMs;
+    const res = await db.execute({
+      sql: `INSERT INTO runs (${cols})
+            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            WHERE (SELECT COUNT(*) FROM runs WHERE owner = ? AND created_at >= ?) < ?`,
+      args: [...vals, run.owner, sinceMs, input.reserve.limit],
+    });
+    if (res.rowsAffected === 0) return null; // over quota - nothing inserted
+    return run;
+  }
+
   await db.execute({
-    sql: `INSERT INTO runs (id, owner, skill_id, status, input, overrides, result, error, bulk_id, row_index, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    args: [
-      run.id,
-      run.owner,
-      run.skillId,
-      run.status,
-      encryptJSON(run.input),
-      JSON.stringify(run.overrides),
-      null,
-      null,
-      run.bulkId,
-      run.rowIndex,
-      now,
-      now,
-    ],
+    sql: `INSERT INTO runs (${cols}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: vals,
   });
   return run;
 }

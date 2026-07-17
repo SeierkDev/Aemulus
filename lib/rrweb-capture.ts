@@ -104,6 +104,12 @@ export async function attachRrwebCapture(
                 /* page tearing down */
               }
             },
+            // Mask EVERY input value, not just type="password". rrweb's default
+            // masks only password fields, so a secret typed into a text/email/tel
+            // box (or the F1 hostile-page case) would otherwise be archived
+            // pixel-accurately in the replay. The replay's value is the visual
+            // walkthrough, not the field contents, so masking costs nothing.
+            maskAllInputs: true,
             // Inline resources so the replay is self-contained and renders under
             // the app's strict CSP with no external loads.
             inlineStylesheet: true,

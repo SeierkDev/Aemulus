@@ -35,7 +35,7 @@ export const SOLANA = {
   holderMin: minNum("AEMULUS_MIN_BALANCE", 1),
   proMin: minNum("AEMULUS_PRO_BALANCE", 1_000_000),
   whaleMin: minNum("AEMULUS_WHALE_BALANCE", 10_000_000),
-  /** Public pump.fun link shown on the gated screen (set after launch). */
+  /** Public pump.fun link for the "Get $AEMU" buy CTAs (set after launch). */
   pumpUrl: process.env.AEMULUS_PUMP_URL ?? "https://pump.fun",
   /** Social links (empty until set, so the UI hides them rather than pointing at
    *  the bare platform homepages). */

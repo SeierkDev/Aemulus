@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
 import { logError } from "@/lib/log";
-import { getQuota } from "@/lib/quota";
+import { getQuota, quotaReserve } from "@/lib/quota";
 import { getSkill, skillAccess } from "@/lib/skills";
-import { startRun } from "@/lib/run-service";
+import { startRun, QuotaExceededError } from "@/lib/run-service";
 import { enforceRateLimit, RUNS_PER_MIN } from "@/lib/ratelimit";
 import { readJson, RunBody } from "@/lib/validate";
 
@@ -45,9 +45,13 @@ export async function POST(req: Request) {
       skill,
       input: input ?? {},
       runner: session.pubkey,
+      quota: quotaReserve(session),
     });
     return NextResponse.json({ run });
   } catch (err) {
+    if (err instanceof QuotaExceededError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     logError("api/runs", err);
     return NextResponse.json(
       { error: "Run failed" },

@@ -69,6 +69,14 @@ class RecorderSession {
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   /** Serializes screenshot+trace writes so indexes never race. */
   private tail: Promise<void> = Promise.resolve();
+  /**
+   * Synchronous count of actions accepted this session. The MAX_ACTIONS guard
+   * used to live only inside the async `tail` callback, so a page firing
+   * __aemRecord in a tight loop enqueued an unbounded chain of closures and a
+   * burst of up-to-MAX screenshots before any completed. This bounds the flood
+   * at the point of entry, before anything is scheduled.
+   */
+  private accepted = 0;
 
   isBusy(): boolean {
     return this.state?.status === "recording";
@@ -83,6 +91,7 @@ class RecorderSession {
       throw new Error("A recording is already in progress.");
     }
     const sid = id("rec");
+    this.accepted = 0;
     this.state = {
       id: sid,
       owner,
@@ -113,16 +122,23 @@ class RecorderSession {
       const req = route.request();
       const url = req.url();
       if (isUnsafeRequestUrl(url)) return route.abort();
-      if (req.isNavigationRequest() && (await navHostResolvesPrivate(url))) {
-        return route.abort();
-      }
+      // Resolve the host and block anything pointing at a private/internal
+      // address - for EVERY request, not just navigations. A subresource
+      // (img/script/fetch) to a public hostname whose DNS points inside the
+      // network would otherwise reach internal services / cloud metadata. The
+      // check is host-cached (60s), so cost is one lookup per distinct host.
+      if (await navHostResolvesPrivate(url)) return route.abort();
       return route.continue();
     });
 
-    // Bridge: in-page script calls window.__aemRecord(action).
+    // Bridge: in-page script calls window.__aemRecord(action). Exposed on the
+    // context, so it's reachable from ANY frame; only accept calls from the top
+    // frame so a cross-origin sub-frame (ad/iframe) can't fabricate trace
+    // actions. source.page is server-side and not page-spoofable.
     await this.context.exposeBinding(
       "__aemRecord",
       async (source, raw: RawAction) => {
+        if (source.frame !== source.page.mainFrame()) return;
         this.enqueue(source.page, raw);
       },
     );
@@ -219,6 +235,12 @@ class RecorderSession {
     // beyond the per-recording action cap.
     const parsed = RawActionSchema.safeParse(raw);
     if (!parsed.success) return;
+    // Bound the flood synchronously, BEFORE scheduling any work: a page looping
+    // __aemRecord can't grow the tail chain or trigger a screenshot burst past
+    // the cap. `accepted` only increments, so once at the cap everything drops.
+    if (!this.state || this.state.status !== "recording") return;
+    if (this.accepted >= MAX_ACTIONS) return;
+    this.accepted++;
     const safeRaw = parsed.data;
     this.tail = this.tail.then(async () => {
       if (!this.state || this.state.status !== "recording") return;
