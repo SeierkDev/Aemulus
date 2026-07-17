@@ -47,3 +47,6 @@ next-env.d.ts
 # Rust/Anchor build artifacts
 /anchor/target/
 /anchor-zk/target/
+
+# Local sandbox credentials for the QBO smoke tool (never committed)
+/scripts/qbo/.env.local

@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "ci": "tsc --noEmit && eslint . && vitest run"
+    "ci": "tsc --noEmit && eslint . && vitest run",
+    "qbo:smoke": "node scripts/qbo/smoke.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
