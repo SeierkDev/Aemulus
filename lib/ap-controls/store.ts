@@ -191,15 +191,18 @@ export function ensureApEventsSchema(): Promise<void> {
 function sha256hex(s: string): string {
   return createHash("sha256").update(s).digest("hex");
 }
-function genesisFor(workspaceId: string, type: string, id: string): string {
-  return `genesis:${workspaceId}:${type}:${id}`;
+function genesisFor(type: string, id: string): string {
+  return `genesis:${type}:${id}`;
 }
 /** The seal of an event = sha256 over its canonical envelope (everything but seal).
- *  workspaceId is included so an event can't be silently moved between workspaces. */
+ *  NOTE: workspace_id is intentionally NOT in the seal — changing the seal formula
+ *  on an append-only log needs a seal-version + re-seal migration (follow-up).
+ *  Cross-workspace moves are already prevented by query-level scoping; every read
+ *  filters workspace_id. */
 function sealOf(e: Omit<ApEventRow, "seal">): string {
   return sha256hex(
     canonicalize({
-      id: e.id, workspaceId: e.workspaceId, aggregateType: e.aggregateType, aggregateId: e.aggregateId, seq: e.seq,
+      id: e.id, aggregateType: e.aggregateType, aggregateId: e.aggregateId, seq: e.seq,
       eventType: e.eventType, eventVersion: e.eventVersion, payload: e.payload, actor: e.actor,
       createdAt: e.createdAt, sealPrev: e.sealPrev,
     }),
@@ -223,7 +226,7 @@ export async function appendApEvent(input: AppendInput): Promise<ApEventRow> {
   });
   const last = tail.rows[0];
   const seq = last ? Number(last.seq) + 1 : 0;
-  const sealPrev = last ? String(last.seal) : genesisFor(workspaceId, input.aggregateType, input.aggregateId);
+  const sealPrev = last ? String(last.seal) : genesisFor(input.aggregateType, input.aggregateId);
 
   if (input.expectedSeq !== undefined && input.expectedSeq !== seq) {
     throw new SequenceConflictError(input.aggregateType, input.aggregateId, input.expectedSeq, seq);
@@ -334,7 +337,7 @@ export async function verifyAggregate(
   workspaceId: string = DEFAULT_WORKSPACE,
 ): Promise<VerifyResult> {
   const rows = await readAggregate(aggregateType, aggregateId, workspaceId);
-  let prevSeal = genesisFor(workspaceId, aggregateType, aggregateId);
+  let prevSeal = genesisFor(aggregateType, aggregateId);
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
     if (r.seq !== i) return { valid: false, length: rows.length, brokenAt: i, reason: "non_contiguous_sequence" };

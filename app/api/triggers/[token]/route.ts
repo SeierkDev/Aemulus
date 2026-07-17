@@ -52,6 +52,11 @@ export async function POST(
     }
 
     const tier = computeTier(await getAemulusBalance(trig.owner));
+    // Explicit access gate (matches the MCP + REST run paths): a wallet with no
+    // access can't fire runs, independent of how the quota limit is configured.
+    if (tier.level < 1) {
+      return NextResponse.json({ error: "Wallet no longer has access" }, { status: 403 });
+    }
     const session: Session = {
       pubkey: trig.owner,
       tier: tier.name as Session["tier"],

@@ -95,8 +95,13 @@ ${list}`;
     return { selector: "", confidence: 0, reasoning: "no decision", tokensIn, tokensOut };
   }
   const out = block.input as Partial<OperatorDecision>;
+  // Only accept a selector the model was actually offered as a candidate — never a
+  // free-form one — so a hostile page can't steer the operator onto an element it
+  // never presented. "" (no match) is the safe fallback.
+  const chosen = typeof out.selector === "string" ? out.selector : "";
+  const selector = args.candidates.some((c) => c.selector === chosen) ? chosen : "";
   return {
-    selector: typeof out.selector === "string" ? out.selector : "",
+    selector,
     confidence: typeof out.confidence === "number" ? out.confidence : 0,
     reasoning: typeof out.reasoning === "string" ? out.reasoning : "",
     tokensIn,

@@ -149,8 +149,14 @@ export async function recoverStuckJobs(
 ): Promise<number> {
   await ready();
   const r = await db.execute({
+    // Never requeue a job whose run is paused for a human (awaiting_input): that
+    // run is legitimately alive (bounded by the live-handoff timeout), and
+    // requeuing it would drive the SAME browser automation a second time against
+    // the target site. A run truly stuck there is recovered once it leaves that
+    // state (it times out and settles) — not by double-executing it.
     sql: `UPDATE jobs SET status = 'queued', run_at = ?
-          WHERE status = 'running' AND locked_at < ?`,
+          WHERE status = 'running' AND locked_at < ?
+            AND run_id NOT IN (SELECT id FROM runs WHERE status = 'awaiting_input')`,
     args: [now, now - staleMs],
   });
   return r.rowsAffected;

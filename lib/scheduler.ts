@@ -36,16 +36,16 @@ async function runDue(): Promise<void> {
   }
 
   for (const s of due) {
-    // Anchor the next run to the SCHEDULED time, not the processing moment, so
-    // per-tick latency doesn't accumulate into forward drift. Roll forward past
-    // any backlog (downtime) to the next future slot in one step - no drift and
-    // no replay storm.
-    let next = nextRunAfter(s.cadence, s.nextRunAt);
-    while (next <= now) next = nextRunAfter(s.cadence, next);
-    // Reserve this firing before doing anything - losers (other ticks /
-    // instances) skip it. A claimed run that then fails just waits a cadence.
-    if (!(await claimSchedule(s.id, now, next))) continue;
     try {
+      // Anchor the next run to the SCHEDULED time, not the processing moment, so
+      // per-tick latency doesn't accumulate into forward drift. Roll forward past
+      // any backlog (downtime) to the next future slot in one step - no drift and
+      // no replay storm.
+      let next = nextRunAfter(s.cadence, s.nextRunAt);
+      while (next <= now) next = nextRunAfter(s.cadence, next);
+      // Reserve this firing before doing anything - losers (other ticks /
+      // instances) skip it. A claimed run that then fails just waits a cadence.
+      if (!(await claimSchedule(s.id, now, next))) continue;
       const skill = await getSkill(s.skillId);
       // Skill gone or no longer runnable by this owner → stop the schedule.
       if (!skill || (skill.owner !== s.owner && !skill.published)) {

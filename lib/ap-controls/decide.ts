@@ -43,9 +43,11 @@ export async function decideInvoice(input: DecideInput): Promise<DecideResult> {
 
   if (!input.canEnter) return { ok: false, error: "limit_reached", httpStatus: 400 };
 
-  // Seal the clearance once. If a prior attempt sealed it but the entry then failed,
-  // a retry re-enters without appending a duplicate override.
-  if (state.overrides.length === 0) {
+  // Seal the review clearance once. If a prior attempt sealed it but the entry then
+  // failed, a retry re-enters without a duplicate — but only THIS review override is
+  // deduped, not an unrelated override (e.g. a duplicate-flag clearance).
+  const alreadyCleared = state.overrides.some((o) => o.field === "review");
+  if (!alreadyCleared) {
     await appendApEvent({
       workspaceId, aggregateType: "invoice", aggregateId: invoiceId, eventType: "invoice.override",
       payload: { type: "review", field: "review", originalValue: "flagged", newValue: "cleared", reasonCode, note },
