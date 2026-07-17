@@ -83,4 +83,19 @@ describe("bulk runs", () => {
     await setRunOutput(run.id, { price: "$42.00" });
     expect((await getRun(run.id))!.output).toEqual({ price: "$42.00" });
   });
+
+  it("applies the atomic quota reserve per child and reports skipped rows", async () => {
+    const owner = "WALLET_BULK_QUOTA";
+    const skill = await createSkill({ owner, generalized: gen(), sourceDemoId: null });
+    // limit 2 → of 5 rows, exactly 2 start and 3 are skipped (not silently dropped).
+    const bulk = await createBulkRun(
+      skill,
+      [{ vendor: "a" }, { vendor: "b" }, { vendor: "c" }, { vendor: "d" }, { vendor: "e" }],
+      owner,
+      { limit: 2, windowMs: 60_000 },
+    );
+    expect(bulk.total).toBe(2);
+    expect(bulk.skipped).toBe(3);
+    expect(await listRunsByBulk(bulk.id)).toHaveLength(2);
+  });
 });

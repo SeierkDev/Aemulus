@@ -5,7 +5,13 @@ import { reportSkill, countReports, isVerified } from "../../lib/moderation";
 import { createTrigger, resolveTrigger, listTriggers } from "../../lib/triggers";
 import type { GeneralizedSkill } from "../../lib/types";
 
-const GEN: GeneralizedSkill = { name: "M", description: "", inputFields: [], steps: [] };
+const GEN: GeneralizedSkill = {
+  name: "M",
+  description: "",
+  inputFields: [],
+  // A publishable skill needs at least one runnable step.
+  steps: [{ intent: "open", action: "navigate", selectors: [], target: "data:text/html,<p>x</p>", valueSource: "none", value: "", inputKey: "", key: "" }],
+};
 
 beforeAll(async () => {
   await ready();

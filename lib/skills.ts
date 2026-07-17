@@ -108,13 +108,47 @@ export async function createSkill(input: {
 export { categorize } from "./skill-utils";
 export { skillTargets };
 
-/** Publish or unpublish a skill to the marketplace (owner only). */
+export class SkillNotPublishableError extends Error {
+  constructor(reason: string) {
+    super(reason);
+    this.name = "SkillNotPublishableError";
+  }
+}
+
+/** Why a skill can't be published (it wouldn't run), or null if it's fine. The
+ *  schema alone allows a 0-step plan and `input` steps bound to keys that aren't
+ *  declared fields — such a skill would sit unrunnable in the marketplace. */
+export function unpublishableReason(skill: Skill): string | null {
+  if (!skill.plan || skill.plan.length === 0) return "This skill has no steps to run.";
+  const fieldKeys = new Set((skill.inputSchema?.fields ?? []).map((f) => f.key).filter(Boolean));
+  for (const s of skill.plan) {
+    if (s.valueSource === "input") {
+      if (!s.inputKey) return "A step expects an input but no input field is set.";
+      if (!fieldKeys.has(s.inputKey)) {
+        return `A step references an input "${s.inputKey}" that isn't one of the skill's input fields.`;
+      }
+    }
+  }
+  return null;
+}
+
+/** Publish or unpublish a skill to the marketplace (owner only). Publishing an
+ *  unrunnable skill is refused (throws SkillNotPublishableError). */
 export async function setPublished(
   skillId: string,
   owner: string,
   published: boolean,
 ): Promise<boolean> {
   await ready();
+  if (published) {
+    const skill = await getSkill(skillId);
+    // Validate only a skill this owner actually owns; a missing/foreign skill
+    // falls through to the ownership-scoped UPDATE, which returns false as before.
+    if (skill && skill.owner === owner) {
+      const reason = unpublishableReason(skill);
+      if (reason) throw new SkillNotPublishableError(reason);
+    }
+  }
   const r = await db.execute({
     sql: `UPDATE skills SET published = ?, published_at = ?, updated_at = ?
           WHERE id = ? AND owner = ?`,

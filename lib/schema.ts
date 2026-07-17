@@ -301,6 +301,10 @@ CREATE INDEX IF NOT EXISTS idx_runs_owner   ON runs(owner);
 CREATE INDEX IF NOT EXISTS idx_skills_pub   ON skills(published);
 CREATE INDEX IF NOT EXISTS idx_earn_owner   ON earnings(owner);
 CREATE INDEX IF NOT EXISTS idx_earn_skill_runner ON earnings(skill_id, runner);
+-- Exactly-once credit per (skill, runner) — enforced in the DB, not just by the
+-- creditEarningOnce NOT-EXISTS check (see migration 31, kept here so a fresh DB
+-- matches an upgraded one).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_earn_skill_runner_uniq ON earnings(skill_id, runner);
 -- Composite indexes for the hottest list/aggregate paths (see migration 25).
 CREATE INDEX IF NOT EXISTS idx_runs_owner_created ON runs(owner, created_at);
 CREATE INDEX IF NOT EXISTS idx_runs_skill_created ON runs(skill_id, created_at);

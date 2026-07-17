@@ -8,7 +8,12 @@ import {
 } from "../../lib/pagination";
 import type { GeneralizedSkill } from "../../lib/types";
 
-const GEN: GeneralizedSkill = { name: "P", description: "", inputFields: [], steps: [] };
+const GEN: GeneralizedSkill = {
+  name: "P",
+  description: "",
+  inputFields: [],
+  steps: [{ intent: "open", action: "navigate", selectors: [], target: "data:text/html,<p>x</p>", valueSource: "none", value: "", inputKey: "", key: "" }],
+};
 
 beforeAll(async () => {
   await ready();

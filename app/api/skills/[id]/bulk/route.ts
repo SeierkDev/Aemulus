@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
 import { logError } from "@/lib/log";
-import { getQuota } from "@/lib/quota";
+import { getQuota, quotaReserve } from "@/lib/quota";
 import { getSkill, skillAccess } from "@/lib/skills";
 import { createBulkRun } from "@/lib/bulk";
 import { enforceRateLimit } from "@/lib/ratelimit";
@@ -57,8 +57,10 @@ export async function POST(
       );
     }
 
-    const bulk = await createBulkRun(skill, rows, session.pubkey);
-    return NextResponse.json({ bulkId: bulk.id, total: bulk.total });
+    // Pass the ATOMIC reserve (not just the soft check above) so concurrent bulks
+    // can't race past the daily cap; report any rows the reserve refused.
+    const bulk = await createBulkRun(skill, rows, session.pubkey, quotaReserve(session));
+    return NextResponse.json({ bulkId: bulk.id, total: bulk.total, skipped: bulk.skipped });
   } catch (err) {
     logError("api/skills/bulk", err);
     return NextResponse.json(

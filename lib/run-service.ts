@@ -110,16 +110,17 @@ export async function completeRun(runId: string, args: RunArgs): Promise<void> {
   // counts/credit/webhooks, so they fire exactly once regardless.
   if (!(await claimRunBookkeeping(runId))) return;
   incr(`runs.${final.status}`); // runs.completed / needs_review / failed
-  await incrementRunCount(args.skill.id);
-  invalidateReputation(args.skill.id); // success-rate aggregate changed
-  // Pay the creator only for: a completed run, by someone other than the
-  // owner, who hasn't run this skill before. The "first run per distinct
-  // runner" rule is the anti-Sybil guard - see hasEarnedFrom.
+  invalidateReputation(args.skill.id); // success-rate aggregate changed (any terminal status)
+  // Marketplace popularity (run_count, the sort key) AND the creator credit both
+  // count only a COMPLETED run by someone OTHER than the owner. This stops an
+  // owner from inflating their own ranking by re-running their skill, and stops
+  // failed/needs_review runs from counting as "uses".
   if (
     final.status === "completed" &&
     args.skill.owner &&
     args.skill.owner !== args.runner
   ) {
+    await incrementRunCount(args.skill.id);
     // Atomic credit-once per (skill, runner): the anti-Sybil first-run rule,
     // safe against two concurrent completions racing a check-then-insert.
     await creditEarningOnce({

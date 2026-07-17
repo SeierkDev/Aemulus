@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
-import { setPublished } from "@/lib/skills";
+import { setPublished, SkillNotPublishableError } from "@/lib/skills";
 import { readJson, PublishBody } from "@/lib/validate";
 
 export const runtime = "nodejs";
@@ -17,9 +17,16 @@ export async function POST(
   const { id } = await params;
   const parsed = await readJson(req, PublishBody);
   if (!parsed.ok) return parsed.res;
-  const ok = await setPublished(id, session.pubkey, parsed.data.published);
-  if (!ok) {
-    return NextResponse.json({ error: "Skill not found" }, { status: 404 });
+  try {
+    const ok = await setPublished(id, session.pubkey, parsed.data.published);
+    if (!ok) {
+      return NextResponse.json({ error: "Skill not found" }, { status: 404 });
+    }
+  } catch (err) {
+    if (err instanceof SkillNotPublishableError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    throw err;
   }
   return NextResponse.json({ published: parsed.data.published });
 }

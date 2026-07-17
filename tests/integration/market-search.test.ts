@@ -5,7 +5,13 @@ import type { GeneralizedSkill } from "../../lib/types";
 
 const OWNER = "WALLET_SEARCH";
 function gen(name: string, description: string): GeneralizedSkill {
-  return { name, description, inputFields: [], steps: [] };
+  // Include a runnable step so the skill is publishable (empty plans are refused).
+  return {
+    name,
+    description,
+    inputFields: [],
+    steps: [{ intent: "open", action: "navigate", selectors: [], target: "data:text/html,<p>x</p>", valueSource: "none", value: "", inputKey: "", key: "" }],
+  };
 }
 async function publish(name: string, description: string) {
   const s = await createSkill({ owner: OWNER, generalized: gen(name, description), sourceDemoId: null });
