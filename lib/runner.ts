@@ -305,7 +305,7 @@ export async function executeRun(
         }
 
         if (!loc) {
-          const decision = await tryOperator(page, step, value);
+          const decision = await tryOperator(page, step);
           tokensIn += decision.tokensIn;
           tokensOut += decision.tokensOut;
           confidence = decision.confidence;
@@ -324,8 +324,14 @@ export async function executeRun(
           // Agentic fallback (opt-in): before pausing for a human, let the agent
           // try to accomplish the step itself. Only for action steps (extract is
           // a read, not something the agent performs).
-          if (agentFallbackEnabled() && step.action !== "extract") {
-            const ag = await agenticStep(page, step, value);
+          if (agentFallbackEnabled() && step.action !== "extract" && Date.now() <= deadline) {
+            // Mark the value sensitive when it's a vault-filled credential so the
+            // agent never sees it in a prompt and only types it while on vaultHost.
+            const sensitive =
+              (step.action === "input" || step.action === "select") &&
+              step.valueSource === "input" &&
+              vaultKeys.has(step.inputKey);
+            const ag = await agenticStep(page, step, value, { sensitive, vaultHost, deadline });
             tokensIn += ag.tokensIn;
             tokensOut += ag.tokensOut;
             if (ag.ok) {
@@ -584,14 +590,13 @@ async function perform(
   }
 }
 
-async function tryOperator(page: Page, step: SkillStep, value: string) {
+async function tryOperator(page: Page, step: SkillStep) {
   try {
     const candidates = await collectCandidates(page);
     const shot = await page.screenshot({ type: "png" });
     return await operatorChooseSelector({
       intent: step.intent,
       action: step.action,
-      value,
       candidates,
       screenshotBase64: shot.toString("base64"),
     });

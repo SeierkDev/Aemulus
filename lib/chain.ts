@@ -16,6 +16,12 @@ export function planHasChaining(plan: SkillStep[]): boolean {
   return plan.some((s) => s.action === "run_skill");
 }
 
+// A captured output (esp. a loop-extract JSON array) can be large; bound each
+// chained value so a hostile page's multi-MB extraction can't bloat the child's
+// stored input + enqueued job. The HTTP edge caps user input similarly; this
+// closes the equivalent in-process path.
+const MAX_CHAIN_VALUE = 100_000; // 100 KB per field
+
 /** Build the child's input: a child field is filled from the parent's captured
  *  output first, then the parent's run input, matched by key. */
 export function childInput(
@@ -28,7 +34,7 @@ export function childInput(
     // Use `||` not `??`: an empty-string captured output (a step that extracted
     // nothing) should fall through to the parent's run input, not shadow it.
     const v = parentOutputs[f.key] || parentInput[f.key];
-    if (v != null) out[f.key] = String(v);
+    if (v != null) out[f.key] = String(v).slice(0, MAX_CHAIN_VALUE);
   }
   return out;
 }

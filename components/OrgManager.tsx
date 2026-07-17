@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button, Card, Label } from "./ui";
 import { short } from "@/lib/format";
 
@@ -48,14 +48,26 @@ export function OrgManager({ initial, me }: { initial: Org[]; me: string }) {
     }
   }
 
+  // Re-entrancy guard: ignore a duplicate identical add/remove while one is in
+  // flight (the buttons aren't disabled, so a double-click could double-submit).
+  const inflight = useRef<Set<string>>(new Set());
+
   async function add(orgId: string) {
     const w = (wallet[orgId] ?? "").trim();
     if (!w) return;
-    const r = await fetch(`/api/orgs/${orgId}/members`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ wallet: w, role: "member" }),
-    });
+    const k = `add:${orgId}:${w}`;
+    if (inflight.current.has(k)) return;
+    inflight.current.add(k);
+    let r: Response;
+    try {
+      r = await fetch(`/api/orgs/${orgId}/members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wallet: w, role: "member" }),
+      });
+    } finally {
+      inflight.current.delete(k);
+    }
     if (r.ok) {
       setOrgs((os) =>
         os.map((o) =>
@@ -69,11 +81,19 @@ export function OrgManager({ initial, me }: { initial: Org[]; me: string }) {
   }
 
   async function remove(orgId: string, w: string) {
-    const r = await fetch(`/api/orgs/${orgId}/members`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ wallet: w }),
-    });
+    const k = `rm:${orgId}:${w}`;
+    if (inflight.current.has(k)) return;
+    inflight.current.add(k);
+    let r: Response;
+    try {
+      r = await fetch(`/api/orgs/${orgId}/members`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wallet: w }),
+      });
+    } finally {
+      inflight.current.delete(k);
+    }
     if (r.ok) {
       setOrgs((os) =>
         os.map((o) =>

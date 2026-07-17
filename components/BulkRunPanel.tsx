@@ -28,7 +28,9 @@ export function BulkRunPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const keys = fields.map((f) => f.key);
+  // Memoize keys on `fields` — otherwise a fresh array every render makes the
+  // `parsed` memo re-run csvToRows on every render regardless of `csv`.
+  const keys = useMemo(() => fields.map((f) => f.key), [fields]);
   const parsed = useMemo(
     () => (csv.trim() ? csvToRows(csv, keys) : { rows: [], missing: [] }),
     [csv, keys],
@@ -42,7 +44,15 @@ export function BulkRunPanel({
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) setCsv(await file.text());
+    if (!file) return;
+    // Don't read an arbitrarily large file into memory; a CSV of runs is small.
+    if (file.size > 5 * 1024 * 1024) {
+      setError("That CSV is too large (max 5 MB).");
+      e.target.value = "";
+      return;
+    }
+    setError(null);
+    setCsv(await file.text());
   }
 
   async function run() {

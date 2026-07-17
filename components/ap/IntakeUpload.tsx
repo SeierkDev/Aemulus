@@ -8,6 +8,11 @@ type Done = { billNumber: string; target: string; verify: { valid: boolean; leng
 
 const input = "w-full rounded-md border border-border bg-bg px-3 py-2 text-sm text-ink focus:border-border-strong focus:outline-none";
 
+// Mirror the server's 12 MB cap client-side so a huge file is rejected instantly
+// instead of being fully read + uploaded only to be 413'd.
+const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
+const ALLOWED_TYPES = ["application/pdf", "image/png", "image/jpeg"];
+
 export function IntakeUpload() {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -20,6 +25,16 @@ export function IntakeUpload() {
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.type && !ALLOWED_TYPES.includes(file.type)) {
+      setError("Unsupported file type — upload a PDF, PNG, or JPEG.");
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setError("That file is too large (max 12 MB).");
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
     setFileName(file.name);
     setError("");
     setDone(null);
