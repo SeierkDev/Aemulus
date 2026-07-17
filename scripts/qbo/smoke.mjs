@@ -35,8 +35,9 @@ function loadEnvLocal() {
 }
 loadEnvLocal();
 
-const BASE = "https://sandbox-quickbooks.api.intuit.com"; // SANDBOX only
+const BASE = (process.env.QBO_BASE || "https://sandbox-quickbooks.api.intuit.com").replace(/\/+$/, "");
 const MV = "73";
+console.log("Target:", BASE);
 const TOKEN = process.env.QBO_TOKEN;
 const REALM = process.env.QBO_REALM;
 const VENDOR_NAME = process.env.QBO_VENDOR_NAME || "Acme Corp";
