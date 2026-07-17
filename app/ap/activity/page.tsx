@@ -4,7 +4,7 @@ import { seedApDemo } from "@/lib/ap-controls/demo";
 import { listLedgerBills, ledgerStats } from "@/lib/ap-controls/ledger";
 import { liveInvoiceQueueAll } from "@/lib/ap-controls/projections";
 import { verifyAggregate } from "@/lib/ap-controls/store";
-import { getApSession } from "@/lib/ap-controls/ap-session";
+import { getApViewer } from "@/lib/ap-controls/ap-viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +16,9 @@ function fmtTime(ms: number): string {
 }
 
 export default async function ApActivityPage() {
-  const session = await getApSession();
-  if (!session) redirect("/ap/login");
-  const ws = session.workspaceId;
+  const viewer = await getApViewer();
+  if (!viewer) redirect("/ap/login");
+  const ws = viewer.workspaceId;
   await seedApDemo(ws);
   const [bills, stats, queue] = await Promise.all([
     listLedgerBills(20, ws),

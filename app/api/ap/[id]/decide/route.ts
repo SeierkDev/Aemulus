@@ -4,7 +4,7 @@ import { DEMO_INVOICE_ID, DEMO_ACTOR } from "@/lib/ap-controls/demo";
 import { appendApEvent, verifyAggregate } from "@/lib/ap-controls/store";
 import { projectInvoiceEntry } from "@/lib/ap-controls/projections";
 import { enterInvoice } from "@/lib/ap-controls/qbo-submit";
-import { getApSession } from "@/lib/ap-controls/ap-session";
+import { getApViewer, viewerActor, viewerEntitlement } from "@/lib/ap-controls/ap-viewer";
 import { DEFAULT_WORKSPACE } from "@/lib/ap-controls/workspace";
 
 export const runtime = "nodejs";
@@ -20,11 +20,9 @@ export async function POST(
   const { id } = await params;
   if (id === DEMO_INVOICE_ID) return NextResponse.json({ ok: false, error: "Use the walkthrough for this invoice." }, { status: 404 });
 
-  const session = await getApSession().catch(() => null);
-  const workspaceId = session?.workspaceId ?? DEFAULT_WORKSPACE;
-  const actor = session
-    ? { userId: session.userId, role: "clerk" as const }
-    : { userId: DEMO_ACTOR.userId, role: DEMO_ACTOR.role };
+  const viewer = await getApViewer().catch(() => null);
+  const workspaceId = viewer?.workspaceId ?? DEFAULT_WORKSPACE;
+  const actor = viewer ? viewerActor(viewer) : { userId: DEMO_ACTOR.userId, role: DEMO_ACTOR.role };
 
   const state = await projectInvoiceEntry(id, workspaceId);
   if (state.status !== "needs_review") {
@@ -47,7 +45,10 @@ export async function POST(
     return NextResponse.json({ ok: true, status: "rejected" });
   }
 
-  // Approve: seal the override, then enter.
+  // Approve: enforce the viewer's plan/tier, then seal the override and enter.
+  if (viewer && !(await viewerEntitlement(viewer, now)).canEnter) {
+    return NextResponse.json({ ok: false, error: "limit_reached" }, { status: 400 });
+  }
   await appendApEvent({
     workspaceId, aggregateType: "invoice", aggregateId: id, eventType: "invoice.override",
     payload: { type: "review", field: "review", originalValue: "flagged", newValue: "cleared", reasonCode, note },

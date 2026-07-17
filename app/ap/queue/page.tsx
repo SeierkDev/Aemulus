@@ -4,7 +4,7 @@ import { ResetButton } from "@/components/ap/ResetButton";
 import { IntakeUpload } from "@/components/ap/IntakeUpload";
 import { seedApDemo } from "@/lib/ap-controls/demo";
 import { liveInvoiceQueueAll } from "@/lib/ap-controls/projections";
-import { getApSession } from "@/lib/ap-controls/ap-session";
+import { getApViewer } from "@/lib/ap-controls/ap-viewer";
 
 export const dynamic = "force-dynamic";
 
@@ -27,10 +27,10 @@ function reasonLabel(code: string | null): string {
 }
 
 export default async function ApQueuePage() {
-  const session = await getApSession();
-  if (!session) redirect("/ap/login");
-  await seedApDemo(session.workspaceId);
-  const queue = await liveInvoiceQueueAll(session.workspaceId);
+  const viewer = await getApViewer();
+  if (!viewer) redirect("/ap/login");
+  await seedApDemo(viewer.workspaceId);
+  const queue = await liveInvoiceQueueAll(viewer.workspaceId);
 
   const atRisk = queue.reduce((s, q) => s + (q.amount ?? 0), 0);
   const oldest = queue.reduce((m, q) => Math.max(m, q.ageMs), 0);

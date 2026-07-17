@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { DEMO_INVOICE_ID, DEMO_FIXTURE, DEMO_ACTOR } from "@/lib/ap-controls/demo";
 import { enterInvoice } from "@/lib/ap-controls/qbo-submit";
-import { getApSession } from "@/lib/ap-controls/ap-session";
+import { getApViewer, viewerActor, viewerEntitlement } from "@/lib/ap-controls/ap-viewer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,10 +17,11 @@ export async function POST(
   const { id } = await params;
   if (id !== DEMO_INVOICE_ID) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const session = await getApSession().catch(() => null);
-  const actor = session
-    ? { userId: session.userId, role: "clerk" as const }
-    : { userId: DEMO_ACTOR.userId, role: DEMO_ACTOR.role };
+  const viewer = await getApViewer().catch(() => null);
+  const actor = viewer ? viewerActor(viewer) : { userId: DEMO_ACTOR.userId, role: DEMO_ACTOR.role };
+  if (viewer && !(await viewerEntitlement(viewer, Date.now())).canEnter) {
+    return NextResponse.json({ ok: false, error: "limit_reached" }, { status: 400 });
+  }
 
   const r = await enterInvoice({
     invoiceId: id,
@@ -32,7 +33,7 @@ export async function POST(
     currency: DEMO_FIXTURE.currency,
     actor,
     now: Date.now(),
-    workspaceId: session?.workspaceId,
+    workspaceId: viewer?.workspaceId,
   });
 
   if (!r.ok) {

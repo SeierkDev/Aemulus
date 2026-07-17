@@ -2,10 +2,11 @@
 
 import { useRouter } from "next/navigation";
 
-export function LogoutButton() {
+export function LogoutButton({ kind }: { kind: "email" | "wallet" }) {
   const router = useRouter();
   async function logout() {
-    await fetch("/api/ap/auth/logout", { method: "POST" });
+    // Email accounts and wallet sessions use different cookies/endpoints.
+    await fetch(kind === "wallet" ? "/api/auth/logout" : "/api/ap/auth/logout", { method: "POST" }).catch(() => {});
     router.replace("/ap/login");
     router.refresh();
   }

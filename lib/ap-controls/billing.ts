@@ -115,7 +115,9 @@ export interface Entitlement {
 /** What a workspace is allowed to do right now. Unenforced (unlimited) unless
  *  Stripe is configured and this is a real user's workspace. */
 export async function entitlement(workspaceId: string, now: number): Promise<Entitlement> {
-  const enforced = billingConfigured() && workspaceId !== DEFAULT_WORKSPACE;
+  // Stripe governs email workspaces only. Wallet workspaces (w_…) are governed by
+  // $AEMU tier via viewerEntitlement; the shared default workspace is never billed.
+  const enforced = billingConfigured() && workspaceId !== DEFAULT_WORKSPACE && !workspaceId.startsWith("w_");
   const wp = await getPlan(workspaceId);
   const isPro = wp.plan === "pro" && wp.status === "active";
   const used = await usageThisPeriod(workspaceId, now);

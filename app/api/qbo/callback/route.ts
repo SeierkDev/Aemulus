@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { exchangeCode } from "@/lib/qbo/oauth";
-import { getApSession } from "@/lib/ap-controls/ap-session";
+import { getApViewer } from "@/lib/ap-controls/ap-viewer";
 import { QBO_STATE_COOKIE } from "../connect/route";
 
 export const runtime = "nodejs";
@@ -26,8 +26,8 @@ export async function GET(req: Request) {
   }
 
   try {
-    const session = await getApSession().catch(() => null);
-    await exchangeCode(code, realmId, Date.now(), session?.workspaceId);
+    const viewer = await getApViewer().catch(() => null);
+    await exchangeCode(code, realmId, Date.now(), viewer?.workspaceId);
     back.searchParams.set("qbo", "connected");
   } catch {
     back.searchParams.set("qbo", "error");

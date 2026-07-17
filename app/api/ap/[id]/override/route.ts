@@ -11,7 +11,7 @@ import { evaluateOverride } from "@/lib/ap-controls/evaluate";
 import { writeOverrideEvent, OverrideWriteError } from "@/lib/ap-controls/override-log";
 import { appendApEvent, readAggregate } from "@/lib/ap-controls/store";
 import { projectInvoiceEntry } from "@/lib/ap-controls/projections";
-import { getApSession } from "@/lib/ap-controls/ap-session";
+import { getApViewer, viewerActor } from "@/lib/ap-controls/ap-viewer";
 import { DEFAULT_WORKSPACE } from "@/lib/ap-controls/workspace";
 import type { EvidenceView } from "@/lib/ap-controls/schema";
 
@@ -36,11 +36,9 @@ export async function POST(
   const note = body.note ? String(body.note) : undefined;
   const evidenceViewed = Array.isArray(body.evidenceViewed) ? body.evidenceViewed : [];
   const now = Date.now();
-  const session = await getApSession().catch(() => null);
-  const workspaceId = session?.workspaceId ?? DEFAULT_WORKSPACE;
-  const actor = session
-    ? { userId: session.userId, role: "clerk" as const }
-    : { userId: DEMO_ACTOR.userId, role: DEMO_ACTOR.role };
+  const viewer = await getApViewer().catch(() => null);
+  const workspaceId = viewer?.workspaceId ?? DEFAULT_WORKSPACE;
+  const actor = viewer ? viewerActor(viewer) : { userId: DEMO_ACTOR.userId, role: DEMO_ACTOR.role };
 
   // 1) Override decision (REAL).
   const decision = evaluateOverride({

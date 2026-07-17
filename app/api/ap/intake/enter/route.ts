@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { intakeEnter } from "@/lib/ap-controls/intake";
-import { getApSession } from "@/lib/ap-controls/ap-session";
+import { getApViewer, viewerActor, viewerEntitlement } from "@/lib/ap-controls/ap-viewer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,9 +28,12 @@ export async function POST(req: Request) {
     currency: String(body.currency ?? "USD"),
   };
 
-  const session = await getApSession().catch(() => null);
-  const actor = session ? { userId: session.userId, role: "clerk" } : undefined;
-  const r = await intakeEnter(fields, "upload", Date.now(), actor, session?.workspaceId);
+  const viewer = await getApViewer().catch(() => null);
+  if (viewer && !(await viewerEntitlement(viewer, Date.now())).canEnter) {
+    return NextResponse.json({ ok: false, error: "limit_reached" }, { status: 400 });
+  }
+  const actor = viewer ? viewerActor(viewer) : undefined;
+  const r = await intakeEnter(fields, "upload", Date.now(), actor, viewer?.workspaceId);
   if (!r.ok) {
     return NextResponse.json({ ok: false, error: r.error }, { status: r.error === "in_progress" ? 409 : 400 });
   }

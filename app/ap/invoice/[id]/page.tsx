@@ -8,7 +8,7 @@ import {
 } from "@/lib/ap-controls/demo";
 import { projectInvoiceEntry } from "@/lib/ap-controls/projections";
 import { loadConnection } from "@/lib/qbo/oauth";
-import { getApSession } from "@/lib/ap-controls/ap-session";
+import { getApViewer } from "@/lib/ap-controls/ap-viewer";
 import { ApReview } from "@/components/ap/ApReview";
 import { GenericReview } from "@/components/ap/GenericReview";
 
@@ -28,9 +28,9 @@ export default async function ApInvoicePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await getApSession();
-  if (!session) redirect("/ap/login");
-  const ws = session.workspaceId;
+  const viewer = await getApViewer();
+  if (!viewer) redirect("/ap/login");
+  const ws = viewer.workspaceId;
   const conn = await loadConnection(ws).catch(() => null);
   const connected = !!conn && conn.status === "connected" && !!conn.accessToken;
 
@@ -44,7 +44,7 @@ export default async function ApInvoicePage({
         initialState={state}
         fixture={DEMO_FIXTURE}
         reasons={[...OVERRIDE_REASONS]}
-        reviewer={session.name}
+        reviewer={viewer.name}
         connected={connected}
       />
     );
