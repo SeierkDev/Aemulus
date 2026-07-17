@@ -93,6 +93,8 @@ export function ApReview({
       } else {
         setError(submitError(sd.error));
       }
+    } catch {
+      setError("Something went wrong. Try again.");
     } finally {
       setBusy(false);
     }

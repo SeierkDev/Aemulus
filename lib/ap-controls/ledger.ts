@@ -23,20 +23,30 @@ let ensured: Promise<void> | null = null;
 export function ensureLedgerSchema(): Promise<void> {
   if (!ensured) {
     ensured = (async () => {
-      await ready();
-      const cols = await db.execute(`PRAGMA table_info(ledger_bill)`);
-      const exists = cols.rows.length > 0;
-      const hasWorkspace = cols.rows.some((r) => String((r as Record<string, unknown>).name) === "workspace_id");
-      if (exists && !hasWorkspace) {
-        await db.execute(`ALTER TABLE ledger_bill RENAME TO ledger_bill_legacy`);
-        await db.execute(DDL);
-        await db.execute(
-          `INSERT INTO ledger_bill (bill_no, workspace_id, invoice_id, vendor, doc_number, amount, currency, entered_at)
-           SELECT bill_no, '${DEFAULT_WORKSPACE}', invoice_id, vendor, doc_number, amount, currency, entered_at FROM ledger_bill_legacy`,
-        );
-        await db.execute(`DROP TABLE ledger_bill_legacy`);
-      } else {
-        await db.execute(DDL);
+      try {
+        await ready();
+        const legacy = await db.execute(`PRAGMA table_info(ledger_bill_legacy)`);
+        const mainPre = await db.execute(`PRAGMA table_info(ledger_bill)`);
+        if (legacy.rows.length > 0 && mainPre.rows.length === 0) {
+          await db.execute(`ALTER TABLE ledger_bill_legacy RENAME TO ledger_bill`);
+        }
+        const cols = await db.execute(`PRAGMA table_info(ledger_bill)`);
+        const exists = cols.rows.length > 0;
+        const hasWorkspace = cols.rows.some((r) => String((r as Record<string, unknown>).name) === "workspace_id");
+        if (exists && !hasWorkspace) {
+          await db.batch([
+            `ALTER TABLE ledger_bill RENAME TO ledger_bill_legacy`,
+            DDL,
+            `INSERT INTO ledger_bill (bill_no, workspace_id, invoice_id, vendor, doc_number, amount, currency, entered_at)
+             SELECT bill_no, '${DEFAULT_WORKSPACE}', invoice_id, vendor, doc_number, amount, currency, entered_at FROM ledger_bill_legacy`,
+            `DROP TABLE ledger_bill_legacy`,
+          ], "write");
+        } else {
+          await db.execute(DDL);
+        }
+      } catch (e) {
+        ensured = null;
+        throw e;
       }
     })();
   }

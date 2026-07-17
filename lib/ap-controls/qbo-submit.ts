@@ -2,7 +2,7 @@ import { qboConfigFromConnection } from "../qbo/oauth";
 import { writeInvoiceToQbo } from "../qbo/write";
 import { recordLedgerBill } from "./ledger";
 import { id as newId } from "../ids";
-import { appendApEvent, verifyAggregate } from "./store";
+import { appendApEvent, verifyAggregate, SequenceConflictError } from "./store";
 import { projectInvoiceEntry } from "./projections";
 import { DEFAULT_WORKSPACE } from "./workspace";
 
@@ -46,7 +46,15 @@ export async function enterInvoice(input: EnterInvoiceInput): Promise<EnterResul
   // paths produce a real bill number and are sealed identically.
   let billNumber: string;
   let target: EnterTarget;
-  const config = await qboConfigFromConnection(input.now, workspaceId);
+  let config;
+  try {
+    config = await qboConfigFromConnection(input.now, workspaceId);
+  } catch {
+    // A QuickBooks token exchange/refresh failed — surface it as a clean, retryable
+    // failure instead of letting it escape as a 500 (and instead of silently
+    // entering to the ledger under a different target than the user connected).
+    return { ok: false, error: "qbo_unavailable" };
+  }
   if (config) {
     const result = await writeInvoiceToQbo({
       invoiceId: input.invoiceId,
@@ -77,17 +85,33 @@ export async function enterInvoice(input: EnterInvoiceInput): Promise<EnterResul
     target = "ledger";
   }
 
-  // Seal the real bill id into the audit stream.
-  const row = await appendApEvent({
-    workspaceId,
-    aggregateType: "invoice",
-    aggregateId: input.invoiceId,
-    eventType: "invoice.submitted",
-    payload: { billNumber, total: input.total, currency: input.currency, auto: input.auto ?? false, target },
-    actor: input.actor,
-    now: input.now,
-    id: newId("evt"),
-  });
+  // Seal the real bill id into the audit stream. Claim the exact next sequence so
+  // two concurrent entries of the same invoice can't both append a submitted event.
+  let row;
+  try {
+    row = await appendApEvent({
+      workspaceId,
+      aggregateType: "invoice",
+      aggregateId: input.invoiceId,
+      eventType: "invoice.submitted",
+      payload: { billNumber, total: input.total, currency: input.currency, auto: input.auto ?? false, target },
+      actor: input.actor,
+      now: input.now,
+      id: newId("evt"),
+      expectedSeq: pre.lastSeq + 1,
+    });
+  } catch (e) {
+    if (e instanceof SequenceConflictError) {
+      // A concurrent writer won the slot — return the committed result idempotently.
+      const after = await projectInvoiceEntry(input.invoiceId, workspaceId);
+      if (after.status === "submitted" && after.billNumber) {
+        const verify = await verifyAggregate("invoice", input.invoiceId, workspaceId);
+        return { ok: true, billNumber: after.billNumber, target: after.enterTarget ?? target, verify, seal: after.latestSeal ?? "" };
+      }
+      return { ok: false, error: "in_progress" };
+    }
+    throw e;
+  }
   const verify = await verifyAggregate("invoice", input.invoiceId, workspaceId);
   return { ok: true, billNumber, target, verify, seal: row.seal };
 }

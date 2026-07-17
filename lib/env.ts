@@ -43,18 +43,20 @@ export const env = {
   get authSecret(): string {
     const v = optional("AUTH_SECRET");
     const DEV_DEFAULT = "aemulus-dev-secret-change-me";
-    if (this.isProd) {
-      // This secret signs session JWTs AND derives the AES-256 at-rest key, so a
-      // weak value is forgeable + weakens encryption. Require a real one in prod.
+    // The dev default is allowed ONLY in an explicit dev/test runtime. Any other
+    // runtime — production, or a misconfigured deploy that never set NODE_ENV —
+    // must supply a strong secret, so we fail closed instead of silently signing
+    // JWTs + deriving the AES key from a public constant.
+    const nodeEnv = process.env.NODE_ENV;
+    const isDevOrTest = nodeEnv === "development" || nodeEnv === "test";
+    if (!isDevOrTest) {
       if (!v || v === DEV_DEFAULT) {
         throw new Error(
-          "AUTH_SECRET must be set to a strong, unique value in production.",
+          "AUTH_SECRET must be set to a strong, unique value (the dev default is not allowed outside development).",
         );
       }
       if (v.length < 32) {
-        throw new Error(
-          "AUTH_SECRET must be at least 32 characters in production.",
-        );
+        throw new Error("AUTH_SECRET must be at least 32 characters.");
       }
     }
     return v ?? DEV_DEFAULT;
@@ -65,8 +67,9 @@ export const env = {
    * (in instrumentation.register) rather than mid-request on the first use.
    */
   validateAtBoot(): void {
-    if (!this.isProd) return;
-    void this.authSecret; // throws if unset/weak
+    // Always touch authSecret — it throws for a weak/default secret in any
+    // non-dev/test runtime, so even a deploy that forgot NODE_ENV fails at boot.
+    void this.authSecret;
   },
 
   get isProd(): boolean {

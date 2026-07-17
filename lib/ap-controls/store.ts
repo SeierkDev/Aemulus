@@ -153,23 +153,35 @@ let ensured: Promise<void> | null = null;
 export function ensureApEventsSchema(): Promise<void> {
   if (!ensured) {
     ensured = (async () => {
-      await ready();
-      const cols = await db.execute(`PRAGMA table_info(ap_events)`);
-      const exists = cols.rows.length > 0;
-      const hasWorkspace = cols.rows.some((r) => String((r as Record<string, unknown>).name) === "workspace_id");
-      if (exists && !hasWorkspace) {
-        // Legacy table (pre-scoping): rebuild with the new UNIQUE and backfill.
-        await db.execute(`ALTER TABLE ap_events RENAME TO ap_events_legacy`);
-        await db.execute(DDL_TABLE);
-        await db.execute(
-          `INSERT INTO ap_events (id, workspace_id, aggregate_type, aggregate_id, seq, event_type, event_version, payload, actor, created_at, seal_prev, seal)
-           SELECT id, '${DEFAULT_WORKSPACE}', aggregate_type, aggregate_id, seq, event_type, event_version, payload, actor, created_at, seal_prev, seal FROM ap_events_legacy`,
-        );
-        await db.execute(`DROP TABLE ap_events_legacy`);
-      } else {
-        await db.execute(DDL_TABLE);
+      try {
+        await ready();
+        // Recover a half-done prior migration: legacy table present, main gone.
+        const legacy = await db.execute(`PRAGMA table_info(ap_events_legacy)`);
+        const mainPre = await db.execute(`PRAGMA table_info(ap_events)`);
+        if (legacy.rows.length > 0 && mainPre.rows.length === 0) {
+          await db.execute(`ALTER TABLE ap_events_legacy RENAME TO ap_events`);
+        }
+        const cols = await db.execute(`PRAGMA table_info(ap_events)`);
+        const exists = cols.rows.length > 0;
+        const hasWorkspace = cols.rows.some((r) => String((r as Record<string, unknown>).name) === "workspace_id");
+        if (exists && !hasWorkspace) {
+          // Legacy table (pre-scoping): rebuild + backfill ATOMICALLY (one txn), so
+          // a crash mid-migration rolls back rather than emptying the audit store.
+          await db.batch([
+            `ALTER TABLE ap_events RENAME TO ap_events_legacy`,
+            DDL_TABLE,
+            `INSERT INTO ap_events (id, workspace_id, aggregate_type, aggregate_id, seq, event_type, event_version, payload, actor, created_at, seal_prev, seal)
+             SELECT id, '${DEFAULT_WORKSPACE}', aggregate_type, aggregate_id, seq, event_type, event_version, payload, actor, created_at, seal_prev, seal FROM ap_events_legacy`,
+            `DROP TABLE ap_events_legacy`,
+          ], "write");
+        } else {
+          await db.execute(DDL_TABLE);
+        }
+        await db.execute(DDL_INDEX);
+      } catch (e) {
+        ensured = null; // don't cache a rejection — allow a later retry
+        throw e;
       }
-      await db.execute(DDL_INDEX);
     })();
   }
   return ensured;
@@ -179,14 +191,15 @@ export function ensureApEventsSchema(): Promise<void> {
 function sha256hex(s: string): string {
   return createHash("sha256").update(s).digest("hex");
 }
-function genesisFor(type: string, id: string): string {
-  return `genesis:${type}:${id}`;
+function genesisFor(workspaceId: string, type: string, id: string): string {
+  return `genesis:${workspaceId}:${type}:${id}`;
 }
-/** The seal of an event = sha256 over its canonical envelope (everything but seal). */
+/** The seal of an event = sha256 over its canonical envelope (everything but seal).
+ *  workspaceId is included so an event can't be silently moved between workspaces. */
 function sealOf(e: Omit<ApEventRow, "seal">): string {
   return sha256hex(
     canonicalize({
-      id: e.id, aggregateType: e.aggregateType, aggregateId: e.aggregateId, seq: e.seq,
+      id: e.id, workspaceId: e.workspaceId, aggregateType: e.aggregateType, aggregateId: e.aggregateId, seq: e.seq,
       eventType: e.eventType, eventVersion: e.eventVersion, payload: e.payload, actor: e.actor,
       createdAt: e.createdAt, sealPrev: e.sealPrev,
     }),
@@ -210,7 +223,7 @@ export async function appendApEvent(input: AppendInput): Promise<ApEventRow> {
   });
   const last = tail.rows[0];
   const seq = last ? Number(last.seq) + 1 : 0;
-  const sealPrev = last ? String(last.seal) : genesisFor(input.aggregateType, input.aggregateId);
+  const sealPrev = last ? String(last.seal) : genesisFor(workspaceId, input.aggregateType, input.aggregateId);
 
   if (input.expectedSeq !== undefined && input.expectedSeq !== seq) {
     throw new SequenceConflictError(input.aggregateType, input.aggregateId, input.expectedSeq, seq);
@@ -321,7 +334,7 @@ export async function verifyAggregate(
   workspaceId: string = DEFAULT_WORKSPACE,
 ): Promise<VerifyResult> {
   const rows = await readAggregate(aggregateType, aggregateId, workspaceId);
-  let prevSeal = genesisFor(aggregateType, aggregateId);
+  let prevSeal = genesisFor(workspaceId, aggregateType, aggregateId);
   for (let i = 0; i < rows.length; i++) {
     const r = rows[i];
     if (r.seq !== i) return { valid: false, length: rows.length, brokenAt: i, reason: "non_contiguous_sequence" };

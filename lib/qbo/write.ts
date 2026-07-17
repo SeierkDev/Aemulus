@@ -31,20 +31,30 @@ let ensured: Promise<void> | null = null;
 export function ensureQboSchema(): Promise<void> {
   if (!ensured) {
     ensured = (async () => {
-      await ready();
-      const cols = await db.execute(`PRAGMA table_info(qbo_write)`);
-      const exists = cols.rows.length > 0;
-      const hasWorkspace = cols.rows.some((r) => String((r as Record<string, unknown>).name) === "workspace_id");
-      if (exists && !hasWorkspace) {
-        await db.execute(`ALTER TABLE qbo_write RENAME TO qbo_write_legacy`);
-        await db.execute(DDL);
-        await db.execute(
-          `INSERT INTO qbo_write (workspace_id, invoice_id, status, qbo_bill_id, doc_number, attempts, last_error, created_at, updated_at)
-           SELECT '${DEFAULT_WORKSPACE}', invoice_id, status, qbo_bill_id, doc_number, attempts, last_error, created_at, updated_at FROM qbo_write_legacy`,
-        );
-        await db.execute(`DROP TABLE qbo_write_legacy`);
-      } else {
-        await db.execute(DDL);
+      try {
+        await ready();
+        const legacy = await db.execute(`PRAGMA table_info(qbo_write_legacy)`);
+        const mainPre = await db.execute(`PRAGMA table_info(qbo_write)`);
+        if (legacy.rows.length > 0 && mainPre.rows.length === 0) {
+          await db.execute(`ALTER TABLE qbo_write_legacy RENAME TO qbo_write`);
+        }
+        const cols = await db.execute(`PRAGMA table_info(qbo_write)`);
+        const exists = cols.rows.length > 0;
+        const hasWorkspace = cols.rows.some((r) => String((r as Record<string, unknown>).name) === "workspace_id");
+        if (exists && !hasWorkspace) {
+          await db.batch([
+            `ALTER TABLE qbo_write RENAME TO qbo_write_legacy`,
+            DDL,
+            `INSERT INTO qbo_write (workspace_id, invoice_id, status, qbo_bill_id, doc_number, attempts, last_error, created_at, updated_at)
+             SELECT '${DEFAULT_WORKSPACE}', invoice_id, status, qbo_bill_id, doc_number, attempts, last_error, created_at, updated_at FROM qbo_write_legacy`,
+            `DROP TABLE qbo_write_legacy`,
+          ], "write");
+        } else {
+          await db.execute(DDL);
+        }
+      } catch (e) {
+        ensured = null;
+        throw e;
       }
     })();
   }

@@ -43,11 +43,15 @@ export async function decideInvoice(input: DecideInput): Promise<DecideResult> {
 
   if (!input.canEnter) return { ok: false, error: "limit_reached", httpStatus: 400 };
 
-  await appendApEvent({
-    workspaceId, aggregateType: "invoice", aggregateId: invoiceId, eventType: "invoice.override",
-    payload: { type: "review", field: "review", originalValue: "flagged", newValue: "cleared", reasonCode, note },
-    actor, now, id: newId("evt"),
-  });
+  // Seal the clearance once. If a prior attempt sealed it but the entry then failed,
+  // a retry re-enters without appending a duplicate override.
+  if (state.overrides.length === 0) {
+    await appendApEvent({
+      workspaceId, aggregateType: "invoice", aggregateId: invoiceId, eventType: "invoice.override",
+      payload: { type: "review", field: "review", originalValue: "flagged", newValue: "cleared", reasonCode, note },
+      actor, now, id: newId("evt"),
+    });
+  }
 
   const r = await enterInvoice({
     invoiceId,

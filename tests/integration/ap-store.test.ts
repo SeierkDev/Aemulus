@@ -40,7 +40,7 @@ describe("replay correctness", () => {
     expect(rows.map((r) => r.seq)).toEqual([0, 1, 2]);
     expect(rows.map((r) => r.eventType)).toEqual(["invoice.review_paused", "invoice.override", "invoice.submitted"]);
     expect(rows[1].payload.newValue).toBe(120);
-    expect(rows[0].sealPrev).toBe(`genesis:invoice:${id}`);
+    expect(rows[0].sealPrev).toBe(`genesis:default:invoice:${id}`);
     expect(rows[2].sealPrev).toBe(rows[1].seal);
 
     expect(await verifyAggregate("invoice", id)).toEqual({ valid: true, length: 3 });

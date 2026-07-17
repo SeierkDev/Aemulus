@@ -43,6 +43,13 @@ const PROMPT =
   "- confidence: 0..1, how confident you are in this read overall.\n" +
   "If a field is genuinely not present, use an empty string (or 0 for amount) and lower your confidence. Do not invent values.";
 
+/** True only for a real ISO calendar date (rejects 2025-13-45 etc.). */
+export function isRealIsoDate(d: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+  const dt = new Date(`${d}T00:00:00Z`);
+  return !Number.isNaN(dt.getTime()) && dt.toISOString().slice(0, 10) === d;
+}
+
 /** Clamp/normalize a raw model read into a safe ExtractedInvoice. */
 export function normalizeExtracted(raw: Partial<ExtractedInvoice>): ExtractedInvoice {
   const amount = Number(raw.amount);
@@ -51,7 +58,7 @@ export function normalizeExtracted(raw: Partial<ExtractedInvoice>): ExtractedInv
   return {
     vendor: String(raw.vendor ?? "").trim(),
     invoiceNumber: String(raw.invoiceNumber ?? "").trim(),
-    invoiceDate: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : "",
+    invoiceDate: isRealIsoDate(date) ? date : "",
     amount: Number.isFinite(amount) && amount > 0 ? Math.round(amount * 100) / 100 : 0,
     currency: (String(raw.currency ?? "USD").trim() || "USD").toUpperCase().slice(0, 3),
     confidence: Number.isFinite(conf) ? Math.min(1, Math.max(0, conf)) : 0,

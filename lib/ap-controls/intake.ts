@@ -1,6 +1,7 @@
 import { id as newId } from "../ids";
 import { appendApEvent } from "./store";
 import { enterInvoice, type EnterResult } from "./qbo-submit";
+import { isRealIsoDate } from "./extract";
 import { DEFAULT_WORKSPACE } from "./workspace";
 
 // Turn a reviewed, extracted invoice into a real workspace invoice: seal its
@@ -31,7 +32,7 @@ export async function intakeEnter(
   const vendor = fields.vendor.trim() || "Unknown vendor";
   const docNumber = fields.invoiceNumber.trim() || `UPLOAD-${invoiceId}`;
   const currency = (fields.currency.trim() || "USD").toUpperCase().slice(0, 3);
-  const txnDate = /^\d{4}-\d{2}-\d{2}$/.test(fields.invoiceDate)
+  const txnDate = isRealIsoDate(fields.invoiceDate)
     ? fields.invoiceDate
     : new Date(now).toISOString().slice(0, 10);
 

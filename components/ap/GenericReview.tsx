@@ -64,6 +64,8 @@ export function GenericReview({
         ? { status: "submitted", billNumber: data.billNumber, target: data.target, verify: data.verify }
         : { status: "rejected" });
       router.refresh();
+    } catch {
+      setError("Something went wrong. Try again.");
     } finally {
       setBusy(false);
     }

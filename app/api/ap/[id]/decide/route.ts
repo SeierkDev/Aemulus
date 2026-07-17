@@ -18,6 +18,9 @@ export async function POST(
   if (id === DEMO_INVOICE_ID) return NextResponse.json({ ok: false, error: "Use the walkthrough for this invoice." }, { status: 404 });
 
   const body = (await req.json().catch(() => ({}))) as { action?: string; reasonCode?: string; note?: string };
+  if (body.action !== "approve" && body.action !== "reject") {
+    return NextResponse.json({ ok: false, error: "Action must be approve or reject." }, { status: 400 });
+  }
   const now = Date.now();
   const ent = await viewerEntitlement(viewer, now);
 
@@ -25,7 +28,7 @@ export async function POST(
     invoiceId: id,
     workspaceId: viewer.workspaceId,
     actor: viewerActor(viewer),
-    action: body.action === "reject" ? "reject" : "approve",
+    action: body.action,
     reasonCode: String(body.reasonCode ?? "").trim(),
     note: body.note ? String(body.note) : undefined,
     canEnter: ent.canEnter,

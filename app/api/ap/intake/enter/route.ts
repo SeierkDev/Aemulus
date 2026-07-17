@@ -8,6 +8,9 @@ export const dynamic = "force-dynamic";
 // Confirm the (possibly edited) extracted fields and enter the invoice: seals
 // provenance + enters via QuickBooks/ledger. Returns the real bill + verification.
 export async function POST(req: Request) {
+  const viewer = await getApViewer().catch(() => null);
+  if (!viewer) return NextResponse.json({ ok: false, error: "Sign in first." }, { status: 401 });
+
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;
@@ -28,8 +31,6 @@ export async function POST(req: Request) {
     currency: String(body.currency ?? "USD"),
   };
 
-  const viewer = await getApViewer().catch(() => null);
-  if (!viewer) return NextResponse.json({ ok: false, error: "Sign in first." }, { status: 401 });
   if (!(await viewerEntitlement(viewer, Date.now())).canEnter) {
     return NextResponse.json({ ok: false, error: "limit_reached" }, { status: 400 });
   }
