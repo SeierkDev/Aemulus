@@ -18,6 +18,7 @@ import { canonicalize } from "./override-log";
 export type ApAggregateType = "invoice" | "vendor";
 
 export type ApEventType =
+  | "invoice.received"
   | "invoice.override"
   | "invoice.submitted"
   | "invoice.review_paused"
@@ -26,6 +27,7 @@ export type ApEventType =
   | "vendor.bank_verified";
 
 // Payload shapes (documentation + call-site typing; stored as JSON).
+export interface InvoiceReceivedPayload { vendor: string; invoiceNumber: string; invoiceDate: string; amount: number; currency: string; source: string }
 export interface InvoiceOverridePayload { type: string; field: string; originalValue: unknown; newValue: unknown; reasonCode: string; overrideEventId?: string }
 export interface InvoiceSubmittedPayload { billNumber: string; total: number; currency: string; auto: boolean } // v2
 export interface InvoiceReviewPausedPayload {
@@ -44,6 +46,7 @@ export interface VendorBankVerifiedPayload { method: "callback" | "portal" | "re
 // Current payload version per event type. Bump when a payload shape changes and
 // add an upcaster below.
 export const CURRENT_VERSIONS: Record<ApEventType, number> = {
+  "invoice.received": 1,
   "invoice.override": 1,
   "invoice.submitted": 2, // v2 renamed `amount` → `total`
   "invoice.review_paused": 1,

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ResetButton } from "@/components/ap/ResetButton";
+import { IntakeUpload } from "@/components/ap/IntakeUpload";
 import { seedApDemo } from "@/lib/ap-controls/demo";
 import { liveInvoiceQueueAll } from "@/lib/ap-controls/projections";
 
@@ -89,6 +90,8 @@ export default async function ApQueuePage() {
             Every decision here is sealed to a tamper-evident audit log.
           </p>
         )}
+
+        <IntakeUpload />
       </div>
 
       {/* Demo controls — deliberately quiet, out of the primary flow. */}
