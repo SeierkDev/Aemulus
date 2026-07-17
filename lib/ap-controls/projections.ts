@@ -38,7 +38,7 @@ export interface OverrideSummary {
 
 export interface InvoiceEntryState {
   invoiceId: string;
-  status: "new" | "needs_review" | "submitted";
+  status: "new" | "needs_review" | "submitted" | "rejected";
   amount: number | null;
   currency: string | null;
   vendor: string | null;
@@ -96,6 +96,13 @@ export function foldInvoiceEntryState(events: ApEventRow[]): InvoiceEntryState {
         if (field === "vendor" || field === "vendorId") s.vendor = str(p, "newValue") ?? s.vendor;
         // A logged override is already fully authorized (incl. any second approver).
         s.pendingSecondApproval = false;
+        break;
+      }
+      case "invoice.rejected": {
+        s.status = "rejected";
+        s.pendingSecondApproval = false;
+        s.reasonCodes = [];
+        s.topReasonCode = null;
         break;
       }
       case "invoice.submitted": {

@@ -22,12 +22,14 @@ export type ApEventType =
   | "invoice.override"
   | "invoice.submitted"
   | "invoice.review_paused"
+  | "invoice.rejected"
   | "vendor.requested"
   | "vendor.approved"
   | "vendor.bank_verified";
 
 // Payload shapes (documentation + call-site typing; stored as JSON).
 export interface InvoiceReceivedPayload { vendor: string; invoiceNumber: string; invoiceDate: string; amount: number; currency: string; source: string }
+export interface InvoiceRejectedPayload { reasonCode: string; note?: string }
 export interface InvoiceOverridePayload { type: string; field: string; originalValue: unknown; newValue: unknown; reasonCode: string; overrideEventId?: string }
 export interface InvoiceSubmittedPayload { billNumber: string; total: number; currency: string; auto: boolean } // v2
 export interface InvoiceReviewPausedPayload {
@@ -47,6 +49,7 @@ export interface VendorBankVerifiedPayload { method: "callback" | "portal" | "re
 // add an upcaster below.
 export const CURRENT_VERSIONS: Record<ApEventType, number> = {
   "invoice.received": 1,
+  "invoice.rejected": 1,
   "invoice.override": 1,
   "invoice.submitted": 2, // v2 renamed `amount` → `total`
   "invoice.review_paused": 1,
