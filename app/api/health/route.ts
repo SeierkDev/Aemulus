@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { bootAt, metricsSnapshot } from "@/lib/metrics";
 import { jobCounts } from "@/lib/jobs";
 import { gatingEnabled } from "@/lib/solana";
+import { launchStatus } from "@/lib/launch-status";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,6 +39,7 @@ export async function GET(req: Request) {
       }
     }
     body.gating = gatingEnabled();
+    body.launch = launchStatus(); // full live config (gating/anchoring/payouts)
     body.metrics = metricsSnapshot();
   }
   return NextResponse.json(body, { status: dbOk ? 200 : 503 });
