@@ -9,8 +9,9 @@ export const dynamic = "force-dynamic";
 export default async function OrgPage() {
   const session = await getSession();
   const orgs = session ? await listMyOrgs(session.pubkey) : [];
+  const me = session?.pubkey ?? ""; // orgs is empty without a session, so this is only used when authed
   const withMembers = await Promise.all(
-    orgs.map(async (o) => ({ ...o, members: await listMembers(o.id) })),
+    orgs.map(async (o) => ({ ...o, members: await listMembers(o.id, me) })),
   );
 
   return (

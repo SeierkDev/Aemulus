@@ -33,6 +33,23 @@ describe("orgs + membership", () => {
     expect(await removeMember(org.id, A, B)).toBe(true);
     expect(await roleOf(org.id, B)).toBeNull();
   });
+
+  it("only the creator can remove or demote another admin (no rogue-admin takeover)", async () => {
+    const org = await createOrg(A, "Beta"); // A is creator/admin
+    expect(await addMember(org.id, A, B, "admin")).toBe(true);
+    expect(await addMember(org.id, A, C, "admin")).toBe(true);
+
+    // B (admin, NOT creator) can't remove or demote co-admin C.
+    expect(await removeMember(org.id, B, C)).toBe(false);
+    expect(await addMember(org.id, B, C, "member")).toBe(false); // demote refused
+    expect(await roleOf(org.id, C)).toBe("admin");
+
+    // The creator can.
+    expect(await addMember(org.id, A, C, "member")).toBe(true); // creator demotes
+    expect(await roleOf(org.id, C)).toBe("member");
+    // A plain admin CAN still remove a plain member.
+    expect(await removeMember(org.id, B, C)).toBe(true);
+  });
 });
 
 describe("skillAccess + shared skills", () => {
@@ -48,8 +65,10 @@ describe("skillAccess + shared skills", () => {
 
     await setSkillOrg(skill.id, A, org.id);
     const shared = (await getSkill(skill.id))!;
+    // Sharing widens view+run to the team, but EDIT stays owner-only — a non-owner
+    // (even an org admin) can't rewrite the executable plan in place.
     expect(await skillAccess(shared, B)).toEqual({ view: true, run: true, edit: false }); // member
-    expect(await skillAccess(shared, C)).toEqual({ view: true, run: true, edit: true }); // admin
+    expect(await skillAccess(shared, C)).toEqual({ view: true, run: true, edit: false }); // admin: view+run, NOT edit
     expect(await skillAccess(shared, "OUTSIDER")).toEqual({ view: false, run: false, edit: false });
 
     // shared skill shows up in a member's skill list

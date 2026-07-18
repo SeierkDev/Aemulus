@@ -63,8 +63,12 @@ export async function listMyOrgs(wallet: string): Promise<OrgMeta[]> {
   }));
 }
 
-export async function listMembers(orgId: string): Promise<MemberMeta[]> {
+export async function listMembers(orgId: string, requester: string): Promise<MemberMeta[]> {
   await ready();
+  // Guard at the function boundary: only a member may list an org's members, so
+  // this can never become a cross-org wallet-enumeration IDOR if a future caller
+  // passes a client-supplied orgId.
+  if ((await roleOf(orgId, requester)) === null) return [];
   const r = await db.execute({
     sql: `SELECT wallet, role, created_at FROM org_members WHERE org_id = ?
           ORDER BY created_at ASC`,
@@ -97,6 +101,9 @@ export async function addMember(
   if (wallet === owner) effRole = "admin";
 
   const existing = await roleOf(orgId, wallet);
+  // Only the creator may DEMOTE an existing admin — otherwise one rogue admin
+  // could strip every co-admin. (Promoting a member to admin stays open to admins.)
+  if (existing === "admin" && effRole !== "admin" && actor !== owner) return false;
   if (existing === null) {
     const count = await db.execute({
       sql: `SELECT COUNT(*) AS n FROM org_members WHERE org_id = ?`,
@@ -121,7 +128,11 @@ export async function removeMember(
 ): Promise<boolean> {
   if ((await roleOf(orgId, actor)) !== "admin") return false;
   const org = await db.execute({ sql: `SELECT owner FROM orgs WHERE id = ?`, args: [orgId] });
-  if (String(org.rows[0]?.owner) === wallet) return false; // never orphan the creator
+  const owner = String(org.rows[0]?.owner ?? "");
+  if (owner === wallet) return false; // never orphan the creator
+  // Only the creator may remove another ADMIN — one rogue admin can't seize the org
+  // by ejecting every co-admin. Admins can still remove plain members.
+  if ((await roleOf(orgId, wallet)) === "admin" && actor !== owner) return false;
   const r = await db.execute({
     sql: `DELETE FROM org_members WHERE org_id = ? AND wallet = ?`,
     args: [orgId, wallet],

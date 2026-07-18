@@ -407,7 +407,12 @@ export async function skillAccess(
   return {
     view: inOrg || skill.published,
     run: inOrg || skill.published,
-    edit: role === "admin", // org admins can edit shared skills (creator already full)
+    // EDIT IS OWNER-ONLY. An org member sharing a skill grants teammates view+run,
+    // NOT the right to rewrite its executable plan in place: a non-owner edit
+    // mutates the single skills row, so a tampered plan would reach the owner's own
+    // vault-enabled runs AND (if published) every marketplace runner. Collaborative
+    // editing, if wanted, must be a fork/propose flow — never an in-place mutation.
+    edit: false,
   };
 }
 
