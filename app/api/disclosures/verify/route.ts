@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { verifyDisclosure } from "@/lib/commitment";
+import { getRun } from "@/lib/runs";
 import { enforceRateLimit } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
@@ -32,6 +33,7 @@ export async function POST(req: Request) {
     const b = await req.json();
     const proof = b?.proof;
     const okShape =
+      str(b?.runId, 120) &&
       str(b?.root, 128) &&
       str(b?.field, 256) &&
       str(b?.value, 20_000) &&
@@ -46,8 +48,25 @@ export async function POST(req: Request) {
           str((s as { hash?: unknown }).hash, 128) &&
           typeof (s as { left?: unknown }).left === "boolean",
       );
-    const valid = okShape && verifyDisclosure(b.root, b.field, b.value, b.salt, proof);
-    return NextResponse.json({ valid: !!valid });
+
+    // BIND the proof to a real run: the bundle's root MUST equal that run's
+    // committed (on-chain anchored) root. Without this, a caller could prove
+    // membership in a self-chosen tree and the "part of the anchored run" claim
+    // would be meaningless. Membership alone is necessary but NOT sufficient.
+    let bound = false;
+    if (okShape) {
+      const run = await getRun(b.runId);
+      bound = !!run?.commitmentRoot && b.root === run.commitmentRoot;
+    }
+
+    const valid = bound && verifyDisclosure(b.root, b.field, b.value, b.salt, proof);
+    return NextResponse.json({
+      valid: !!valid,
+      // Distinguish "cryptographically valid but not tied to this run" from a
+      // genuine proof, so the UI never shows a false "part of the run" claim.
+      bound,
+      runId: valid ? b.runId : undefined,
+    });
   } catch {
     return NextResponse.json({ valid: false }, { status: 400 });
   }

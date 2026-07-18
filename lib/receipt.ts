@@ -46,6 +46,13 @@ export function receiptDigest(input: {
   steps: ReceiptStep[];
   /** Private-receipt commitment root, folded in so it's anchored on-chain too. */
   commitmentRoot?: string | null;
+  /** The outcome verdict + result/error, folded in so the "achieved" trust signal
+   *  and the run's result/error are tamper-evident (not mutable DB fields the hash
+   *  ignores). */
+  outcomeStatus?: string | null;
+  outcomeReason?: string | null;
+  result?: string | null;
+  error?: string | null;
 }): string {
   const canonical = JSON.stringify({
     run: input.runId,
@@ -53,6 +60,10 @@ export function receiptDigest(input: {
     owner: input.owner,
     status: input.status,
     commit: input.commitmentRoot ?? null,
+    outcome: input.outcomeStatus ?? null,
+    outcomeReason: input.outcomeReason ?? null,
+    result: input.result ?? null,
+    error: input.error ?? null,
     steps: [...input.steps]
       .sort((a, b) => a.idx - b.idx)
       .map((s) => ({
@@ -131,6 +142,10 @@ async function digestForRun(run: Run): Promise<string> {
     owner: run.owner,
     status: run.status,
     commitmentRoot: run.commitmentRoot,
+    outcomeStatus: run.outcomeStatus,
+    outcomeReason: run.outcomeReason,
+    result: run.result,
+    error: run.error,
     steps,
   });
 }

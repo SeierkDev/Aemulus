@@ -215,7 +215,7 @@ class RecorderSession {
           await page.mouse.move(clamp(ev.x, VIEWPORT.width), clamp(ev.y, VIEWPORT.height));
           break;
         case "scroll":
-          await page.mouse.wheel(0, ev.dy);
+          await page.mouse.wheel(0, Math.max(-100_000, Math.min(100_000, ev.dy)));
           break;
         case "text":
           await page.keyboard.type(ev.text);

@@ -42,7 +42,13 @@ export function buildMerkle(leafHashes: string[]): MerkleTree {
   const layers: Buffer[][] = [];
   for (;;) {
     if (level.length > 1 && level.length % 2 === 1) {
-      level = [...level, level[level.length - 1]]; // duplicate last (Bitcoin-style)
+      // Duplicate the last node (Bitcoin-style). The CVE-2012-2459 malleability
+      // this admits is neutralized here by (a) leaf/node domain separation
+      // (hashLeaf 0x00 vs hashNode 0x01, so no node reads as a leaf) and (b) leaves
+      // being fixed, unique, server-computed hashes with 128-bit salts — an
+      // attacker can't induce the duplicate-leaf ambiguity. INVARIANT: this holds
+      // only while leaves stay server-computed and never attacker-chosen.
+      level = [...level, level[level.length - 1]];
     }
     layers.push(level);
     if (level.length === 1) break;

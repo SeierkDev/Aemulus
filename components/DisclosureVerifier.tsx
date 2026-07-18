@@ -5,6 +5,8 @@ import { Button, Card, Label } from "./ui";
 
 interface Result {
   valid: boolean;
+  bound?: boolean;
+  runId?: string;
   field?: string;
   value?: string;
   root?: string;
@@ -42,6 +44,8 @@ export function DisclosureVerifier({ initial = "" }: { initial?: string }) {
       const d = await r.json();
       setResult({
         valid: !!d.valid,
+        bound: !!d.bound,
+        runId: typeof d.runId === "string" ? d.runId : undefined,
         field: typeof bundle.field === "string" ? bundle.field : undefined,
         value: typeof bundle.value === "string" ? bundle.value : undefined,
         root: typeof bundle.root === "string" ? bundle.root : undefined,
@@ -63,7 +67,7 @@ export function DisclosureVerifier({ initial = "" }: { initial?: string }) {
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder='{ "field": "output.total", "value": "$42.00", "salt": "…", "proof": { "siblings": […] }, "root": "…" }'
+        placeholder='{ "runId": "run_…", "field": "output.total", "value": "$42.00", "salt": "…", "proof": { "siblings": […] }, "root": "…" }'
         aria-label="Disclosure bundle"
         rows={6}
         className="mono mt-3 w-full rounded-[var(--radius-base)] border border-border-strong bg-surface-2 p-3 text-xs outline-none placeholder:text-ink-3 focus:border-ink-3"
@@ -85,10 +89,15 @@ export function DisclosureVerifier({ initial = "" }: { initial?: string }) {
             <>
               <div className="text-sm font-semibold text-ink">✓ Proof verified</div>
               <p className="mt-1.5 text-sm text-ink-2">
-                The field below is provably part of the committed (anchored) run —
-                and nothing else about the run is revealed by this proof.
+                The field below is provably part of run{" "}
+                <span className="mono text-ink">{result.runId}</span>&apos;s committed
+                (on-chain anchored) root — and nothing else about the run is revealed.
               </p>
               <div className="mt-3 grid gap-1.5 text-sm">
+                <div className="flex items-baseline gap-2">
+                  <span className="mono w-14 shrink-0 text-ink-3">run</span>
+                  <span className="mono text-ink">{result.runId}</span>
+                </div>
                 <div className="flex items-baseline gap-2">
                   <span className="mono w-14 shrink-0 text-ink-3">field</span>
                   <span className="mono text-ink">{result.field}</span>
@@ -105,7 +114,8 @@ export function DisclosureVerifier({ initial = "" }: { initial?: string }) {
             </>
           ) : (
             <div className="text-sm font-semibold text-ink">
-              ✗ This proof does not verify against its stated root.
+              ✗ This proof does not verify — its root doesn&apos;t match the run&apos;s
+              committed root, or the field isn&apos;t part of it.
             </div>
           )}
         </div>

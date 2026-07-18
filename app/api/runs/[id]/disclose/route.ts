@@ -39,5 +39,7 @@ export async function GET(
   if (!disclosure) {
     return NextResponse.json({ error: "Unknown field" }, { status: 404 });
   }
-  return NextResponse.json({ disclosure });
+  // Bind the bundle to the run: the verifier requires bundle.root === the run's
+  // committed root, so a proof can't be re-based onto an attacker-chosen tree.
+  return NextResponse.json({ disclosure: { runId: id, ...disclosure } });
 }

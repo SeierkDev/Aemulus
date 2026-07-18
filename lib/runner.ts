@@ -204,12 +204,23 @@ export async function executeRun(
         // Interactive checkpoint: pause for a live human takeover (e.g. 2FA),
         // keeping THIS browser/context alive so the authenticated session
         // persists, then resume. Opt-in via AEMULUS_LIVE_HANDOFF=1.
+        // NOTE: the run holds its Chromium run-slot for the whole pause — by
+        // design, since the browser stays allocated (releasing the slot would let
+        // total live browsers exceed AEMULUS_MAX_CONCURRENT_RUNS). It's bounded by
+        // LIVE_TIMEOUT_MS and off by default; many concurrent handoffs can still
+        // starve the pool, so size the pool for expected interactive concurrency.
         if (step.interactive && liveHandoffEnabled()) {
           await setRunStatus(runId, "awaiting_input");
-          await registerLive(runId, page);
           const pauseStart = Date.now();
-          const outcome = await waitForResume(runId, LIVE_TIMEOUT_MS);
-          await unregisterLive(runId);
+          let outcome: "resumed" | "timeout";
+          // finally so the LiveSession (Page + CDP + screencast) is always torn
+          // down even if an await between register and unregister ever throws.
+          await registerLive(runId, page);
+          try {
+            outcome = await waitForResume(runId, LIVE_TIMEOUT_MS);
+          } finally {
+            await unregisterLive(runId);
+          }
           deadline += Date.now() - pauseStart; // don't bill the human pause to the run
           await page.screenshot({ path: shotPath }).catch(() => {});
           if (outcome === "timeout") {
@@ -454,11 +465,11 @@ export async function executeRun(
     } catch (e) {
       logError("runner.commitment", e);
     }
-    await attachReceipt(runId); // verifiable receipt (+ anchor if configured)
-
     // Vision success-verification: did the final screen show the goal was met?
     // Best-effort (skips silently without an API key); its tokens roll into the
-    // run's cost below.
+    // run's cost below. Run this BEFORE attachReceipt so the outcome verdict is
+    // folded into the receipt hash (and thus the on-chain anchor) — otherwise the
+    // hash would omit the very "achieved" signal it's meant to make tamper-evident.
     if (finalStatus === "completed" && finalShot) {
       const goal = `${skill.name}. ${skill.description}`.trim();
       const v = await verifyOutcome(goal, finalShot);
@@ -470,6 +481,8 @@ export async function executeRun(
         incr(v.achieved ? "runs.outcomeVerified" : "runs.outcomeUnconfirmed");
       }
     }
+
+    await attachReceipt(runId); // verifiable receipt (+ anchor if configured)
 
     // Self-healing: only on a fully-completed run, and only when the owner runs
     // their own skill (never let a third party's run mutate a published skill).

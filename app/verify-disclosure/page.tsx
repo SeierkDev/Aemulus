@@ -36,10 +36,12 @@ export default function VerifyDisclosurePage() {
         </div>
 
         <p className="mt-6 text-xs text-ink-3">
-          Run owners generate a disclosure from the run&apos;s page. The root in a
-          proof matches the run&apos;s receipt at{" "}
-          <span className="mono">/verify/&lt;runId&gt;</span> — cross-check it
-          there to confirm the field belongs to the run you expect.
+          Run owners generate a disclosure from the run&apos;s page. The verifier
+          binds the proof to its run automatically — a valid result means the
+          field belongs to that run&apos;s committed root, not just to some root the
+          bundle carries. Cross-check the run itself at{" "}
+          <span className="mono">/verify/&lt;runId&gt;</span> (and its on-chain
+          anchor) for full provenance.
         </p>
       </div>
       <div className="py-10" />

@@ -16,7 +16,12 @@ interface LiveSession {
   lastFrame: string | null;
   resolve: (() => void) | null;
   timer: ReturnType<typeof setTimeout> | null;
+  /** A resume that arrived before waitForResume armed (e.g. during registerLive's
+   *  CDP setup) — honored the moment the wait arms, so it's never dropped. */
+  resumeRequested: boolean;
 }
+
+const MAX_SCROLL = 100_000; // bound the one un-clamped streamed-input field
 
 declare global {
   var __aemLive: Map<string, LiveSession> | undefined;
@@ -38,7 +43,7 @@ export function liveSessionActive(runId: string): boolean {
 
 /** Register a run's live page and start streaming it (screencast best-effort). */
 export async function registerLive(runId: string, page: Page): Promise<void> {
-  const s: LiveSession = { page, cdp: null, lastFrame: null, resolve: null, timer: null };
+  const s: LiveSession = { page, cdp: null, lastFrame: null, resolve: null, timer: null, resumeRequested: false };
   sessions.set(runId, s);
   try {
     const cdp = await page.context().newCDPSession(page);
@@ -81,7 +86,7 @@ export async function liveInput(runId: string, ev: LiveInputEvent): Promise<void
   const page = s.page;
   try {
     if (ev.type === "click") await page.mouse.click(clamp(ev.x, VIEW.width), clamp(ev.y, VIEW.height));
-    else if (ev.type === "scroll") await page.mouse.wheel(0, ev.dy);
+    else if (ev.type === "scroll") await page.mouse.wheel(0, Math.max(-MAX_SCROLL, Math.min(MAX_SCROLL, ev.dy)));
     else if (ev.type === "text") await page.keyboard.type(ev.text);
     else if (ev.type === "key") await page.keyboard.press(ev.key);
   } catch {
@@ -97,6 +102,11 @@ export function waitForResume(
   return new Promise((resolve) => {
     const s = sessions.get(runId);
     if (!s) return resolve("timeout");
+    // Honor a resume that raced ahead of this wait (arrived during CDP setup).
+    if (s.resumeRequested) {
+      s.resumeRequested = false;
+      return resolve("resumed");
+    }
     const t = setTimeout(() => {
       s.resolve = null;
       s.timer = null;
@@ -111,11 +121,13 @@ export function waitForResume(
   });
 }
 
-/** Signal the run to continue. Returns false if nothing is waiting. */
+/** Signal the run to continue. Returns false only if there is no live session
+ *  (a resume that arrives before the wait arms is recorded and honored later). */
 export function resumeLive(runId: string): boolean {
   const s = sessions.get(runId);
-  if (!s || !s.resolve) return false;
-  s.resolve();
+  if (!s) return false;
+  s.resumeRequested = true; // remembered even if no waiter yet
+  if (s.resolve) s.resolve();
   return true;
 }
 
