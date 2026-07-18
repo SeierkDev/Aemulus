@@ -69,7 +69,14 @@ afterEach(() => {
   vi.mocked(recordRunOnChain).mockReset();
   vi.mocked(findClaimPayouts).mockReset();
   delete process.env.AEMULUS_RECEIPT_SECRET;
+  delete process.env.AEMULUS_CLAIM_AUTO_ROLLBACK;
 });
+
+// Isolate each claim test from lingering pending claims of earlier ones.
+async function clearClaims(): Promise<void> {
+  await db.execute(`DELETE FROM claims`);
+  await db.execute(`UPDATE earnings SET claim_id = NULL WHERE claim_id IS NOT NULL`);
+}
 
 describe("anchor reconciliation", () => {
   it("re-anchors a sig-NULL Memo batch and backfills the batch + its runs", async () => {
@@ -126,6 +133,7 @@ describe("anchor reconciliation", () => {
   });
 
   it("settles a pending claim whose payout IS found on-chain (records the real sig)", async () => {
+    await clearClaims();
     const claimId = await seedPendingClaim("CLAIM_SETTLE", 9, Date.now() - 20 * 60 * 1000);
     vi.mocked(findClaimPayouts).mockResolvedValue({
       found: { [claimId]: { sig: "PAID_SIG", cluster: "mainnet-beta" } },
@@ -139,8 +147,25 @@ describe("anchor reconciliation", () => {
     expect(await getClaimable("CLAIM_SETTLE")).toBe(0);
   });
 
-  it("rolls back a definitively-unpaid claim (old + confirmed absent) → earnings claimable again", async () => {
-    const created = Date.now() - 30 * 60 * 1000; // 30m ago (past the grace window)
+  it("by DEFAULT does not auto-roll-back — surfaces a confirmed-absent claim for review (no double-pay)", async () => {
+    await clearClaims();
+    const created = Date.now() - 30 * 60 * 1000;
+    const claimId = await seedPendingClaim("CLAIM_REVIEW", 15, created);
+    vi.mocked(findClaimPayouts).mockResolvedValue({ found: {}, coveredSince: created - 5 * 60 * 1000 });
+    // no AEMULUS_CLAIM_AUTO_ROLLBACK
+    const res = await reconcilePendingClaims();
+    expect(res.rolledBack).toBe(0);
+    expect(res.needsReview).toBeGreaterThanOrEqual(1);
+    // Earnings STAY claimed and the claim survives — a bad RPC memo miss can't
+    // silently un-claim and enable a double-claim.
+    expect(await getClaimable("CLAIM_REVIEW")).toBe(0);
+    expect((await db.execute({ sql: `SELECT 1 FROM claims WHERE id = ?`, args: [claimId] })).rows).toHaveLength(1);
+  });
+
+  it("with AEMULUS_CLAIM_AUTO_ROLLBACK=1, rolls back a definitively-unpaid claim → earnings claimable again", async () => {
+    await clearClaims();
+    process.env.AEMULUS_CLAIM_AUTO_ROLLBACK = "1";
+    const created = Date.now() - 30 * 60 * 1000; // past the grace window
     const claimId = await seedPendingClaim("CLAIM_ROLLBACK", 12, created);
     vi.mocked(findClaimPayouts).mockResolvedValue({
       found: {}, // not on-chain
@@ -148,23 +173,25 @@ describe("anchor reconciliation", () => {
     });
     const res = await reconcilePendingClaims();
     expect(res.rolledBack).toBe(1);
-    // Earnings returned to claimable, claim row gone.
     expect(await getClaimable("CLAIM_ROLLBACK")).toBe(12);
     expect((await db.execute({ sql: `SELECT 1 FROM claims WHERE id = ?`, args: [claimId] })).rows).toHaveLength(0);
   });
 
-  it("leaves a recent unpaid claim pending (payout could still land)", async () => {
+  it("even opted-in, leaves a recent claim pending (payout could still land)", async () => {
+    await clearClaims();
+    process.env.AEMULUS_CLAIM_AUTO_ROLLBACK = "1";
     const claimId = await seedPendingClaim("CLAIM_RECENT", 4, Date.now() - 60 * 1000); // 1m ago
     vi.mocked(findClaimPayouts).mockResolvedValue({ found: {}, coveredSince: Date.now() - 2 * 60 * 1000 });
     const res = await reconcilePendingClaims();
     expect(res.stuck).toBeGreaterThanOrEqual(1);
     expect(res.rolledBack).toBe(0);
-    // Still claimed (not rolled back) — no double-pay window.
     expect(await getClaimable("CLAIM_RECENT")).toBe(0);
     expect((await db.execute({ sql: `SELECT sig FROM claims WHERE id = ?`, args: [claimId] })).rows[0].sig).toBeNull();
   });
 
-  it("does NOT roll back when the scan didn't reach back before the claim (absence unconfirmed)", async () => {
+  it("even opted-in, does NOT roll back when the scan didn't reach back before the claim (absence unconfirmed)", async () => {
+    await clearClaims();
+    process.env.AEMULUS_CLAIM_AUTO_ROLLBACK = "1";
     const created = Date.now() - 30 * 60 * 1000; // old enough by age…
     await seedPendingClaim("CLAIM_UNSCANNED", 8, created);
     vi.mocked(findClaimPayouts).mockResolvedValue({

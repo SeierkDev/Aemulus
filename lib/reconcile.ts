@@ -41,6 +41,17 @@ const STUCK_CLAIM_MS = 15 * 60 * 1000;
 // to roll back — provided the history scan actually reached back before it.
 const SETTLE_GRACE_MS = 10 * 60 * 1000;
 
+// Auto-rollback un-claims earnings (enabling a re-claim) based on the payout being
+// ABSENT from the treasury's memo history. That is only as trustworthy as the RPC's
+// memo indexing — if a payout actually landed but its memo isn't surfaced, an auto
+// rollback DOUBLE-PAYS the creator. So it's OPT-IN: by default a confirmed-absent
+// claim is SURFACED for an operator to verify on the explorer and roll back by hand
+// (rollbackClaim). Enable only after confirming the RPC reliably surfaces payout
+// memos AND that no pending claim predates payout-memo support.
+function autoRollbackEnabled(): boolean {
+  return process.env.AEMULUS_CLAIM_AUTO_ROLLBACK === "1";
+}
+
 /** A Memo signer is configured (the batch anchor path is live). */
 function memoAnchorEnabled(): boolean {
   return !!process.env.AEMULUS_RECEIPT_SECRET;
@@ -157,18 +168,33 @@ export async function reconcileZkAnchors(max = RECONCILE_MAX): Promise<number> {
  * carries an on-chain memo of its claim id (see sendPayout), so we scan the
  * treasury's history and:
  *  - SETTLE a claim whose payout IS found on-chain (record the real signature).
- *  - ROLL BACK a claim whose payout is definitively absent — old enough that its
- *    blockhash has long expired (so it can never land) AND within the range our
- *    scan actually covered — returning the earnings to claimable so the creator
- *    can retry. This is the only safe way to auto-recover a dropped payout without
- *    risking a double pay.
- *  - LEAVE PENDING anything too recent, or that the (bounded) scan didn't reach.
+ *    Presence-based and provably safe: the memo only appears on a SUCCESSFUL,
+ *    atomic payout tx, so a match means the transfer happened.
+ *  - Otherwise, if the payout is ABSENT and the claim is old enough that its
+ *    blockhash has long expired (can never land) AND the scan reached back before
+ *    it, the claim is CONFIRMED-ABSENT: eligible for rollback. But rolling back
+ *    un-claims earnings (enabling a re-claim), which DOUBLE-PAYS if the payout
+ *    actually landed and the RPC merely didn't surface its memo — so it is only
+ *    performed automatically under the AEMULUS_CLAIM_AUTO_ROLLBACK opt-in;
+ *    otherwise it's SURFACED for manual verification (needsReview).
+ *  - LEAVE PENDING anything too recent, or old-but-not-yet-scanned-back-to (the
+ *    bounded scan capped out on a busy treasury — absence is NOT confirmed).
  * Without a configured treasury it can't reconcile, so it just surfaces stuck ones.
  */
-export async function reconcilePendingClaims(): Promise<{ settled: number; rolledBack: number; stuck: number }> {
+export interface ClaimReconcileResult {
+  settled: number;
+  rolledBack: number;
+  /** Confirmed absent + eligible to roll back, but awaiting manual action (auto off). */
+  needsReview: number;
+  /** Not actionable yet: too recent, or the scan didn't reach back to confirm absence. */
+  stuck: number;
+}
+
+export async function reconcilePendingClaims(): Promise<ClaimReconcileResult> {
   await ready();
   const pending = await listPendingClaims(); // created_at ASC
-  if (pending.length === 0) return { settled: 0, rolledBack: 0, stuck: 0 };
+  const zero: ClaimReconcileResult = { settled: 0, rolledBack: 0, needsReview: 0, stuck: 0 };
+  if (pending.length === 0) return zero;
 
   const now = Date.now();
   const lookup = await findClaimPayouts(pending[0].createdAt);
@@ -177,27 +203,46 @@ export async function reconcilePendingClaims(): Promise<{ settled: number; rolle
     if (stuck) {
       logError("reconcile.claims", new Error(`${stuck} pending claim(s) with no signature and no treasury configured to reconcile against`));
     }
-    return { settled: 0, rolledBack: 0, stuck };
+    return { ...zero, stuck };
   }
 
-  let settled = 0;
-  let rolledBack = 0;
-  let stuck = 0;
+  const res: ClaimReconcileResult = { settled: 0, rolledBack: 0, needsReview: 0, stuck: 0 };
+  let scanCapped = 0;
   for (const c of pending) {
     const hit = lookup.found[c.id];
     if (hit) {
       await settleClaim(c.id, hit.sig, hit.cluster);
-      settled++;
-    } else if (c.createdAt < now - SETTLE_GRACE_MS && lookup.coveredSince <= c.createdAt) {
-      await rollbackClaim(c.id);
-      rolledBack++;
+      res.settled++;
+      continue;
+    }
+    const oldEnough = c.createdAt < now - SETTLE_GRACE_MS;
+    const covered = lookup.coveredSince <= c.createdAt;
+    if (oldEnough && covered) {
+      // Confirmed absent on-chain.
+      if (autoRollbackEnabled()) {
+        await rollbackClaim(c.id);
+        res.rolledBack++;
+      } else {
+        res.needsReview++;
+        logError(
+          "reconcile.claims",
+          new Error(`claim ${c.id} (owner-scoped) appears UNPAID on-chain and is eligible to roll back — verify on the explorer and reconcile by hand, or set AEMULUS_CLAIM_AUTO_ROLLBACK=1`),
+        );
+      }
+    } else if (oldEnough && !covered) {
+      // Old, but the bounded scan didn't reach its window (busy treasury): absence
+      // is NOT confirmed, so never roll back — signal it distinctly from "recent".
+      res.stuck++;
+      scanCapped++;
     } else {
-      stuck++; // too recent, or beyond the scan window — try again next tick
+      res.stuck++; // simply too recent — a payout could still be confirming
     }
   }
-  if (settled || rolledBack) logInfo("reconcile.claims", "reconciled claims", { settled, rolledBack });
-  if (stuck) logError("reconcile.claims", new Error(`${stuck} claim(s) still pending reconciliation`));
-  return { settled, rolledBack, stuck };
+  if (res.settled || res.rolledBack) logInfo("reconcile.claims", "reconciled claims", { settled: res.settled, rolledBack: res.rolledBack });
+  if (scanCapped) {
+    logError("reconcile.claims", new Error(`${scanCapped} old pending claim(s) beyond the signature-scan window — raise AEMULUS_RECONCILE_MAX or reconcile manually`));
+  }
+  return res;
 }
 
 let running = false;
@@ -206,12 +251,12 @@ export interface ReconcileSummary {
   batch: number;
   registry: number;
   zk: number;
-  claims: { settled: number; rolledBack: number; stuck: number };
+  claims: ClaimReconcileResult;
 }
 
 /** One reconciliation pass over all anchor types + claims (re-entrancy-guarded). */
 export async function reconcileAnchors(): Promise<ReconcileSummary> {
-  const empty: ReconcileSummary = { batch: 0, registry: 0, zk: 0, claims: { settled: 0, rolledBack: 0, stuck: 0 } };
+  const empty: ReconcileSummary = { batch: 0, registry: 0, zk: 0, claims: { settled: 0, rolledBack: 0, needsReview: 0, stuck: 0 } };
   if (running) return empty;
   running = true;
   try {
