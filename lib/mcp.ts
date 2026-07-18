@@ -173,7 +173,7 @@ async function callTool(
 export async function handleMcp(
   owner: string,
   msg: JsonRpc,
-  scopes: Scope[] = ["read", "run"],
+  scopes: Scope[] = ["read"], // least-privilege default; the real caller passes the key's scopes
 ): Promise<object | null> {
   if (!msg || typeof msg !== "object" || typeof msg.method !== "string") {
     return rpcErr(null, -32600, "Invalid Request");

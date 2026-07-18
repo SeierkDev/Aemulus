@@ -138,23 +138,33 @@ export async function executeRun(
     page.setDefaultTimeout(STEP_TIMEOUT_MS); // per-action cap (no hanging steps)
     let deadline = Date.now() + RUN_TIMEOUT_MS; // hard wall-clock cap (extended over human pauses)
 
-    // Credential vault: auto-fill the runner's stored secrets into any matching
-    // input field not already provided (explicit input wins). Only when the skill
-    // has an OWNER-SET allowlist (so an author can't steer which of the runner's
-    // vault hosts gets filled via a plan-derived host), and each secret is bound
-    // to vaultHost — it's only actually typed while the page is on that host
-    // (see the per-step host check below), so a skill can't navigate elsewhere
-    // and capture the credential.
+    // Credential vault: auto-fill the runner's stored secrets into matching input
+    // fields not already provided (explicit input wins). ONLY for a skill the
+    // runner AUTHORED (owner === runner): a marketplace skill written by someone
+    // else controls the field keys, selectors, and plan, so it could declare an
+    // input keyed "password", allowlist a host the runner has a credential for, and
+    // steer that credential into an author-readable element on the SAME host — which
+    // host-binding alone can't stop. Auto-fill is therefore your-own-skills-only;
+    // running another author's skill never pulls your vault. Each secret is still
+    // bound to vaultHost and only typed while the page is on that host (per-step
+    // check below).
     let effInput = input;
     const vaultKeys = new Set<string>();
     const vaultHost = allowedHosts[0]?.toLowerCase() ?? "";
+    // Input fields the author marked secret (masked in all UI) — used, together
+    // with vaultKeys, to keep a typed secret out of step records + screenshots.
+    const secretFieldKeys = new Set(
+      skill.inputSchema.fields.filter((f) => f.secret).map((f) => f.key),
+    );
     try {
-      if (vaultHost) {
+      if (vaultHost && owner === skill.owner) {
         const creds = await resolveCredentials(owner, vaultHost);
         const fieldKeys = new Set(skill.inputSchema.fields.map((f) => f.key));
         const fill: Record<string, string> = {};
         for (const [k, v] of Object.entries(creds)) {
-          if (fieldKeys.has(k) && !input[k]) {
+          // `!v` skips an undecryptable entry (rotated AUTH_SECRET → "") so a blank
+          // credential is never typed/submitted (fail safe, not fail blank).
+          if (fieldKeys.has(k) && !input[k] && v) {
             fill[k] = v;
             vaultKeys.add(k);
           }
@@ -177,11 +187,26 @@ export async function executeRun(
       const shotRel = path.posix.join("recordings", owner, runId, shotFile);
       const shotPath = path.join(RUNS_DIR, owner, runId, shotFile);
 
+      // A step that types a secret (a vault-filled or author-marked-secret input).
+      // Its value must never be persisted in the step record (shown unmasked in the
+      // Steps list + replay), and its post-fill screenshot must not be captured (a
+      // token in a non-password field would be stored in cleartext on disk + folded
+      // into the receipt). `recVal`/`recShot` are the redacted values to record.
+      const sensitive =
+        (step.action === "input" || step.action === "select") &&
+        step.valueSource === "input" &&
+        (vaultKeys.has(step.inputKey) || secretFieldKeys.has(step.inputKey));
+      const recVal = sensitive ? "" : value;
+      const recShot = sensitive ? "" : shotRel;
+      const snap = async () => {
+        if (!sensitive) await page.screenshot({ path: shotPath }).catch(() => {});
+      };
+
       try {
         // Reviewer chose to skip this step.
         if (override?.skip) {
-          await page.screenshot({ path: shotPath }).catch(() => {});
-          await recordStep(runId, step, "", value, shotRel, 1, false, "Skipped by reviewer.");
+          await snap();
+          await recordStep(runId, step, "", recVal, recShot, 1, false, "Skipped by reviewer.");
           continue;
         }
 
@@ -310,8 +335,8 @@ export async function executeRun(
         if (!loc && Date.now() > deadline) {
           finalStatus = "failed";
           error = "Run exceeded the time limit.";
-          await page.screenshot({ path: shotPath }).catch(() => {});
-          await recordStep(runId, step, "", value, shotRel, 0, true, "Skipped: run time limit reached.");
+          await snap();
+          await recordStep(runId, step, "", recVal, recShot, 0, true, "Skipped: run time limit reached.");
           break;
         }
 
@@ -346,19 +371,19 @@ export async function executeRun(
             tokensIn += ag.tokensIn;
             tokensOut += ag.tokensOut;
             if (ag.ok) {
-              await page.screenshot({ path: shotPath });
-              await recordStep(runId, step, ag.selectorUsed, value, shotRel, ag.confidence, false, ag.note);
+              await snap();
+              await recordStep(runId, step, ag.selectorUsed, recVal, recShot, ag.confidence, false, ag.note);
               continue; // the agent performed the step
             }
             note = ag.note || note;
           }
-          await page.screenshot({ path: shotPath });
+          await snap();
           await recordStep(
             runId,
             step,
             selectorUsed,
-            value,
-            shotRel,
+            recVal,
+            recShot,
             confidence,
             true,
             note || "Could not confidently locate the element.",
@@ -391,17 +416,17 @@ export async function executeRun(
         } else {
           await perform(page, loc.locator, step, value);
           await page.waitForTimeout(150);
-          await page.screenshot({ path: shotPath });
-          await recordStep(runId, step, selectorUsed, value, shotRel, confidence, false, note);
+          await snap(); // skips the screenshot for a secret-typing step
+          await recordStep(runId, step, selectorUsed, recVal, recShot, confidence, false, note);
         }
       } catch (stepErr) {
-        await page.screenshot({ path: shotPath }).catch(() => {});
+        await snap();
         await recordStep(
           runId,
           step,
           "",
-          value,
-          shotRel,
+          recVal,
+          recShot,
           0,
           true,
           stepErr instanceof Error ? stepErr.message : "Step failed.",
