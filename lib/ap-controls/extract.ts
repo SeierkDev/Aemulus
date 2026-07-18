@@ -50,17 +50,27 @@ export function isRealIsoDate(d: string): boolean {
   return !Number.isNaN(dt.getTime()) && dt.toISOString().slice(0, 10) === d;
 }
 
+// Strip control chars (a malicious invoice image could inject newlines / control
+// bytes into the extracted text, which then get sealed verbatim) and length-cap.
+function cleanText(s: unknown, max = 200): string {
+  // eslint-disable-next-line no-control-regex
+  return String(s ?? "").replace(/[\x00-\x1F\x7F]/g, " ").trim().slice(0, max);
+}
+
 /** Clamp/normalize a raw model read into a safe ExtractedInvoice. */
 export function normalizeExtracted(raw: Partial<ExtractedInvoice>): ExtractedInvoice {
   const amount = Number(raw.amount);
   const conf = Number(raw.confidence);
   const date = String(raw.invoiceDate ?? "").trim();
+  const cur = String(raw.currency ?? "").trim().toUpperCase();
   return {
-    vendor: String(raw.vendor ?? "").trim(),
-    invoiceNumber: String(raw.invoiceNumber ?? "").trim(),
+    vendor: cleanText(raw.vendor),
+    invoiceNumber: cleanText(raw.invoiceNumber, 100),
     invoiceDate: isRealIsoDate(date) ? date : "",
     amount: Number.isFinite(amount) && amount > 0 ? Math.round(amount * 100) / 100 : 0,
-    currency: (String(raw.currency ?? "USD").trim() || "USD").toUpperCase().slice(0, 3),
+    // Only a real 3-letter alphabetic code; anything else (e.g. "1$X", "dollars")
+    // falls back to USD rather than sealing a bogus currency.
+    currency: /^[A-Z]{3}$/.test(cur) ? cur : "USD",
     confidence: Number.isFinite(conf) ? Math.min(1, Math.max(0, conf)) : 0,
   };
 }
@@ -72,7 +82,7 @@ export async function extractInvoice(input: ExtractInput): Promise<ExtractedInvo
       : imageBlock(input.base64, input.mediaType);
 
   const res = await getClaude().messages.create({
-    model: MODELS.generalizer, // vision-capable; extraction is a read, not deep reasoning
+    model: MODELS.operator, // vision-capable + cheaper; extraction is an OCR read, not deep reasoning
     max_tokens: 1024,
     thinking: { type: "disabled" },
     output_config: { format: { type: "json_schema", schema: SCHEMA } },

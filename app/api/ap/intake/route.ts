@@ -18,6 +18,13 @@ export async function POST(req: Request) {
   const limited = enforceRateLimit(`ap-extract:${viewer.workspaceId}`, 10, 60_000, "Too many uploads");
   if (limited) return NextResponse.json({ ok: false, error: "Too many uploads — slow down." }, { status: 429 });
 
+  // Reject an oversized upload by its declared size BEFORE formData() buffers the
+  // whole multipart body into memory (App-Router handlers have no default cap).
+  // The exact file.size is re-checked below (a multipart body is a bit larger).
+  if (Number(req.headers.get("content-length") || 0) > MAX_BYTES + 1024 * 1024) {
+    return NextResponse.json({ ok: false, error: "File is too large (max 12 MB)." }, { status: 413 });
+  }
+
   let form: FormData;
   try {
     form = await req.formData();

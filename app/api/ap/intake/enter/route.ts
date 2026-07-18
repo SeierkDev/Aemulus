@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { intakeEnter } from "@/lib/ap-controls/intake";
 import { normalizeExtracted } from "@/lib/ap-controls/extract";
 import { getApViewer, viewerActor, viewerEntitlement } from "@/lib/ap-controls/ap-viewer";
+import { reserveApEntry, releaseApEntry } from "@/lib/ap-controls/billing";
+import { enforceRateLimit } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +17,11 @@ const MAX_ENTER_AMOUNT = 1_000_000_000_000; // 1 trillion
 export async function POST(req: Request) {
   const viewer = await getApViewer().catch(() => null);
   if (!viewer) return NextResponse.json({ ok: false, error: "Sign in first." }, { status: 401 });
+
+  // Throttle entries per workspace (the entry path needs no prior upload, so an
+  // unmetered burst could hammer the seal store / race the quota).
+  const limited = enforceRateLimit(`ap-enter:${viewer.workspaceId}`, 20, 60_000, "Too many entries");
+  if (limited) return limited;
 
   let body: Record<string, unknown>;
   try {
@@ -49,11 +56,21 @@ export async function POST(req: Request) {
     currency: norm.currency,
   };
 
-  if (!(await viewerEntitlement(viewer, Date.now())).canEnter) {
-    return NextResponse.json({ ok: false, error: "limit_reached" }, { status: 400 });
+  // Atomically RESERVE a quota slot before entering, so a concurrent burst can't
+  // race past a soft used<limit check. Only for a capped tier; unlimited/pre-launch
+  // needs no reservation. Released below if the entry doesn't complete.
+  const now = Date.now();
+  const ent = await viewerEntitlement(viewer, now);
+  let reservation: string | null = null;
+  if (ent.enforced && ent.limit !== null) {
+    reservation = await reserveApEntry(viewer.workspaceId, ent.limit, now);
+    if (!reservation) {
+      return NextResponse.json({ ok: false, error: "limit_reached" }, { status: 400 });
+    }
   }
-  const r = await intakeEnter(fields, "upload", Date.now(), viewerActor(viewer), viewer.workspaceId);
+  const r = await intakeEnter(fields, "upload", now, viewerActor(viewer), viewer.workspaceId);
   if (!r.ok) {
+    if (reservation) await releaseApEntry(reservation); // entry failed → return the slot
     return NextResponse.json({ ok: false, error: r.error }, { status: r.error === "in_progress" ? 409 : 400 });
   }
   return NextResponse.json({
