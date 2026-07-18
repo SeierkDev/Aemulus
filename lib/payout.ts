@@ -20,7 +20,14 @@ import { SOLANA, gatingEnabled } from "./solana";
 
 const TOKEN_PROGRAM = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 const ATA_PROGRAM = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+const MEMO_PROGRAM = new PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
 const DECIMALS = Math.max(0, Number(process.env.AEMULUS_DECIMALS) || 6);
+
+/** Memo stamped on each payout so it can be matched back to its claim on-chain. */
+export const CLAIM_MEMO_PREFIX = "aemulus:claim:";
+function claimMemo(claimId: string): string {
+  return `${CLAIM_MEMO_PREFIX}${claimId}`;
+}
 
 export function payoutsEnabled(): boolean {
   return gatingEnabled() && !!process.env.AEMULUS_TREASURY_SECRET;
@@ -101,6 +108,7 @@ export class PayoutPrepError extends Error {
 export async function sendPayout(
   toWallet: string,
   amount: number,
+  reference?: string,
 ): Promise<{ sig: string; cluster: string } | null> {
   const secret = process.env.AEMULUS_TREASURY_SECRET;
   if (!gatingEnabled() || !secret) return null;
@@ -143,6 +151,18 @@ export async function sendPayout(
     for (const ix of buildPayoutInstructions(treasury.publicKey, to, mint, toBaseUnits(amount))) {
       tx.add(ix);
     }
+    // Stamp the claim id as a Memo so a payout whose confirmation is lost can be
+    // matched back to its claim on-chain (see findClaimPayouts) and safely settled
+    // or rolled back — rather than stranding the creator's funds forever.
+    if (reference) {
+      tx.add(
+        new TransactionInstruction({
+          programId: MEMO_PROGRAM,
+          keys: [],
+          data: Buffer.from(claimMemo(reference), "utf8"),
+        }),
+      );
+    }
   } catch (e) {
     if (e instanceof PayoutPrepError) throw e;
     throw new PayoutPrepError(e instanceof Error ? e.message : "payout preparation failed");
@@ -150,4 +170,47 @@ export async function sendPayout(
 
   const sig = await sendAndConfirmTransaction(conn, tx, [treasury]);
   return { sig, cluster };
+}
+
+/**
+ * Scan the treasury's recent transaction history for payout memos, mapping each
+ * claim id back to the transaction that paid it. The memo is surfaced directly in
+ * getSignaturesForAddress, so no per-transaction fetch is needed. Returns the
+ * matches plus `coveredSince` — the oldest block time the scan reached — so the
+ * caller can tell whether the ABSENCE of a claim is real (scan went back far
+ * enough) or just un-scanned. Null when the treasury isn't configured.
+ *
+ * `_conn` is injectable for tests (defaults to a live connection).
+ */
+export async function findClaimPayouts(
+  sinceMs: number,
+  _conn?: Pick<Connection, "getSignaturesForAddress">,
+): Promise<{ found: Record<string, { sig: string; cluster: string }>; coveredSince: number } | null> {
+  const secret = process.env.AEMULUS_TREASURY_SECRET;
+  if (!gatingEnabled() || !secret) return null;
+  const cluster = process.env.AEMULUS_RECEIPT_CLUSTER || "mainnet-beta";
+  const conn = _conn ?? new Connection(process.env.AEMULUS_RECEIPT_RPC || SOLANA.rpcUrl, "confirmed");
+  const treasury = Keypair.fromSecretKey(bs58.decode(secret)).publicKey;
+
+  const found: Record<string, { sig: string; cluster: string }> = {};
+  let coveredSince = Date.now();
+  let before: string | undefined;
+  const MAX_PAGES = 10; // bound the scan (up to ~10k signatures)
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const sigs = await conn.getSignaturesForAddress(treasury, { before, limit: 1000 });
+    if (sigs.length === 0) break;
+    for (const s of sigs) {
+      const bt = (s.blockTime ?? 0) * 1000;
+      if (bt) coveredSince = Math.min(coveredSince, bt);
+      // A failed tx never moved funds — don't treat it as a settled payout.
+      if (s.err) continue;
+      const m = s.memo?.match(/aemulus:claim:(\S+)/);
+      if (m && !found[m[1]]) found[m[1]] = { sig: s.signature, cluster };
+    }
+    const last = sigs[sigs.length - 1];
+    before = last.signature;
+    const oldestBt = (last.blockTime ?? 0) * 1000;
+    if (oldestBt && oldestBt < sinceMs) break; // reached back past the window
+  }
+  return { found, coveredSince };
 }

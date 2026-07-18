@@ -165,7 +165,9 @@ export async function claimEarnings(
 
   let res: Awaited<ReturnType<Sender>>;
   try {
-    res = await send(owner, amount);
+    // Pass the claim id so the payout carries an on-chain memo matching it back to
+    // this claim — the basis for safe reconciliation of a lost-confirmation payout.
+    res = await send(owner, amount, claimId);
   } catch (e) {
     if (e instanceof PayoutPrepError) {
       // Nothing was broadcast (bad config / decimals mismatch / build error) →
@@ -198,6 +200,47 @@ export async function claimEarnings(
   });
   incr("claims.settled");
   return { claimed: amount, sig: res.sig, cluster: res.cluster };
+}
+
+/** Claims that were left pending (payout confirmation lost) — for reconciliation. */
+export async function listPendingClaims(): Promise<{ id: string; createdAt: number }[]> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT id, created_at FROM claims WHERE sig IS NULL ORDER BY created_at ASC`,
+  });
+  return r.rows.map((x) => ({ id: String(x.id), createdAt: Number(x.created_at) }));
+}
+
+/** Reconciliation: the payout WAS found on-chain — record its signature (settle).
+ *  Idempotent via the sig-IS-NULL guard. */
+export async function settleClaim(claimId: string, sig: string, cluster: string): Promise<void> {
+  await ready();
+  const r = await db.execute({
+    sql: `UPDATE claims SET sig = ?, cluster = ? WHERE id = ? AND sig IS NULL`,
+    args: [sig, cluster, claimId],
+  });
+  if (r.rowsAffected > 0) incr("claims.reconciled");
+}
+
+/** Reconciliation: the payout was DEFINITIVELY not made (past blockhash expiry and
+ *  confirmed absent on-chain) — return the earnings to claimable and drop the claim
+ *  so the creator can retry. Only call when absence is certain (no double-pay). */
+export async function rollbackClaim(claimId: string): Promise<void> {
+  await ready();
+  // Both statements are guarded on the claim still being pending (sig IS NULL), so
+  // if a concurrent settle recorded a signature first, this is a no-op — it can
+  // never un-claim earnings for a payout that actually landed.
+  await db.batch(
+    [
+      {
+        sql: `UPDATE earnings SET claim_id = NULL
+              WHERE claim_id = ? AND (SELECT sig FROM claims WHERE id = ?) IS NULL`,
+        args: [claimId, claimId],
+      },
+      { sql: `DELETE FROM claims WHERE id = ? AND sig IS NULL`, args: [claimId] },
+    ],
+    "write",
+  );
 }
 
 export async function getEarningsSummary(

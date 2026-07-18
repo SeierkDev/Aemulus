@@ -3,6 +3,8 @@ import { getSkill } from "./skills";
 import { recordRunOnChain, registryEnabled } from "./registry";
 import { recordRunCompressed, zkReceiptsEnabled } from "./zk-receipts";
 import { anchorOnChain } from "./receipt";
+import { findClaimPayouts } from "./payout";
+import { listPendingClaims, settleClaim, rollbackClaim } from "./earnings";
 import { setRunRegistryAnchor, setRunZkAnchor } from "./runs";
 import { logError, logInfo } from "./log";
 
@@ -32,9 +34,12 @@ const RECONCILE_WINDOW_MS = Math.max(
   Number(process.env.AEMULUS_RECONCILE_WINDOW_MS) || 24 * 60 * 60 * 1000,
 );
 const RECONCILE_MAX = Math.max(1, Number(process.env.AEMULUS_RECONCILE_MAX) || 50);
-// A pending claim older than this with no signature is surfaced for an operator
-// (it can't be safely auto-retried — see reconcilePendingClaims).
+// Surfaced-only threshold when the treasury isn't configured (can't reconcile).
 const STUCK_CLAIM_MS = 15 * 60 * 1000;
+// A pending claim not found on-chain past this age is DEFINITIVELY unpaid (well
+// beyond Solana's ~90s blockhash validity, so the tx can no longer land) and safe
+// to roll back — provided the history scan actually reached back before it.
+const SETTLE_GRACE_MS = 10 * 60 * 1000;
 
 /** A Memo signer is configured (the batch anchor path is live). */
 function memoAnchorEnabled(): boolean {
@@ -148,44 +153,76 @@ export async function reconcileZkAnchors(max = RECONCILE_MAX): Promise<number> {
 }
 
 /**
- * A claim whose payout may have broadcast but whose confirmation was lost is left
- * pending (sig NULL) ON PURPOSE — auto-retrying a transfer we can't prove failed
- * risks a DOUBLE payout, and a plain SPL transfer carries no reference to match it
- * back to the claim. So this only SURFACES long-stuck pending claims for an
- * operator to reconcile against the treasury's history by hand. Returns the count.
- * (A future safe auto-reconcile would need the payout to carry the claim id.)
+ * Reconcile claims whose payout confirmation was lost (sig NULL). Each payout
+ * carries an on-chain memo of its claim id (see sendPayout), so we scan the
+ * treasury's history and:
+ *  - SETTLE a claim whose payout IS found on-chain (record the real signature).
+ *  - ROLL BACK a claim whose payout is definitively absent — old enough that its
+ *    blockhash has long expired (so it can never land) AND within the range our
+ *    scan actually covered — returning the earnings to claimable so the creator
+ *    can retry. This is the only safe way to auto-recover a dropped payout without
+ *    risking a double pay.
+ *  - LEAVE PENDING anything too recent, or that the (bounded) scan didn't reach.
+ * Without a configured treasury it can't reconcile, so it just surfaces stuck ones.
  */
-export async function reconcilePendingClaims(): Promise<number> {
+export async function reconcilePendingClaims(): Promise<{ settled: number; rolledBack: number; stuck: number }> {
   await ready();
-  const r = await db.execute({
-    sql: `SELECT COUNT(*) AS n FROM claims WHERE sig IS NULL AND created_at < ?`,
-    args: [Date.now() - STUCK_CLAIM_MS],
-  });
-  const n = Number(r.rows[0]?.n ?? 0);
-  if (n > 0) {
-    logError(
-      "reconcile.claims",
-      new Error(`${n} claim(s) pending with no signature > ${Math.round(STUCK_CLAIM_MS / 60000)}m — reconcile against the treasury by hand`),
-    );
+  const pending = await listPendingClaims(); // created_at ASC
+  if (pending.length === 0) return { settled: 0, rolledBack: 0, stuck: 0 };
+
+  const now = Date.now();
+  const lookup = await findClaimPayouts(pending[0].createdAt);
+  if (!lookup) {
+    const stuck = pending.filter((c) => c.createdAt < now - STUCK_CLAIM_MS).length;
+    if (stuck) {
+      logError("reconcile.claims", new Error(`${stuck} pending claim(s) with no signature and no treasury configured to reconcile against`));
+    }
+    return { settled: 0, rolledBack: 0, stuck };
   }
-  return n;
+
+  let settled = 0;
+  let rolledBack = 0;
+  let stuck = 0;
+  for (const c of pending) {
+    const hit = lookup.found[c.id];
+    if (hit) {
+      await settleClaim(c.id, hit.sig, hit.cluster);
+      settled++;
+    } else if (c.createdAt < now - SETTLE_GRACE_MS && lookup.coveredSince <= c.createdAt) {
+      await rollbackClaim(c.id);
+      rolledBack++;
+    } else {
+      stuck++; // too recent, or beyond the scan window — try again next tick
+    }
+  }
+  if (settled || rolledBack) logInfo("reconcile.claims", "reconciled claims", { settled, rolledBack });
+  if (stuck) logError("reconcile.claims", new Error(`${stuck} claim(s) still pending reconciliation`));
+  return { settled, rolledBack, stuck };
 }
 
 let running = false;
 
-/** One reconciliation pass over all anchor types (re-entrancy-guarded). */
-export async function reconcileAnchors(): Promise<{ batch: number; registry: number; zk: number; stuckClaims: number }> {
-  if (running) return { batch: 0, registry: 0, zk: 0, stuckClaims: 0 };
+export interface ReconcileSummary {
+  batch: number;
+  registry: number;
+  zk: number;
+  claims: { settled: number; rolledBack: number; stuck: number };
+}
+
+/** One reconciliation pass over all anchor types + claims (re-entrancy-guarded). */
+export async function reconcileAnchors(): Promise<ReconcileSummary> {
+  const empty: ReconcileSummary = { batch: 0, registry: 0, zk: 0, claims: { settled: 0, rolledBack: 0, stuck: 0 } };
+  if (running) return empty;
   running = true;
   try {
     const batch = await reconcileBatchAnchors();
     const registry = await reconcileRegistryAnchors();
     const zk = await reconcileZkAnchors();
-    const stuckClaims = await reconcilePendingClaims();
+    const claims = await reconcilePendingClaims();
     if (batch || registry || zk) {
       logInfo("reconcile", "recovered anchors", { batch, registry, zk });
     }
-    return { batch, registry, zk, stuckClaims };
+    return { batch, registry, zk, claims };
   } finally {
     running = false;
   }
