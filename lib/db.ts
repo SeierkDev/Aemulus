@@ -71,8 +71,12 @@ export async function migrate(): Promise<void> {
       await addColumnIfMissing(c.table, c.column, c.def);
     }
     for (const sql of m.statements ?? []) await db.executeMultiple(sql);
+    // OR IGNORE: two instances booting concurrently against a shared DB can both run
+    // migration N (its statements are all idempotent) and then both try to record it
+    // — a bare INSERT would make the loser reject the whole migrate() on the PK
+    // conflict (and, via the ready() cache, brick that instance).
     await db.execute({
-      sql: `INSERT INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)`,
+      sql: `INSERT OR IGNORE INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)`,
       args: [m.id, m.name, Date.now()],
     });
   }
@@ -80,5 +84,12 @@ export async function migrate(): Promise<void> {
 
 /** Idempotently bring the schema up to date. Awaited before any query. */
 export function ready(): Promise<void> {
-  return (globalThis.__aemDbReady ??= migrate());
+  // Cache the in-flight promise so migrate() runs once — but if it REJECTS (e.g. a
+  // transient connection blip on a network DB at cold start), clear the cache so the
+  // next ready() retries. Caching a rejected promise would brick the process until a
+  // full restart even though the DB recovered seconds later.
+  return (globalThis.__aemDbReady ??= migrate().catch((e) => {
+    globalThis.__aemDbReady = undefined;
+    throw e;
+  }));
 }

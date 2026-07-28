@@ -35,4 +35,21 @@ describe("computeTier with gating ON (mint set)", () => {
     vi.unstubAllEnvs();
     vi.resetModules();
   });
+
+  it("a zero/negative AEMULUS_MIN_BALANCE does NOT open the gate to a zero-balance wallet", async () => {
+    // Regression: minNum clamps a negative min to 0, and `balance >= 0` would then
+    // admit a no-token wallet as Holder — collapsing the whole gate. A non-positive
+    // balance must stay Locked regardless of a misconfigured threshold.
+    for (const badMin of ["0", "-5"]) {
+      vi.resetModules();
+      vi.stubEnv("AEMULUS_MINT", "SoMeMintAddress1111111111111111111111111111");
+      vi.stubEnv("AEMULUS_MIN_BALANCE", badMin);
+      const solana = await import("../lib/solana");
+      expect(solana.computeTier(0).name, `min=${badMin}, bal=0`).toBe("Locked");
+      expect(solana.computeTier(0).allowed, `min=${badMin}, bal=0`).toBe(false);
+      expect(solana.computeTier(5).name, `min=${badMin}, bal=5`).toBe("Holder"); // a real holding still works
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    }
+  });
 });

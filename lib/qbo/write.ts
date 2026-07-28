@@ -97,6 +97,18 @@ function billMatchesAmount(billTotal: number | undefined, amount: number): boole
   return Math.abs(billTotal - amount) < 0.005;
 }
 
+// Same-amount is currency-blind: with multicurrency enabled, a 100 EUR invoice and a
+// 100 USD bill share DocNumber+total but are DIFFERENT liabilities. Refuse to adopt
+// when BOTH the existing Bill and this invoice carry an explicit (differing) currency.
+// When either is unset (home-currency company / no code given), fall back to
+// amount-only, preserving the common single-currency dedup.
+function billMatchesCurrency(existing: { value?: string } | undefined, currency: string | undefined): boolean {
+  const e = existing?.value?.toUpperCase();
+  const i = currency && /^[A-Za-z]{3}$/.test(currency) ? currency.toUpperCase() : undefined;
+  if (e && i) return e === i;
+  return true;
+}
+
 export async function readQboWrite(invoiceId: string, workspaceId: string = DEFAULT_WORKSPACE): Promise<QboWriteRow | null> {
   await ensureQboSchema();
   const r = await db.execute({ sql: `SELECT * FROM qbo_write WHERE workspace_id = ? AND invoice_id = ?`, args: [workspaceId, invoiceId] });
@@ -153,7 +165,11 @@ export async function writeInvoiceToQbo(input: WriteInvoiceInput): Promise<Write
     // if the amount matches (see billMatchesAmount) so a different invoice with
     // the same doc number isn't marked posted against it.
     const existing = await client.findBillByDocNumber(docNumber).catch(() => null);
-    if (existing?.Id && billMatchesAmount(existing.TotalAmt, input.amount)) {
+    if (
+      existing?.Id &&
+      billMatchesAmount(existing.TotalAmt, input.amount) &&
+      billMatchesCurrency(existing.CurrencyRef, input.currency)
+    ) {
       await setPosted(workspaceId, invoiceId, existing.Id, now);
       return { status: "posted", billId: existing.Id };
     }
@@ -182,7 +198,11 @@ export async function writeInvoiceToQbo(input: WriteInvoiceInput): Promise<Write
     // (a crash-recovered post of this invoice). A same-docNumber/different-amount
     // bill belongs to a different invoice, so don't adopt it.
     const pre = await client.findBillByDocNumber(docNumber);
-    if (pre?.Id && billMatchesAmount(pre.TotalAmt, input.amount)) {
+    if (
+      pre?.Id &&
+      billMatchesAmount(pre.TotalAmt, input.amount) &&
+      billMatchesCurrency(pre.CurrencyRef, input.currency)
+    ) {
       await setPosted(workspaceId, invoiceId, pre.Id, now);
       return { status: "posted", billId: pre.Id };
     }

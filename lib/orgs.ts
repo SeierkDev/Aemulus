@@ -21,6 +21,19 @@ export interface MemberMeta {
   createdAt: number;
 }
 
+/** Per-owner cap on orgs created — bounds orgs/org_members row growth per wallet. */
+export const MAX_ORGS_PER_OWNER = 25;
+
+/** Count of orgs a wallet has created (owns) — for the create cap. */
+export async function countOrgsByOwner(owner: string): Promise<number> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT COUNT(*) AS c FROM orgs WHERE owner = ?`,
+    args: [owner],
+  });
+  return Number((r.rows[0] as Record<string, unknown>).c);
+}
+
 export async function createOrg(owner: string, name: string): Promise<OrgMeta> {
   await ready();
   const oid = id("org");

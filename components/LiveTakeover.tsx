@@ -20,8 +20,13 @@ export function LiveTakeover({ runId }: { runId: string }) {
     const tick = async () => {
       try {
         const r = await fetch(`/api/runs/${runId}/live`, { cache: "no-store" });
-        if (!r.ok) return;
+        if (stop || !r.ok) return;
         const d = await r.json();
+        // Re-check after the await: if the effect was torn down (e.g. the reviewer
+        // navigated to a different paused run and React reused this instance), an
+        // in-flight fetch for the OLD runId must not paint that run's frame — and
+        // route the reviewer's clicks/keystrokes — into the new run's takeover.
+        if (stop) return;
         if (d.data) setFrame(d.data as string);
       } catch {
         /* transient */

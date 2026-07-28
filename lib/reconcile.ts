@@ -3,7 +3,7 @@ import { getSkill } from "./skills";
 import { recordRunOnChain, registryEnabled } from "./registry";
 import { recordRunCompressed, zkReceiptsEnabled } from "./zk-receipts";
 import { anchorOnChain } from "./receipt";
-import { findClaimPayouts } from "./payout";
+import { findClaimPayouts, payoutsEnabled } from "./payout";
 import { listPendingClaims, settleClaim, rollbackClaim } from "./earnings";
 import { setRunRegistryAnchor, setRunZkAnchor } from "./runs";
 import { logError, logInfo } from "./log";
@@ -277,12 +277,15 @@ declare global {
   var __aemReconciler: ReturnType<typeof setInterval> | undefined;
 }
 
-/** Periodically reconcile lost anchor signatures. Fully inert (never starts the
- *  interval) unless at least one anchor path is configured, so pre-launch there is
- *  no wasted work. */
+/** Periodically reconcile lost anchor signatures AND pending claim payouts. Fully
+ *  inert (never starts the interval) unless an anchor path OR payouts are configured,
+ *  so pre-launch there is no wasted work. payoutsEnabled MUST be in this gate: the
+ *  tick's reconcilePendingClaims is the ONLY thing that settles/rolls-back a claim
+ *  whose payout broadcast but lost confirmation — omitting it stranded a creator's
+ *  earnings forever when payouts were live but no receipt-anchor path was configured. */
 export function startReconciler(): void {
   if (globalThis.__aemReconciler) return;
-  if (!memoAnchorEnabled() && !registryEnabled() && !zkReceiptsEnabled()) return;
+  if (!memoAnchorEnabled() && !registryEnabled() && !zkReceiptsEnabled() && !payoutsEnabled()) return;
   const ms = Math.max(30_000, Number(process.env.AEMULUS_RECONCILE_MS) || 5 * 60 * 1000);
   globalThis.__aemReconciler = setInterval(() => {
     reconcileAnchors().catch((e) => logError("reconcile.tick", e));

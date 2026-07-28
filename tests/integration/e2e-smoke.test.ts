@@ -100,8 +100,10 @@ describe("end-to-end: publish → run → receipt → verify → earn → rate",
     const run = await startRun({ skill, input: {}, runner: CREATOR }); // owner runs their own skill
     await completeRun(run.id, { skill, input: {}, runner: CREATOR });
     expect((await getRun(run.id))!.status).toBe("completed");
-    // owner run: no self-credit, and it doesn't count toward marketplace popularity
+    // owner run: no self-credit, and it counts toward NEITHER marketplace popularity
+    // (run_count) NOR the public reputation "runs · success" signal — otherwise an
+    // owner could self-inflate the trust signal by re-running their own skill.
     expect(await getClaimable(CREATOR)).toBe(before);
-    expect((await getSkillReputation(skill.id)).runs).toBe(1); // reputation still tracks the run
+    expect((await getSkillReputation(skill.id)).runs).toBe(0); // owner runs excluded from reputation
   });
 });

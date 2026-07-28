@@ -29,7 +29,11 @@ export async function POST(
 
     const { id } = await params;
     const skill = await getSkill(id);
-    if (!skill) {
+    // Only a PUBLISHED skill is reportable. Without this, reports could be pre-loaded
+    // against a still-private skill (a known/guessed id + N wallets), so it crosses the
+    // takedown threshold the moment the owner publishes — they can't keep it up. Treat
+    // an unpublished skill as not found (don't reveal it exists to a reporter).
+    if (!skill || !skill.published) {
       return NextResponse.json({ error: "Skill not found" }, { status: 404 });
     }
     if (skill.owner === session.pubkey) {

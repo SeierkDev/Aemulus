@@ -21,7 +21,12 @@ import { SOLANA, gatingEnabled } from "./solana";
 const TOKEN_PROGRAM = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
 const ATA_PROGRAM = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
 const MEMO_PROGRAM = new PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
-const DECIMALS = Math.max(0, Number(process.env.AEMULUS_DECIMALS) || 6);
+// `Number(x) || 6` would turn an explicit AEMULUS_DECIMALS=0 into 6 (0 is falsy);
+// accept 0 as a valid decimals value and only fall back to 6 for a missing/invalid one.
+const DECIMALS = (() => {
+  const raw = Number(process.env.AEMULUS_DECIMALS);
+  return Number.isInteger(raw) && raw >= 0 ? raw : 6;
+})();
 
 /** Memo stamped on each payout so it can be matched back to its claim on-chain. */
 export const CLAIM_MEMO_PREFIX = "aemulus:claim:";

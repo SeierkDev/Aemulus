@@ -188,6 +188,16 @@ export async function claimRunBookkeeping(runId: string): Promise<boolean> {
   return r.rowsAffected > 0;
 }
 
+/** Has this run's one-time bookkeeping (run_count / earnings / webhooks) already
+ *  run? Lets completeRun distinguish "terminal + done" from "terminal but crashed
+ *  before bookkeeping" so a completed run isn't silently robbed of its credit. */
+export async function isRunBookkept(runId: string): Promise<boolean> {
+  await ready();
+  const r = await db.execute({ sql: `SELECT bookkept FROM runs WHERE id = ?`, args: [runId] });
+  const row = r.rows[0] as Record<string, unknown> | undefined;
+  return !!row && Number(row.bookkept) === 1;
+}
+
 export async function getBulkRun(bulkId: string): Promise<BulkRun | null> {
   await ready();
   const r = await db.execute({
@@ -306,6 +316,23 @@ export async function hasRunSkill(
   return r.rows.length > 0;
 }
 
+/** True if `runId` is the FIRST completed run of `skillId` by `runner` (no other
+ *  completed run by them exists). Used to make the marketplace run_count count
+ *  DISTINCT adopters, not raw runs — so one funded burner can't farm ranking. The
+ *  caller's run must already be marked completed; it's excluded via `runId`. */
+export async function isFirstCompletedRunByRunner(
+  skillId: string,
+  runner: string,
+  runId: string,
+): Promise<boolean> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT 1 FROM runs WHERE skill_id = ? AND owner = ? AND status = 'completed' AND id <> ? LIMIT 1`,
+    args: [skillId, runner, runId],
+  });
+  return r.rows.length === 0;
+}
+
 /** Persist values captured by "extract" steps during a run. */
 export async function setRunOutput(
   runId: string,
@@ -322,8 +349,12 @@ export async function setRunOutput(
 /** Set a run's status (e.g. running -> awaiting_input -> running). */
 export async function setRunStatus(runId: string, status: string): Promise<void> {
   await ready();
+  // Only used for transient transitions (awaiting_input ↔ running). Never move a run
+  // OUT of a terminal state: under the opt-in live-handoff window a second concurrent
+  // execution hitting a checkpoint could otherwise flip an already-completed run back
+  // to awaiting_input, resurrecting a settled run. Mirrors finishRun's terminal guard.
   await db.execute({
-    sql: `UPDATE runs SET status = ?, updated_at = ? WHERE id = ?`,
+    sql: `UPDATE runs SET status = ?, updated_at = ? WHERE id = ? AND status NOT IN ('completed','failed','needs_review')`,
     args: [status, Date.now(), runId],
   });
 }

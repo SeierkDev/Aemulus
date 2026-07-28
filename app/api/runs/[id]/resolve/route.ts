@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
 import { logError } from "@/lib/log";
-import { getQuota } from "@/lib/quota";
+import { getQuota, quotaReserve } from "@/lib/quota";
 import { getRun } from "@/lib/runs";
 import { getSkill, skillAccess } from "@/lib/skills";
-import { startRun } from "@/lib/run-service";
+import { startRun, QuotaExceededError } from "@/lib/run-service";
 import { enforceRateLimit, RUNS_PER_MIN } from "@/lib/ratelimit";
 import { readJson, ResolveBody } from "@/lib/validate";
 import type { RunOverrides } from "@/lib/types";
@@ -76,9 +76,14 @@ export async function POST(
       input: original.input,
       overrides,
       runner: session.pubkey,
+      // Atomic reserve, matching the main run route — the soft getQuota above races.
+      quota: quotaReserve(session),
     });
     return NextResponse.json({ run });
   } catch (err) {
+    if (err instanceof QuotaExceededError) {
+      return NextResponse.json({ error: "Daily run limit reached." }, { status: 429 });
+    }
     logError("api/runs/resolve", err);
     return NextResponse.json(
       { error: "Resolve failed" },

@@ -83,7 +83,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     setSession(null);
-    await disconnect().catch(() => {});
+    // Bound the wallet disconnect: the server cookie + client session are already
+    // cleared, so a wallet adapter whose disconnect() never resolves must not hang
+    // signOut() (which callers await before navigating away from a signed-out page).
+    await Promise.race([
+      disconnect().catch(() => {}),
+      new Promise((r) => setTimeout(r, 1500)),
+    ]);
   }, [disconnect]);
 
   return (

@@ -136,17 +136,25 @@ export function traceForPrompt(demo: Demonstration): string {
     else if (a.value != null && a.value !== "") parts.push(`value="${scrubFence(a.value)}"`);
     if (a.key) parts.push(`key=${scrubFence(a.key)}`);
     if (a.selectors?.length) parts.push(`selector=${scrubFence(a.selectors[0])}`);
-    if (a.type === "navigate") parts.push(`url=${a.url}`);
+    if (a.type === "navigate") parts.push(`url=${scrubFence(a.url)}`);
     return parts.join("  ");
   });
   return lines.join("\n");
 }
 
 // A field is a credential by name shape — a safety net so a recorded secret is
-// marked even if the selector match below misses (e.g. the model rewrote it).
+// marked even if the selector match below misses (e.g. the model rewrote the
+// selector, so the trace's `sensitive` flag can't be matched back to this field).
+// This MUST stay a superset of the recorder's capture-time `isSensitive` name
+// taxonomy in lib/recorder-inject.ts: the recorder blanks a value it deems
+// sensitive, but runtime step-record/screenshot masking fires ONLY on `secret`.
+// If a shape (card number, SSN, IBAN, routing, auth code…) is redacted at capture
+// but not marked `secret` here, a non-owner running the published skill would
+// persist THEIR value for that field in cleartext. Keep the two in sync (a shared
+// module isn't possible — recorder-inject is serialized into the page).
 function isCredentialName(key: string, label: string): boolean {
   const s = `${key} ${label}`.toLowerCase();
-  return /pass|secret|token|otp|one[-\s]?time|passcode|cvv|cvc|\bpin\b|\bmfa\b|\b2fa\b|api[-\s]?key|credential|security\s*code/.test(s);
+  return /pass|secret|token|otp|one[-_\s]?time|passcode|cvv|cvc|ccv|card[-_\s]?number|cardnumber|creditcard|security[-_\s]*code|\bssn\b|social.?security|routing|iban|\bpin\b|\bmfa\b|\b2fa\b|auth(?:entication)?[-_\s]?code|api[-_\s]?key|credential/.test(s);
 }
 
 /**
@@ -166,6 +174,22 @@ export function markSecretFields(skill: GeneralizedSkill, demo: Demonstration): 
     if (step.valueSource === "input" && step.inputKey && step.selectors?.some((sel) => sensitiveSelectors.has(sel))) {
       secretKeys.add(step.inputKey);
     }
+  }
+  // ORDER-based correlation — robust when the model rewrote the selector (so the set
+  // match above misses) AND the field was sensitive only by autocomplete/type=password
+  // rather than by a credential-shaped name (so isCredentialName misses too). The i-th
+  // recorded input/select action lines up with the i-th input/select step; if the
+  // recorder blanked that action as sensitive, the step's field is secret. Only fires
+  // when the two sequences align 1:1, and only ever ADDS secrets (over-redaction is the
+  // safe default), so a coincidental alignment can't unmark a real field.
+  const tracePos = demo.trace
+    .filter((a) => a.type === "input" || a.type === "select")
+    .map((a) => a.sensitive === true);
+  const stepPos = skill.steps.filter((s) => s.action === "input" || s.action === "select");
+  if (tracePos.length === stepPos.length) {
+    stepPos.forEach((step, i) => {
+      if (tracePos[i] && step.valueSource === "input" && step.inputKey) secretKeys.add(step.inputKey);
+    });
   }
   return {
     ...skill,

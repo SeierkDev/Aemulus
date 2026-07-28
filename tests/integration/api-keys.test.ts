@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { ready } from "../../lib/db";
+import { ready, db } from "../../lib/db";
 import {
   createApiKey,
   listApiKeys,
@@ -51,6 +51,20 @@ describe("api keys", () => {
     const { key, meta } = await createApiKey(OWNER, "mine");
     expect(await revokeApiKey(meta.id, "SOMEONE_ELSE")).toBe(false);
     expect((await authApiKey(key))?.owner).toBe(OWNER); // still valid
+  });
+
+  it("revoke hard-deletes, so a create→revoke loop can't grow the table unbounded", async () => {
+    const W = "WALLET_API_LOOP";
+    const rowCount = async () => {
+      const r = await db.execute({ sql: `SELECT COUNT(*) AS c FROM api_keys WHERE owner = ?`, args: [W] });
+      return Number((r.rows[0] as Record<string, unknown>).c);
+    };
+    for (let i = 0; i < 10; i++) {
+      const { meta } = await createApiKey(W, `loop${i}`);
+      await revokeApiKey(meta.id, W);
+    }
+    // A soft `revoked=1` flag would have left 10 dead rows; hard-delete leaves 0.
+    expect(await rowCount()).toBe(0);
   });
 
   it("honors scopes: read-only key can't run; 'run' implies 'read'", async () => {

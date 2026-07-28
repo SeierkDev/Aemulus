@@ -79,7 +79,10 @@ export function recorderInitScript() {
   }
 
   // A field is sensitive if it's a password OR carries any credential-shaped
-  // signal. Never trust type==="password" alone - a hostile or sloppy page can
+  // signal. The name taxonomy below MUST stay in sync with isCredentialName in
+  // lib/generalize.ts (which must remain a superset) — a shape redacted here but
+  // not marked `secret` there leaks at runtime. Never trust type==="password"
+  // alone - a hostile or sloppy page can
   // collect a secret in a type="text" box (or flip type before the change
   // fires); those must still be redacted, not stored verbatim. Errs toward
   // over-redaction: a false positive just makes the generalizer treat the field
@@ -99,7 +102,7 @@ export function recorderInitScript() {
     ]
       .join(" ")
       .toLowerCase();
-    return /pass|secret|token|otp|one[-\s]?time|passcode|cvv|cvc|ccv|card[-\s]?number|cardnumber|creditcard|security\s*code|\bssn\b|social.?security|routing|iban|\bpin\b|\bmfa\b|\b2fa\b|auth(?:entication)?[-\s]?code|api[-\s]?key/.test(
+    return /pass|secret|token|otp|one[-_\s]?time|passcode|cvv|cvc|ccv|card[-_\s]?number|cardnumber|creditcard|security[-_\s]*code|\bssn\b|social.?security|routing|iban|\bpin\b|\bmfa\b|\b2fa\b|auth(?:entication)?[-_\s]?code|api[-_\s]?key/.test(
       hints,
     );
   }

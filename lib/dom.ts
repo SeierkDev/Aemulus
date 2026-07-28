@@ -109,16 +109,37 @@ export function collectCandidates(page: Page): Promise<Candidate[]> {
       ),
     ).slice(0, 50);
 
-    return nodes.map((el) => ({
-      selector: uniqueSelector(el),
-      tag: el.tagName.toLowerCase(),
-      role: roleOf(el),
-      name:
-        el.getAttribute("aria-label") ||
-        el.getAttribute("name") ||
-        el.getAttribute("placeholder") ||
-        "",
-      text: ((el as HTMLElement).innerText || "").trim().slice(0, 60),
-    }));
+    // Every field below is UNTRUSTED page content that gets rendered into the
+    // operator/agent model prompt between AEMULUS_*_BEGIN/END fence markers. Strip
+    // control chars (so a value can't inject a newline + a fake instruction), NEUTER
+    // any forged fence marker, and hard-cap length (so a giant aria-label can't blow
+    // the token budget). operate.ts/agent.ts rely on this fence holding.
+    const clean = (s: string, max: number): string =>
+      (s || "")
+        .replace(/[\u0000-\u001f]+/g, " ")
+        .replace(/AEMULUS_[A-Z_]+/g, "·")
+        .trim()
+        .slice(0, max);
+
+    // The selector must stay VERBATIM — it's used to LOCATE the element, so truncating
+    // a verified-unique path could make it match an ancestor (mis-target a click/type)
+    // or nothing (break a step that used to work). Only strip control chars; drop a
+    // candidate whose selector is implausibly long rather than emit a broken one.
+    const stripCtl = (s: string): string => (s || "").replace(/[\u0000-\u001f]+/g, "");
+    return nodes
+      .map((el) => ({
+        selector: stripCtl(uniqueSelector(el)),
+        tag: el.tagName.toLowerCase(),
+        role: roleOf(el),
+        name: clean(
+          el.getAttribute("aria-label") ||
+            el.getAttribute("name") ||
+            el.getAttribute("placeholder") ||
+            "",
+          80,
+        ),
+        text: clean((el as HTMLElement).innerText || "", 60),
+      }))
+      .filter((c) => c.selector.length > 0 && c.selector.length <= 512);
   });
 }

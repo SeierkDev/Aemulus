@@ -133,6 +133,18 @@ export class SequenceConflictError extends Error {
   }
 }
 
+/** Thrown when appendApEvent is asked to extend a chain whose existing keyed head
+ *  doesn't match its current rows — i.e. the chain was tampered/de-headed. Refusing
+ *  the append prevents the new head from being re-minted over the forged chain
+ *  (which would launder it to `valid`). */
+export class HeadIntegrityError extends Error {
+  code = "HEAD_INTEGRITY";
+  constructor(public aggregateType: string, public aggregateId: string) {
+    super(`Refusing to append to ${aggregateType}:${aggregateId} — its sealed head does not match its rows (tampering).`);
+    this.name = "HeadIntegrityError";
+  }
+}
+
 // ── Schema ──────────────────────────────────────────────────────────────────
 const DDL_TABLE = `
   CREATE TABLE IF NOT EXISTS ap_events (
@@ -202,6 +214,14 @@ export function ensureApEventsSchema(): Promise<void> {
         }
         await db.execute(DDL_INDEX);
         await db.execute(DDL_HEAD);
+        // NOTE: we deliberately do NOT backfill head anchors at runtime. Re-minting a
+        // keyed head from the current (mutable) event rows is a signing oracle: a
+        // DB-write attacker can downgrade every row to keyless v1 (preserving them),
+        // wipe the head rows, and a cold start would re-sign their forged chain with
+        // the server key. Any headless non-empty aggregate is therefore treated as
+        // tampering (missing_head) permanently. Genuine legacy pre-anchor chains, if
+        // any ever exist, must be blessed ONCE via an explicit offline operator
+        // migration (backfillMissingHeads), never automatically on boot.
       } catch (e) {
         ensured = null; // don't cache a rejection — allow a later retry
         throw e;
@@ -209,6 +229,58 @@ export function ensureApEventsSchema(): Promise<void> {
     })();
   }
   return ensured;
+}
+
+/**
+ * OFFLINE OPERATOR MIGRATION ONLY — never call this at runtime / on boot.
+ *
+ * Gives a keyed head anchor to any pre-existing aggregate that lacks one, so genuine
+ * legacy pre-anchor chains (v1 rows migrated from before the head anchor shipped) can
+ * pass the now-mandatory head check. It snapshots each chain's current (count, last
+ * seal) under the seal key.
+ *
+ * Why it must be offline-only: it re-mints keyed heads from the CURRENT event rows,
+ * which a DB-write attacker fully controls. Wiring it into any automatic path (every
+ * boot, a deletable marker, or a "no v2 rows" data check) turns it into a signing
+ * oracle — the attacker downgrades all rows to keyless v1, wipes the heads, triggers
+ * the path, and the server re-signs their forged chain as valid. There is no
+ * runtime condition safe to gate it on, because the attacker controls every input to
+ * that condition. So the ONLY safe use is a deliberate, one-time migration run by an
+ * operator in a trusted context; at runtime, a headless non-empty aggregate stays
+ * `missing_head` forever. Exported for that migration + tests.
+ */
+export async function backfillMissingHeads(): Promise<void> {
+  const missing = await db.execute(`
+    SELECT e.workspace_id AS ws, e.aggregate_type AS at, e.aggregate_id AS ai,
+           COUNT(*) AS cnt, MAX(e.seq) AS maxseq
+    FROM ap_events e
+    LEFT JOIN ap_aggregate_head h
+      ON h.workspace_id = e.workspace_id
+     AND h.aggregate_type = e.aggregate_type
+     AND h.aggregate_id = e.aggregate_id
+    WHERE h.workspace_id IS NULL
+    GROUP BY e.workspace_id, e.aggregate_type, e.aggregate_id`);
+  const now = Date.now();
+  for (const row of missing.rows) {
+    const r = row as Record<string, unknown>;
+    const ws = String(r.ws), at = String(r.at), ai = String(r.ai);
+    const cnt = Number(r.cnt), maxseq = Number(r.maxseq);
+    // Anchor over (count, last seal) exactly as verifyAggregate recomputes it. For a
+    // well-formed chain COUNT == maxseq+1 and the last row sits at seq=maxseq; a
+    // chain with a seq gap is already broken and the per-row replay fails before the
+    // head is even consulted, so its head value is immaterial.
+    const last = await db.execute({
+      sql: `SELECT seal FROM ap_events WHERE workspace_id = ? AND aggregate_type = ? AND aggregate_id = ? AND seq = ? LIMIT 1`,
+      args: [ws, at, ai, maxseq],
+    });
+    const lastSeal = last.rows[0] ? String((last.rows[0] as Record<string, unknown>).seal) : "";
+    const mac = headMac(ws, at, ai, cnt, lastSeal);
+    await db.execute({
+      sql: `INSERT OR IGNORE INTO ap_aggregate_head (workspace_id, aggregate_type, aggregate_id, seq_count, head_mac, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?)`,
+      args: [ws, at, ai, cnt, mac, now],
+    });
+  }
 }
 
 // ── Sealing ─────────────────────────────────────────────────────────────────
@@ -295,6 +367,41 @@ export async function appendApEvent(input: AppendInput): Promise<ApEventRow> {
 
   if (input.expectedSeq !== undefined && input.expectedSeq !== seq) {
     throw new SequenceConflictError(input.aggregateType, input.aggregateId, input.expectedSeq, seq);
+  }
+
+  // Refuse to EXTEND a chain that isn't already head-valid. This append re-mints the
+  // head over the current (count, tailSeal) and advances it unconditionally; if a
+  // DB-write attacker tampered a prior row — which changes the forward-linked tail
+  // seal — the stale head would otherwise be silently overwritten here, LAUNDERING
+  // the forgery into a `valid` verdict on the next legitimate append. So require the
+  // existing keyed head to already match the existing chain before advancing it. A
+  // genuinely-appended chain always matches (the prior append left a valid head), so
+  // legitimate flows are unaffected; only a tampered / de-headed / unanchored (legacy,
+  // un-migrated) chain is blocked. `count`-1 == seq == the existing row count here.
+  if (last) {
+    const priorHead = await loadHead(input.aggregateType, input.aggregateId, workspaceId);
+    const expectedPriorMac = headMac(workspaceId, input.aggregateType, input.aggregateId, seq, String(last.seal));
+    if (!priorHead) {
+      // A non-empty chain with NO head anchor: tampering (head deleted) or an
+      // un-migrated legacy chain — a genuine current chain always has one. Refuse.
+      throw new HeadIntegrityError(input.aggregateType, input.aggregateId);
+    }
+    if (priorHead.seqCount !== seq) {
+      // Our tail read is STALE relative to the committed head: a concurrent append
+      // advanced it (or rows were truncated). Surface it as a sequence conflict so the
+      // normal retry / in_progress handling applies — NOT as tampering. (A genuine
+      // truncation still fails verifyAggregate as truncated_tail; the append is refused
+      // here either way — fail-closed.) The event+head are written in one atomic batch,
+      // so a committed head always matches a committed tail; a divergence here is never
+      // a partially-applied legitimate append.
+      throw new SequenceConflictError(input.aggregateType, input.aggregateId, seq, priorHead.seqCount);
+    }
+    if (priorHead.headMac !== expectedPriorMac) {
+      // Head present and count matches, but the MAC is over a different tail seal — the
+      // rows were tampered (e.g. a keyless v1 downgrade) without the seal key. Refuse so
+      // the next append can't re-mint a valid head over the forgery.
+      throw new HeadIntegrityError(input.aggregateType, input.aggregateId);
+    }
   }
 
   const eventVersion = input.eventVersion ?? CURRENT_VERSIONS[input.eventType] ?? 1;
@@ -450,10 +557,19 @@ export async function verifyAggregate(
     prevSeal = r.seal;
   }
 
-  // Tail-truncation check. A v2-sealed chain must have a head anchor matching its
-  // current length + latest seal; a missing head on a v2 tail, or a mismatch,
-  // means rows were dropped (or the head forged, which needs the seal key). Legacy
-  // all-v1 chains predate the anchor, so a missing head is tolerated there.
+  // Tail-truncation / integrity anchor. Every non-empty aggregate must carry a
+  // keyed head over its current length + latest seal. This is the one artifact a
+  // DB-write attacker can't forge (headMac needs the seal key) or silently drop,
+  // so it's what keeps the log tamper-evident even against a *seal-version
+  // downgrade*: an attacker can recompute a keyless v1 seal over altered rows
+  // (v1 needs no secret), but cannot produce a matching head — and a missing head
+  // now ALWAYS fails here, instead of being tolerated whenever the tail row merely
+  // claims sealVersion 1 (an attacker-controlled field). The head is minted ONLY by
+  // a genuine appendApEvent (atomic event+head batch); it is never re-minted at
+  // runtime (that would be a signing oracle — see backfillMissingHeads). A genuine
+  // legacy pre-anchor DB, if one ever exists, must be blessed once by the OFFLINE
+  // backfillMissingHeads migration before its old chains verify; absent that, its
+  // pre-anchor chains correctly read missing_head (keyless v1 was never vouchable).
   const head = await loadHead(aggregateType, aggregateId, workspaceId);
   const lastSeal = rows.length ? rows[rows.length - 1].seal : "";
   if (head) {
@@ -461,7 +577,7 @@ export async function verifyAggregate(
     if (head.seqCount !== rows.length || head.headMac !== expected) {
       return { valid: false, length: rows.length, brokenAt: rows.length, reason: "truncated_tail" };
     }
-  } else if (rows.length > 0 && rows[rows.length - 1].sealVersion >= 2) {
+  } else if (rows.length > 0) {
     return { valid: false, length: rows.length, brokenAt: rows.length, reason: "missing_head" };
   }
 

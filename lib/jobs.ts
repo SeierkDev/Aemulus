@@ -120,22 +120,33 @@ export async function failJob(
   jobId: string,
   error: string,
   maxAttempts = 3,
+  lockedAt?: number,
 ): Promise<boolean> {
   await ready();
+  // Fence on the claim's locked_at (like completeJob): if this execution is a stale
+  // one whose job was already requeued + re-claimed by a new owner, don't re-queue or
+  // fail the job out from under them. Unfenced when lockedAt is omitted (pre-exec
+  // permanent-fail paths that don't hold a live claim).
+  const fence = lockedAt === undefined ? "" : ` AND locked_at = ${Number(lockedAt)}`;
   const r = await db.execute({ sql: `SELECT attempts FROM jobs WHERE id = ?`, args: [jobId] });
   const attempts = Number(r.rows[0]?.attempts ?? 0);
   if (attempts < maxAttempts) {
     const backoff = Math.min(60_000, 1000 * 2 ** (attempts - 1)); // 1s, 2s, 4s…
     await db.execute({
-      sql: `UPDATE jobs SET status = 'queued', run_at = ?, last_error = ? WHERE id = ?`,
+      sql: `UPDATE jobs SET status = 'queued', run_at = ?, last_error = ? WHERE id = ?${fence}`,
       args: [Date.now() + backoff, error.slice(0, 500), jobId],
     });
-    return true;
+    return true; // requeued (or a stale no-op) — either way the caller must not settle the run
   }
-  await db.execute({
-    sql: `UPDATE jobs SET status = 'failed', last_error = ? WHERE id = ?`,
+  const up = await db.execute({
+    sql: `UPDATE jobs SET status = 'failed', last_error = ? WHERE id = ?${fence}`,
     args: [error.slice(0, 500), jobId],
   });
+  // If the fence matched no row, THIS execution's claim was superseded (the job was
+  // requeued + re-claimed and a new owner is running it). Report "retried" so the
+  // caller does NOT settle the run as failed out from under the active owner — the
+  // return, not just the job row, must respect the fence.
+  if (fence && up.rowsAffected === 0) return true;
   return false;
 }
 

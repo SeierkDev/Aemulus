@@ -25,7 +25,13 @@ export default async function ApActivityPage() {
     ledgerStats(ws),
     liveInvoiceQueueAll(ws),
   ]);
-  const verified = await Promise.all(bills.map((b) => verifyAggregate("invoice", b.invoiceId, ws).then((v) => v.valid)));
+  // A ledger bill only exists because an invoice.submitted event was sealed, so its
+  // backing chain must be NON-EMPTY. `length === 0` means the events were erased
+  // (verifyAggregate treats a truly-empty aggregate as vacuously valid) — that's a
+  // tampered/orphaned bill, not a verified one, so require valid AND non-empty.
+  const verified = await Promise.all(
+    bills.map((b) => verifyAggregate("invoice", b.invoiceId, ws).then((v) => v.valid && v.length > 0)),
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-6">

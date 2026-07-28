@@ -49,6 +49,49 @@ describe("markSecretFields (F1: recorded secrets stay secret)", () => {
     expect(marked.inputFields[0].secret).toBe(true);
   });
 
+  it("marks financial/PII credential shapes the recorder redacts (ssn, card, iban, routing, cvv, auth code)", () => {
+    // These are blanked at capture by recorder-inject's isSensitive; isCredentialName
+    // MUST stay a superset so a model-rewritten selector can't let them escape `secret`
+    // and be persisted in cleartext on a non-owner run.
+    for (const key of ["ssn", "card_number", "cardNumber", "creditCard", "iban", "routing_number", "ccv", "auth_code", "security_code"]) {
+      const s: GeneralizedSkill = {
+        name: "x", description: "", steps: [],
+        inputFields: [{ key, label: key, example: "" }],
+      };
+      const marked = markSecretFields(s, { ...demo, trace: [] }); // no matching selector
+      expect(marked.inputFields[0].secret, `${key} should be secret`).toBe(true);
+    }
+  });
+
+  it("marks a field secret by TRACE ORDER when both the selector and the name miss (autocomplete/type-only field)", () => {
+    // A field sensitive ONLY by autocomplete (e.g. autocomplete=\"cc-number\", short
+    // generic label) is blanked at capture, but if the model rewrote its selector AND
+    // the name isn't credential-shaped, the selector + name signals both miss. The
+    // i-th sensitive input action must still mark the i-th input step's field secret.
+    const d: Demonstration = {
+      id: "d_ord", owner: "W", title: "checkout", startUrl: "https://shop.com", createdAt: 0,
+      trace: [
+        act({ idx: 0, type: "navigate" }),
+        act({ idx: 1, type: "input", sensitive: true, selectors: ["#cc"], value: "" }), // blanked at capture
+        act({ idx: 2, type: "input", sensitive: false, selectors: ["#email"], value: "a@b.com" }),
+      ],
+    };
+    const s: GeneralizedSkill = {
+      name: "Checkout", description: "",
+      inputFields: [
+        { key: "card", label: "Card", example: "" }, // benign name, no selector overlap
+        { key: "email", label: "Email", example: "a@b.com" },
+      ],
+      steps: [
+        { intent: "type card", action: "input", selectors: ["#card-rewritten"], target: "", valueSource: "input", value: "", inputKey: "card", key: "" },
+        { intent: "type email", action: "input", selectors: ["#email"], target: "", valueSource: "input", value: "", inputKey: "email", key: "" },
+      ],
+    };
+    const marked = markSecretFields(s, d);
+    expect(marked.inputFields.find((f) => f.key === "card")!.secret).toBe(true);
+    expect(marked.inputFields.find((f) => f.key === "email")!.secret).toBeFalsy();
+  });
+
   it("leaves ordinary fields untouched", () => {
     const s: GeneralizedSkill = {
       name: "x", description: "", steps: [],

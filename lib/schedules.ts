@@ -84,6 +84,11 @@ export async function createSchedule(input: {
 
 /** Cap on active schedules per owner - bounds scheduler load / quota churn. */
 export const MAX_ACTIVE_SCHEDULES = 25;
+/** Cap on TOTAL (active + paused) schedules per owner. Paused rows are kept (they're
+ *  re-activatable) so the active-only cap doesn't bound row growth — a create→pause
+ *  loop would accumulate rows that the /schedules page then loads + decrypts. This
+ *  bounds it at the source; freeing a slot needs a DELETE (not just a pause). */
+export const MAX_TOTAL_SCHEDULES = 50;
 
 /** How many active (running) schedules an owner currently has. */
 export async function countActiveSchedules(owner: string): Promise<number> {
@@ -95,13 +100,26 @@ export async function countActiveSchedules(owner: string): Promise<number> {
   return Number(r.rows[0]?.n ?? 0);
 }
 
-export async function listSchedules(owner: string): Promise<Schedule[]> {
+/** Total schedules (active + paused) an owner has — for the row-growth cap. */
+export async function countAllSchedules(owner: string): Promise<number> {
   await ready();
+  const r = await db.execute({
+    sql: `SELECT COUNT(*) AS n FROM schedules WHERE owner = ?`,
+    args: [owner],
+  });
+  return Number(r.rows[0]?.n ?? 0);
+}
+
+export async function listSchedules(owner: string, limit = 200): Promise<Schedule[]> {
+  await ready();
+  // Bound the list: each row AES-GCM-decrypts its stored input, so an unlimited SELECT
+  // would make a heavy user's own server-rendered /schedules page do unbounded decrypt
+  // work. The total-schedules cap already bounds rows; this is defense-in-depth.
   const r = await db.execute({
     sql: `SELECT sc.*, COALESCE(sk.name, sc.skill_id) AS skill_name
           FROM schedules sc LEFT JOIN skills sk ON sk.id = sc.skill_id
-          WHERE sc.owner = ? ORDER BY sc.created_at DESC`,
-    args: [owner],
+          WHERE sc.owner = ? ORDER BY sc.created_at DESC LIMIT ?`,
+    args: [owner, Math.max(1, Math.min(1000, limit))],
   });
   return r.rows.map(rowToSchedule);
 }

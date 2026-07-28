@@ -11,6 +11,15 @@ describe("assertSafeUrl (SSRF guard)", () => {
     "http://172.16.0.1",
     "http://[::1]",
     "http://0.0.0.0",
+    // IPv4-mapped/compatible IPv6 in every textual form — all route to an internal
+    // IPv4 at the socket layer and must be blocked (regression for the ::ffff:7f00:1
+    // hex-form SSRF bypass).
+    "http://[::ffff:7f00:1]/", // == 127.0.0.1 (compressed hex)
+    "http://[::ffff:127.0.0.1]/", // == 127.0.0.1 (dotted)
+    "http://[0:0:0:0:0:ffff:7f00:1]/", // == 127.0.0.1 (expanded)
+    "http://[::ffff:a9fe:a9fe]/latest/meta-data", // == 169.254.169.254 metadata
+    "http://[::ffff:a00:5]/", // == 10.0.0.5 (RFC1918)
+    "http://[::127.0.0.1]/", // IPv4-compatible (deprecated)
     "file:///etc/passwd",
     "ftp://example.com",
     "not a url",

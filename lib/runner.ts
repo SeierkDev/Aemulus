@@ -210,15 +210,19 @@ export async function executeRun(
           continue;
         }
 
-        // Conditional step (branching): run only if the condition holds.
+        // Conditional step (branching): run only if the condition holds. Use the
+        // redacted recVal/recShot + snap() like every other secret-typing path — a
+        // conditional SECRET input whose condition is false must not persist the
+        // resolved credential into the step record (shown unmasked + folded into the
+        // receipt).
         if (step.condition && !(await conditionMet(page, step.condition))) {
-          await page.screenshot({ path: shotPath }).catch(() => {});
+          await snap();
           await recordStep(
             runId,
             step,
             "",
-            value,
-            shotRel,
+            recVal,
+            recShot,
             1,
             false,
             `Skipped: condition (${step.condition.kind} ${step.condition.selector}) not met.`,
@@ -247,14 +251,14 @@ export async function executeRun(
             await unregisterLive(runId);
           }
           deadline += Date.now() - pauseStart; // don't bill the human pause to the run
-          await page.screenshot({ path: shotPath }).catch(() => {});
+          await snap();
           if (outcome === "timeout") {
-            await recordStep(runId, step, "", value, shotRel, 1, true, "Timed out waiting for the live takeover.");
+            await recordStep(runId, step, "", recVal, recShot, 1, true, "Timed out waiting for the live takeover.");
             finalStatus = "needs_review";
             break;
           }
           await setRunStatus(runId, "running");
-          await recordStep(runId, step, "", value, shotRel, 1, false, "Human completed an interactive checkpoint.");
+          await recordStep(runId, step, "", recVal, recShot, 1, false, "Human completed an interactive checkpoint.");
           continue;
         }
 
@@ -361,13 +365,21 @@ export async function executeRun(
           // try to accomplish the step itself. Only for action steps (extract is
           // a read, not something the agent performs).
           if (agentFallbackEnabled() && step.action !== "extract" && Date.now() <= deadline) {
-            // Mark the value sensitive when it's a vault-filled credential so the
-            // agent never sees it in a prompt and only types it while on vaultHost.
-            const sensitive =
+            // Hide the value from the model for BOTH a vault credential and an
+            // author-marked secret input (mirrors the step-record masking at line
+            // 195) — otherwise a non-owner's secret would be echoed into the operator
+            // prompt. Only a vault credential is additionally host-bound, so pass
+            // vaultHost ONLY for vault keys (an author secret has no host to bind to
+            // and must not be refused off-host).
+            const isSecretInput =
               (step.action === "input" || step.action === "select") &&
               step.valueSource === "input" &&
-              vaultKeys.has(step.inputKey);
-            const ag = await agenticStep(page, step, value, { sensitive, vaultHost, deadline });
+              (vaultKeys.has(step.inputKey) || secretFieldKeys.has(step.inputKey));
+            const ag = await agenticStep(page, step, value, {
+              sensitive: isSecretInput,
+              vaultHost: vaultKeys.has(step.inputKey) ? vaultHost : undefined,
+              deadline,
+            });
             tokensIn += ag.tokensIn;
             tokensOut += ag.tokensOut;
             if (ag.ok) {

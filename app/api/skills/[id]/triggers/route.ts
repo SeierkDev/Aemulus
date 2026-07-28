@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
 import { getSkill } from "@/lib/skills";
-import { createTrigger } from "@/lib/triggers";
+import { createTrigger, countActiveTriggers, MAX_ACTIVE_TRIGGERS } from "@/lib/triggers";
 import { logError } from "@/lib/log";
 
 export const runtime = "nodejs";
@@ -21,6 +21,13 @@ export async function POST(
     const skill = await getSkill(id);
     if (!skill || skill.owner !== session.pubkey) {
       return NextResponse.json({ error: "Skill not found" }, { status: 404 });
+    }
+    // Cap active triggers per owner, matching the schedules/webhooks siblings.
+    if ((await countActiveTriggers(session.pubkey)) >= MAX_ACTIVE_TRIGGERS) {
+      return NextResponse.json(
+        { error: `Trigger limit reached (max ${MAX_ACTIVE_TRIGGERS}).` },
+        { status: 409 },
+      );
     }
     const trigger = await createTrigger(session.pubkey, id);
     return NextResponse.json({ trigger });

@@ -55,4 +55,11 @@ describe("toCsv", () => {
       ["x,y", 'q"z'],
     ]);
   });
+
+  it("quotes a lone carriage return so it doesn't split into extra rows", () => {
+    // A bare \r (Windows/old-Mac content) is a record separator to parseCsv/Excel;
+    // it must be quoted or the field corrupts into multiple rows on round-trip.
+    const csv = toCsv(["note"], [{ note: "line1\rline2" }]);
+    expect(parseCsv(csv)).toEqual([["note"], ["line1\nline2"]]); // one field, not two rows
+  });
 });

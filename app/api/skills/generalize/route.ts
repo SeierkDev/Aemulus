@@ -4,7 +4,7 @@ import { logError } from "@/lib/log";
 import { enforceRateLimit } from "@/lib/ratelimit";
 import { getDemonstration } from "@/lib/demonstrations";
 import { generalizeDemonstration } from "@/lib/generalize";
-import { createSkill } from "@/lib/skills";
+import { createSkill, countSkillsByOwner, MAX_SKILLS_PER_OWNER } from "@/lib/skills";
 import { recordedNavHosts } from "@/lib/skill-utils";
 import { readJson, GeneralizeBody } from "@/lib/validate";
 
@@ -35,6 +35,9 @@ export async function POST(req: Request) {
         { error: "Demonstration not found" },
         { status: 404 },
       );
+    }
+    if ((await countSkillsByOwner(session.pubkey)) >= MAX_SKILLS_PER_OWNER) {
+      return NextResponse.json({ error: `Skill limit reached (max ${MAX_SKILLS_PER_OWNER}).` }, { status: 409 });
     }
     const generalized = await generalizeDemonstration(demo);
     const skill = await createSkill({

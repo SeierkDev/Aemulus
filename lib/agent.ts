@@ -36,9 +36,11 @@ function hostMatches(url: string, host: string): boolean {
   }
 }
 
-/** Extra guards for the agentic loop. `sensitive` marks that `value` is a bound
- *  vault credential (never shown to the model, only typed while on `vaultHost`);
- *  `deadline` caps the loop against the run's wall-clock budget. */
+/** Extra guards for the agentic loop. `sensitive` marks that `value` must never be
+ *  shown to the model (a vault credential OR an author-marked secret input) — it's
+ *  typed by the runner at action time, not echoed into the prompt. `vaultHost`, when
+ *  set, additionally host-binds the value (vault credentials only); an author secret
+ *  is sensitive with no vaultHost. `deadline` caps the loop against the run budget. */
 export interface AgentOpts {
   sensitive?: boolean;
   vaultHost?: string;
@@ -200,14 +202,16 @@ export async function agenticStep(
           else if (act.action === "type") {
             let toType = act.value ?? value;
             if (opts.sensitive) {
-              // The bound vault credential may only ever be typed while the page is
-              // still on its host — the agent can navigate to another allowed host,
-              // so re-check here (the one-time pre-fallback check isn't enough).
-              if (!opts.vaultHost || !hostMatches(page.url(), opts.vaultHost)) {
-                history.push(`#${i + 1} type -> refused (credential is bound to ${opts.vaultHost || "its host"})`);
+              toType = value; // the real secret, never the model's echoed value
+              // A VAULT credential is additionally host-bound: only type it while the
+              // page is still on its host (the agent can navigate between allowed
+              // hosts, so the one-time pre-fallback check isn't enough). An author-
+              // marked secret has no vaultHost — it's hidden from the model but is
+              // this run's own input, typed like any other value (not host-bound).
+              if (opts.vaultHost && !hostMatches(page.url(), opts.vaultHost)) {
+                history.push(`#${i + 1} type -> refused (credential is bound to ${opts.vaultHost})`);
                 continue;
               }
-              toType = value; // the real secret, never the model's echoed value
             }
             await loc.fill(toType);
           } else if (act.action === "press") await loc.press(act.key || "Enter");

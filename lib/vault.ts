@@ -16,7 +16,21 @@ export interface VaultEntryMeta {
   createdAt: number;
 }
 
-/** Upsert a credential (owner+host+key is unique). Value stored encrypted. */
+/** Per-owner distinct-credential cap (bounds vault row growth per wallet). */
+export const MAX_VAULT_ENTRIES = 200;
+
+/** Thrown by setCredential when a NEW credential would exceed the per-owner cap. */
+export class VaultLimitError extends Error {
+  code = "VAULT_LIMIT";
+  constructor() {
+    super(`Vault limit reached (max ${MAX_VAULT_ENTRIES} credentials).`);
+    this.name = "VaultLimitError";
+  }
+}
+
+/** Upsert a credential (owner+host+key is unique). Value stored encrypted. Updating
+ *  an existing (host,key) is always allowed; adding a NEW one is capped per owner so
+ *  a wallet can't grow the vault table without bound. */
 export async function setCredential(
   owner: string,
   host: string,
@@ -25,6 +39,14 @@ export async function setCredential(
 ): Promise<void> {
   await ready();
   const h = host.trim().toLowerCase();
+  const exists = await db.execute({
+    sql: `SELECT 1 FROM vault WHERE owner = ? AND host = ? AND key = ? LIMIT 1`,
+    args: [owner, h, key],
+  });
+  if (exists.rows.length === 0) {
+    const c = await db.execute({ sql: `SELECT COUNT(*) AS n FROM vault WHERE owner = ?`, args: [owner] });
+    if (Number((c.rows[0] as Record<string, unknown>).n) >= MAX_VAULT_ENTRIES) throw new VaultLimitError();
+  }
   await db.execute({
     sql: `INSERT INTO vault (id, owner, host, key, value, created_at)
           VALUES (?, ?, ?, ?, ?, ?)

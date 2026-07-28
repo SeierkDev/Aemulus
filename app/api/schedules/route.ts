@@ -4,7 +4,9 @@ import { getSkill } from "@/lib/skills";
 import {
   createSchedule,
   countActiveSchedules,
+  countAllSchedules,
   MAX_ACTIVE_SCHEDULES,
+  MAX_TOTAL_SCHEDULES,
 } from "@/lib/schedules";
 import { readJson, ScheduleCreateBody } from "@/lib/validate";
 
@@ -28,7 +30,15 @@ export async function POST(req: Request) {
 
   if ((await countActiveSchedules(session.pubkey)) >= MAX_ACTIVE_SCHEDULES) {
     return NextResponse.json(
-      { error: `Schedule limit reached (max ${MAX_ACTIVE_SCHEDULES}).` },
+      { error: `Active schedule limit reached (max ${MAX_ACTIVE_SCHEDULES}).` },
+      { status: 409 },
+    );
+  }
+  // Total-rows cap: paused schedules are kept (re-activatable), so cap active+paused
+  // too — otherwise a create→pause loop grows rows unbounded. Delete some to free room.
+  if ((await countAllSchedules(session.pubkey)) >= MAX_TOTAL_SCHEDULES) {
+    return NextResponse.json(
+      { error: `Total schedule limit reached (max ${MAX_TOTAL_SCHEDULES}); delete some to add more.` },
       { status: 409 },
     );
   }

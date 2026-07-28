@@ -38,7 +38,9 @@ export function launchStatus(): LaunchStatus {
     registryAnchor,
     zkAnchor,
     payouts: payoutsEnabled(),
-    reconciler: memoAnchor || registryAnchor || zkAnchor,
+    // Mirror startReconciler's actual gate (reconcile.ts): payouts alone also start
+    // the reconciler, since its tick is what settles/rolls-back lost claim payouts.
+    reconciler: memoAnchor || registryAnchor || zkAnchor || payoutsEnabled(),
   };
 }
 

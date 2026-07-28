@@ -71,6 +71,28 @@ describe("job queue", () => {
     await completeJob(reclaimed!.id);
   });
 
+  it("failJob with a STALE locked_at doesn't settle a job a new owner re-claimed", async () => {
+    await enqueueRunJob({ runId: "run_j_fence", runner: "W", skillId: "skl_j", input: {} });
+    const t = Date.now();
+    const first = await claimNextJob(t + 5); // locked_at = t+5, attempts 1
+    expect(first!.runId).toBe("run_j_fence");
+    const staleLock = first!.lockedAt;
+    // The job goes stale and a NEW owner re-claims it (locked_at advances).
+    await recoverStuckJobs(t + 10_000, 50);
+    const second = await claimNextJob(t + 20_000); // new locked_at, attempts 2
+    expect(second!.runId).toBe("run_j_fence");
+    expect(second!.lockedAt).not.toBe(staleLock);
+    // The superseded first worker now fails out. With maxAttempts=1 it hits the
+    // permanent-fail branch, but the stale fence must make the UPDATE a no-op AND
+    // report "retried" (true) — so the caller does NOT settle the run the new owner
+    // is actively executing.
+    expect(await failJob(first!.id, "stale", 1, staleLock)).toBe(true);
+    // The job is still 'running' under the new owner (not flipped to 'failed'): a
+    // fresh claim finds nothing, and completing the real owner's claim settles it.
+    expect(await claimNextJob(t + 30_000)).toBeNull();
+    await completeJob(second!.id, second!.lockedAt);
+  });
+
   it("startRun enqueues a job (durable, not in-request)", async () => {
     const skill = await createSkill({ owner: "JOB_OWNER", generalized: GEN, sourceDemoId: null });
     const run = await startRun({ skill, input: { x: "1" }, runner: "JOB_OWNER" });

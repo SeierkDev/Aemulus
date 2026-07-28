@@ -3,7 +3,7 @@ import { db, ready } from "../../lib/db";
 import { createSkill } from "../../lib/skills";
 import { createRun, finishRun, addRunStep } from "../../lib/runs";
 import { attachReceipt, verifyReceipt, buildBatchBundle } from "../../lib/receipt";
-import { batchPendingReceipts } from "../../lib/receipt-batch";
+import { batchPendingReceipts, recoverOrphanedBatchClaims } from "../../lib/receipt-batch";
 import { verifyProof } from "../../lib/merkle";
 import type { GeneralizedSkill } from "../../lib/types";
 
@@ -95,6 +95,25 @@ describe("merkle receipt batching", () => {
     // content address is deterministic
     const again = await buildBatchBundle(res!.batchId);
     expect(again!.bundleHash).toBe(bundle!.bundleHash);
+  });
+
+  it("boot recovery reclaims a STALE orphaned batch claim but NOT a live one (multi-instance)", async () => {
+    const skill = await createSkill({ owner: OWNER, generalized: gen(), sourceDemoId: null });
+    const id = await completedRunWithReceipt(skill.id);
+    const now = 1_700_000_000_000;
+    // Simulate a claimed-but-unproven run (a batch mid-anchor): batch_id set, no proof.
+    await db.execute({
+      sql: `UPDATE runs SET batch_id = 'b_live', batched_at = ?, merkle_proof = NULL WHERE id = ?`,
+      args: [now, id],
+    });
+    // A peer instance booting WHILE this batch is live must NOT wipe it.
+    expect(await recoverOrphanedBatchClaims(now + 1000)).toBe(0);
+    const stillClaimed = await db.execute({ sql: `SELECT batch_id FROM runs WHERE id = ?`, args: [id] });
+    expect(String(stillClaimed.rows[0]!.batch_id)).toBe("b_live");
+    // Once genuinely stale (crashed), it IS reclaimed so it can re-batch.
+    expect(await recoverOrphanedBatchClaims(now + 10 * 60_000)).toBeGreaterThanOrEqual(1);
+    const released = await db.execute({ sql: `SELECT batch_id FROM runs WHERE id = ?`, args: [id] });
+    expect(released.rows[0]!.batch_id).toBeNull();
   });
 
   it("tampering after batching breaks the membership proof", async () => {

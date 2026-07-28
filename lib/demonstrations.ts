@@ -48,11 +48,16 @@ export async function getDemonstration(
 
 export async function listDemonstrations(
   owner: string,
+  limit = 200,
 ): Promise<Demonstration[]> {
   await ready();
+  // Bound the list: each row decrypts a full (up-to-1000-action) trace, so an
+  // unlimited SELECT would make a heavy user's own server-rendered skills page do
+  // unbounded row-loading + AES-GCM work. The most-recent N covers the "pending to
+  // generalize" UI; older demos are still fetchable by id.
   const r = await db.execute({
-    sql: `SELECT * FROM demonstrations WHERE owner = ? ORDER BY created_at DESC`,
-    args: [owner],
+    sql: `SELECT * FROM demonstrations WHERE owner = ? ORDER BY created_at DESC LIMIT ?`,
+    args: [owner, Math.max(1, Math.min(1000, limit))],
   });
   return r.rows.map(rowToDemonstration);
 }

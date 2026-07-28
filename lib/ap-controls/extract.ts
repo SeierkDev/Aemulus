@@ -53,7 +53,6 @@ export function isRealIsoDate(d: string): boolean {
 // Strip control chars (a malicious invoice image could inject newlines / control
 // bytes into the extracted text, which then get sealed verbatim) and length-cap.
 function cleanText(s: unknown, max = 200): string {
-  // eslint-disable-next-line no-control-regex
   return String(s ?? "").replace(/[\x00-\x1F\x7F]/g, " ").trim().slice(0, max);
 }
 

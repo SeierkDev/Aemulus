@@ -18,6 +18,48 @@ const BLOCKED_HOSTS = new Set([
   "metadata",
 ]);
 
+/**
+ * If `ip` is an IPv4-mapped (::ffff:a.b.c.d) or IPv4-compatible (::a.b.c.d,
+ * deprecated) IPv6 address in ANY textual form — compressed hex (::ffff:7f00:1),
+ * dotted (::ffff:127.0.0.1), or fully expanded (0:0:0:0:0:ffff:7f00:1) — return the
+ * embedded dotted-quad IPv4, else null. The socket layer connects a mapped literal
+ * to that IPv4, so isPrivateIp must decode every form; the old code only handled the
+ * "::ffff:" + dotted-quad case, letting ::ffff:7f00:1 (== 127.0.0.1) slip through as
+ * public and defeat every SSRF guard.
+ */
+function embeddedIPv4(ip: string): string | null {
+  const s = ip.toLowerCase().split("%")[0];
+  if (!net.isIPv6(s)) return null;
+  // Peel off an embedded dotted-quad tail (if any) into its two 16-bit groups.
+  let hexPart = s;
+  let tail: number[] = [];
+  const dq = /^(.*:)((?:\d{1,3}\.){3}\d{1,3})$/.exec(s);
+  if (dq) {
+    const q = dq[2].split(".").map(Number);
+    if (q.some((n) => n > 255)) return null;
+    hexPart = dq[1];
+    tail = [((q[0] << 8) | q[1]) & 0xffff, ((q[2] << 8) | q[3]) & 0xffff];
+  }
+  // Expand "::" and parse the hex groups into a full 8-group vector.
+  let groups: number[];
+  const dbl = hexPart.indexOf("::");
+  if (dbl >= 0) {
+    const left = hexPart.slice(0, dbl).split(":").filter(Boolean).map((g) => parseInt(g, 16));
+    const right = hexPart.slice(dbl + 2).split(":").filter(Boolean).map((g) => parseInt(g, 16));
+    const missing = 8 - left.length - right.length - tail.length;
+    if (missing < 0) return null;
+    groups = [...left, ...Array(missing).fill(0), ...right, ...tail];
+  } else {
+    groups = [...hexPart.split(":").filter(Boolean).map((g) => parseInt(g, 16)), ...tail];
+  }
+  if (groups.length !== 8 || groups.some((g) => Number.isNaN(g) || g < 0 || g > 0xffff)) return null;
+  const mapped = groups.slice(0, 5).every((g) => g === 0) && groups[5] === 0xffff;
+  const compat = groups.slice(0, 6).every((g) => g === 0) && (groups[6] !== 0 || groups[7] !== 0);
+  if (!mapped && !compat) return null;
+  const g6 = groups[6], g7 = groups[7];
+  return [(g6 >> 8) & 255, g6 & 255, (g7 >> 8) & 255, g7 & 255].join(".");
+}
+
 function isPrivateIp(ip: string): boolean {
   if (net.isIPv4(ip)) {
     const [a, b, c] = ip.split(".").map(Number);
@@ -39,7 +81,10 @@ function isPrivateIp(ip: string): boolean {
     if (low === "::1" || low === "::") return true;
     if (low.startsWith("fc") || low.startsWith("fd")) return true; // ULA
     if (low.startsWith("fe80")) return true; // link-local
-    if (low.startsWith("::ffff:")) return isPrivateIp(low.slice(7)); // mapped v4
+    // IPv4-mapped/compatible IPv6 in ANY form routes to the embedded IPv4 at the
+    // socket layer — decode and re-check it (::ffff:7f00:1 == 127.0.0.1, etc.).
+    const v4 = embeddedIPv4(ip);
+    if (v4) return isPrivateIp(v4);
     return false;
   }
   return false;

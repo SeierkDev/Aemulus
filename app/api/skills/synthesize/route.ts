@@ -4,7 +4,7 @@ import { logError } from "@/lib/log";
 import { enforceRateLimit } from "@/lib/ratelimit";
 import { getDemonstration } from "@/lib/demonstrations";
 import { synthesizeSkill } from "@/lib/synthesize";
-import { createSkill } from "@/lib/skills";
+import { createSkill, countSkillsByOwner, MAX_SKILLS_PER_OWNER } from "@/lib/skills";
 import { recordedNavHosts } from "@/lib/skill-utils";
 import { readJson, SynthesizeBody } from "@/lib/validate";
 
@@ -49,6 +49,9 @@ export async function POST(req: Request) {
       demos.push(demo);
     }
 
+    if ((await countSkillsByOwner(session.pubkey)) >= MAX_SKILLS_PER_OWNER) {
+      return NextResponse.json({ error: `Skill limit reached (max ${MAX_SKILLS_PER_OWNER}).` }, { status: 409 });
+    }
     const result = await synthesizeSkill(demos);
     const skill = await createSkill({
       owner: session.pubkey,

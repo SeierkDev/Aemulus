@@ -55,7 +55,7 @@ async function processJob(job: Job): Promise<void> {
     incr("jobs.done");
   } catch (e) {
     const msg = e instanceof Error ? e.message : "run failed";
-    const retried = await failJob(job.id, msg, MAX_ATTEMPTS);
+    const retried = await failJob(job.id, msg, MAX_ATTEMPTS, job.lockedAt);
     incr(retried ? "jobs.retried" : "jobs.failed");
     if (!retried) {
       // Out of retries - settle the run as failed and notify.

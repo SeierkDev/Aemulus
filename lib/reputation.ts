@@ -66,11 +66,18 @@ export async function getReputationBatch(
 
   await ready();
   const ph = misses.map(() => "?").join(",");
+  // Exclude the author's OWN runs from the public "N runs · X% success" trust
+  // signal — otherwise an owner can self-inflate it by re-running their own skill on
+  // cherry-picked inputs. This mirrors the run_count/earnings anti-gaming rule
+  // (run-service.ts: credit only when skill.owner !== runner), which this aggregate
+  // previously contradicted.
   const runs = await db.execute({
-    sql: `SELECT skill_id,
+    sql: `SELECT r.skill_id AS skill_id,
                  COUNT(*) AS total,
-                 SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) AS completed
-          FROM runs WHERE skill_id IN (${ph}) GROUP BY skill_id`,
+                 SUM(CASE WHEN r.status='completed' THEN 1 ELSE 0 END) AS completed
+          FROM runs r JOIN skills s ON s.id = r.skill_id
+          WHERE r.skill_id IN (${ph}) AND r.owner <> s.owner
+          GROUP BY r.skill_id`,
     args: misses,
   });
   const rates = await db.execute({

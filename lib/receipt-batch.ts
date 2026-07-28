@@ -34,14 +34,25 @@ async function anchorWithTimeout(
   }
 }
 
+// A claimed-but-unproven batch older than this is treated as crashed and reclaimable.
+// MUST exceed the anchor timeout + persist time so it can never reclaim a LIVE batch
+// (which sits claimed-but-unproven for up to ANCHOR_TIMEOUT_MS while anchoring).
+const BATCH_STALE_MS = ANCHOR_TIMEOUT_MS + 4 * 60_000; // 5 min
+
 /** Release runs that were claimed into a batch but never got an inclusion proof
- *  written (a crash between claim and persist) so they re-batch. Run at boot,
- *  when no tick is in flight, so it can't race a live batch. */
-export async function recoverOrphanedBatchClaims(): Promise<number> {
+ *  written (a crash between claim and persist) so they re-batch. Gated on staleness:
+ *  a peer instance's LIVE batch (claimed-but-unproven while anchoring) has a recent
+ *  `batched_at` and is NOT reclaimed — only genuinely-crashed claims older than
+ *  BATCH_STALE_MS are. Without this age guard, a second instance booting mid-batch
+ *  would wipe the first's in-flight batch (duplicate on-chain anchoring + phantom
+ *  batch rows). */
+export async function recoverOrphanedBatchClaims(now: number = Date.now()): Promise<number> {
   await ready();
   const r = await db.execute({
     sql: `UPDATE runs SET batch_id = NULL
-          WHERE batch_id IS NOT NULL AND merkle_proof IS NULL`,
+          WHERE batch_id IS NOT NULL AND merkle_proof IS NULL
+            AND (batched_at IS NULL OR batched_at < ?)`,
+    args: [now - BATCH_STALE_MS],
   });
   return r.rowsAffected;
 }
@@ -65,13 +76,13 @@ export async function batchPendingReceipts(
     // claimed exactly once even if two batchers run). The id tiebreaker makes the
     // claim's ordering agree with the tree-build re-SELECT below.
     const claim = await db.execute({
-      sql: `UPDATE runs SET batch_id = ?
+      sql: `UPDATE runs SET batch_id = ?, batched_at = ?
             WHERE id IN (
               SELECT id FROM runs
               WHERE batch_id IS NULL AND receipt_hash IS NOT NULL
               ORDER BY created_at ASC, id ASC LIMIT ?
             )`,
-      args: [batchId, max],
+      args: [batchId, Date.now(), max],
     });
     if (claim.rowsAffected === 0) return null;
 

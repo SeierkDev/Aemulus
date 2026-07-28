@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
 import { logError } from "@/lib/log";
-import { getQuota } from "@/lib/quota";
+import { getQuota, quotaReserve } from "@/lib/quota";
 import { getRun } from "@/lib/runs";
 import { getSkill, skillAccess } from "@/lib/skills";
-import { startRun } from "@/lib/run-service";
+import { startRun, QuotaExceededError } from "@/lib/run-service";
 import { enforceRateLimit, RUNS_PER_MIN } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
@@ -62,9 +62,15 @@ export async function POST(
       input: original.input,
       overrides: original.overrides,
       runner: session.pubkey,
+      // Reserve the slot atomically (not just the soft getQuota above): concurrent
+      // retries would otherwise all pass the read-only check and blow past the cap.
+      quota: quotaReserve(session),
     });
     return NextResponse.json({ run });
   } catch (err) {
+    if (err instanceof QuotaExceededError) {
+      return NextResponse.json({ error: "Daily run limit reached." }, { status: 429 });
+    }
     logError("api/runs/retry", err);
     return NextResponse.json(
       { error: "Retry failed" },

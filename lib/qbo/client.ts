@@ -26,6 +26,7 @@ export interface QboBill {
   Id: string;
   DocNumber?: string;
   TotalAmt?: number;
+  CurrencyRef?: { value?: string };
 }
 
 export class QboError extends Error {

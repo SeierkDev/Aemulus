@@ -30,6 +30,20 @@ export interface TriggerResolved {
   skillId: string;
 }
 
+/** Per-owner cap on active inbound triggers — same idea as MAX_ACTIVE_SCHEDULES (a
+ *  higher ceiling since triggers are event-driven, not polled). Bounds self-inflicted
+ *  row growth; each trigger firing is independently rate + quota gated. */
+export const MAX_ACTIVE_TRIGGERS = 50;
+
+export async function countActiveTriggers(owner: string): Promise<number> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT COUNT(*) AS c FROM triggers WHERE owner = ? AND active = 1`,
+    args: [owner],
+  });
+  return Number((r.rows[0] as Record<string, unknown>).c);
+}
+
 export async function createTrigger(
   owner: string,
   skillId: string,

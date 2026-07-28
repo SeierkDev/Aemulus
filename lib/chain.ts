@@ -1,5 +1,6 @@
 import { getSkill } from "./skills";
-import { createRun } from "./runs";
+import { createRun, finishRun } from "./runs";
+import { quotaReserveForOwner } from "./quota";
 import { enqueueRunJob } from "./jobs";
 import { incr } from "./metrics";
 import type { SkillInputField, SkillStep } from "./types";
@@ -58,15 +59,35 @@ export async function startChainedRun(args: {
   if (planHasChaining(sub.plan)) return { skipped: "nested chaining is not allowed" };
 
   const input = childInput(sub.inputSchema.fields, args.parentInput, args.parentOutputs);
-  const run = await createRun({ owner: args.owner, skillId: sub.id, input, overrides: {} });
-  incr("runs.started");
-  await enqueueRunJob({
-    runId: run.id,
-    runner: args.owner,
+  // Meter the child against the owner's daily quota. Without this, a parent skill with
+  // up to 200 `run_skill` steps would spawn that many UNmetered child runs — one
+  // metered parent bypassing the cap 200×. Reserve atomically like every user-facing
+  // run path (unlimited tiers make it a no-op); refuse the chain step when over quota.
+  const run = await createRun({
+    owner: args.owner,
     skillId: sub.id,
     input,
     overrides: {},
+    reserve: await quotaReserveForOwner(args.owner),
   });
+  if (!run) return { skipped: "daily run limit reached" };
+  incr("runs.started");
+  // Mirror startRun: if the enqueue write fails after the run row (+ its quota
+  // reservation) is created, mark the child failed so it doesn't strand in "running"
+  // forever with a permanently-consumed quota slot (no reconciler scans for a run
+  // that never got a job).
+  try {
+    await enqueueRunJob({
+      runId: run.id,
+      runner: args.owner,
+      skillId: sub.id,
+      input,
+      overrides: {},
+    });
+  } catch (e) {
+    await finishRun(run.id, { status: "failed", error: "Could not queue the chained run." }).catch(() => {});
+    throw e;
+  }
   incr("chains.started");
   return { runId: run.id };
 }

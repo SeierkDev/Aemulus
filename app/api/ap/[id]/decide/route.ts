@@ -3,6 +3,7 @@ import { DEMO_INVOICE_ID } from "@/lib/ap-controls/demo";
 import { decideInvoice } from "@/lib/ap-controls/decide";
 import { getApViewer, viewerActor, viewerEntitlement } from "@/lib/ap-controls/ap-viewer";
 import { reserveApEntry, releaseApEntry } from "@/lib/ap-controls/billing";
+import { enforceRateLimit } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +18,10 @@ export async function POST(
   const viewer = await getApViewer().catch(() => null);
   if (!viewer) return NextResponse.json({ ok: false, error: "Sign in first." }, { status: 401 });
   if (id === DEMO_INVOICE_ID) return NextResponse.json({ ok: false, error: "Use the walkthrough for this invoice." }, { status: 404 });
+  // Throttle per workspace, matching the intake/enter sibling — approving enters an
+  // invoice (a seal + quota reservation), so an unmetered burst shouldn't hammer it.
+  const limited = enforceRateLimit(`ap-decide:${viewer.workspaceId}`, 30, 60_000, "Too many decisions");
+  if (limited) return limited;
 
   const body = (await req.json().catch(() => ({}))) as { action?: string; reasonCode?: string; note?: string };
   if (body.action !== "approve" && body.action !== "reject") {
@@ -35,21 +40,31 @@ export async function POST(
   }
   const canEnter = capped ? reservation !== null : ent.canEnter;
 
-  const r = await decideInvoice({
-    invoiceId: id,
-    workspaceId: viewer.workspaceId,
-    actor: viewerActor(viewer),
-    action: body.action,
-    reasonCode: String(body.reasonCode ?? "").trim(),
-    note: body.note ? String(body.note) : undefined,
-    canEnter,
-    now,
-  });
-
-  // Return the slot unless an entry actually sealed (rejected, errored, or refused).
-  if (reservation && !(r.ok && r.status === "submitted")) {
-    await releaseApEntry(reservation);
+  let r;
+  try {
+    r = await decideInvoice({
+      invoiceId: id,
+      workspaceId: viewer.workspaceId,
+      actor: viewerActor(viewer),
+      action: body.action,
+      reasonCode: String(body.reasonCode ?? "").trim(),
+      note: body.note ? String(body.note) : undefined,
+      canEnter,
+      now,
+    });
+  } catch (e) {
+    // Never leak the reserved slot if the entry threw (e.g. a detected-tamper
+    // HeadIntegrityError) before we reached the release below.
+    if (reservation) await releaseApEntry(reservation);
+    throw e;
   }
+
+  // Always release the reservation: it's a transient concurrency HOLD, not the usage
+  // record. The durable count is the sealed invoice.submitted event (see
+  // reserveApEntry), which the entry just wrote (or didn't) — so releasing after the
+  // decision, sealed or not, is correct and makes a double-clicked / idempotent approve
+  // naturally count once (one event, one slot).
+  if (reservation) await releaseApEntry(reservation);
 
   if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: r.httpStatus });
   return NextResponse.json(r);

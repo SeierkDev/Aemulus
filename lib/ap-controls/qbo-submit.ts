@@ -2,7 +2,7 @@ import { qboConfigFromConnection } from "../qbo/oauth";
 import { writeInvoiceToQbo } from "../qbo/write";
 import { recordLedgerBill, deleteLedgerBill } from "./ledger";
 import { id as newId } from "../ids";
-import { appendApEvent, verifyAggregate, SequenceConflictError } from "./store";
+import { appendApEvent, verifyAggregate, SequenceConflictError, HeadIntegrityError } from "./store";
 import { projectInvoiceEntry } from "./projections";
 import { DEFAULT_WORKSPACE } from "./workspace";
 
@@ -28,7 +28,11 @@ export interface EnterInvoiceInput {
 
 export type EnterTarget = "quickbooks" | "ledger";
 export type EnterResult =
-  | { ok: true; billNumber: string; target: EnterTarget; verify: { valid: boolean; length: number }; seal: string }
+  // `deduped` = this call did NOT seal a new submitted event (the invoice was
+  // already entered, or a concurrent writer won the seq). The caller uses it to
+  // release a quota reservation it made speculatively, so an idempotent replay /
+  // double-submit of the same invoice can't consume a second slot.
+  | { ok: true; billNumber: string; target: EnterTarget; verify: { valid: boolean; length: number }; seal: string; deduped?: boolean }
   | { ok: false; error: string };
 
 export async function enterInvoice(input: EnterInvoiceInput): Promise<EnterResult> {
@@ -39,7 +43,7 @@ export async function enterInvoice(input: EnterInvoiceInput): Promise<EnterResul
   const pre = await projectInvoiceEntry(input.invoiceId, workspaceId);
   if (pre.status === "submitted" && pre.billNumber) {
     const verify = await verifyAggregate("invoice", input.invoiceId, workspaceId);
-    return { ok: true, billNumber: pre.billNumber, target: pre.enterTarget ?? "ledger", verify, seal: pre.latestSeal ?? "" };
+    return { ok: true, billNumber: pre.billNumber, target: pre.enterTarget ?? "ledger", verify, seal: pre.latestSeal ?? "", deduped: true };
   }
 
   // Enter into QuickBooks when connected, otherwise the built-in ledger. Both
@@ -107,7 +111,7 @@ export async function enterInvoice(input: EnterInvoiceInput): Promise<EnterResul
       const after = await projectInvoiceEntry(input.invoiceId, workspaceId);
       if (after.status === "submitted" && after.billNumber) {
         const verify = await verifyAggregate("invoice", input.invoiceId, workspaceId);
-        return { ok: true, billNumber: after.billNumber, target: after.enterTarget ?? target, verify, seal: after.latestSeal ?? "" };
+        return { ok: true, billNumber: after.billNumber, target: after.enterTarget ?? target, verify, seal: after.latestSeal ?? "", deduped: true };
       }
       // The invoice did NOT end up submitted (e.g. a concurrent reject took the
       // slot). We already wrote a ledger bill above; roll it back so the ledger
@@ -118,6 +122,12 @@ export async function enterInvoice(input: EnterInvoiceInput): Promise<EnterResul
         await deleteLedgerBill(input.invoiceId, workspaceId);
       }
       return { ok: false, error: "in_progress" };
+    }
+    // The invoice's sealed chain was tampered (append refused by the head-integrity
+    // check). We already wrote a ledger bill above — roll it back so a detected forgery
+    // doesn't leave an orphaned ledger row with no sealed invoice.submitted event.
+    if (e instanceof HeadIntegrityError && target === "ledger") {
+      await deleteLedgerBill(input.invoiceId, workspaceId);
     }
     throw e;
   }

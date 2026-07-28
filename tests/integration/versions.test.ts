@@ -6,6 +6,7 @@ import {
   updateSkill,
   listSkillVersions,
   restoreSkillVersion,
+  MAX_VERSION_HISTORY,
 } from "../../lib/skills";
 import { createRun, finishRun } from "../../lib/runs";
 import { creditEarning } from "../../lib/earnings";
@@ -101,6 +102,24 @@ describe("skill versioning", () => {
     // Restoring v1 must bring back v1's NARROWER allowlist, not keep the widened one.
     expect(await restoreSkillVersion(skill.id, 1)).toBe(true);
     expect((await getSkill(skill.id))!.allowedHosts).toEqual(["v1.example.com"]);
+  });
+
+  it("caps version history so an edit loop can't grow skill_versions without bound", async () => {
+    const skill = await createSkill({ owner: OWNER, generalized: gen("Loopy"), sourceDemoId: null });
+    // Edit well past the retention window.
+    for (let i = 0; i < MAX_VERSION_HISTORY + 15; i++) {
+      await updateSkill(skill.id, {
+        name: `v${i}`,
+        description: "d",
+        plan: skill.plan,
+        inputSchema: skill.inputSchema,
+      });
+    }
+    const versions = await listSkillVersions(skill.id);
+    expect(versions.length).toBeLessThanOrEqual(MAX_VERSION_HISTORY);
+    // The most recent versions are retained (old ones pruned), so a recent restore works.
+    const latest = versions[0].version;
+    expect(await restoreSkillVersion(skill.id, latest)).toBe(true);
   });
 });
 

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
 import { logError } from "@/lib/log";
-import { createApiKey, listApiKeys } from "@/lib/api-keys";
+import { createApiKey, listApiKeys, countActiveApiKeys, MAX_API_KEYS_PER_OWNER } from "@/lib/api-keys";
+import { enforceRateLimit } from "@/lib/ratelimit";
 import { readJson, ApiKeyBody } from "@/lib/validate";
 
 export const runtime = "nodejs";
@@ -23,8 +24,13 @@ export async function POST(req: Request) {
     if (!session) {
       return NextResponse.json({ error: "Not authorized" }, { status: 401 });
     }
+    const limited = enforceRateLimit(`apikey-create:${session.pubkey}`, 20, 60_000, "Too many keys");
+    if (limited) return limited;
     const parsed = await readJson(req, ApiKeyBody);
     if (!parsed.ok) return parsed.res;
+    if ((await countActiveApiKeys(session.pubkey)) >= MAX_API_KEYS_PER_OWNER) {
+      return NextResponse.json({ error: `API key limit reached (max ${MAX_API_KEYS_PER_OWNER}).` }, { status: 409 });
+    }
     const { key, meta } = await createApiKey(
       session.pubkey,
       parsed.data.name ?? "API key",

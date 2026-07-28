@@ -2,7 +2,10 @@ import { executeRun } from "./runner";
 import {
   createRun,
   getRun,
+  finishRun,
   claimRunBookkeeping,
+  isRunBookkept,
+  isFirstCompletedRunByRunner,
   setRunRegistryAnchor,
   setRunZkAnchor,
 } from "./runs";
@@ -69,14 +72,22 @@ export async function startRun(args: RunArgs): Promise<Run> {
   if (!run) throw new QuotaExceededError();
   incr("runs.started");
   // Durable: enqueue for the worker instead of executing in-request, so the run
-  // survives a restart and retries transient failures.
-  await enqueueRunJob({
-    runId: run.id,
-    runner: args.runner,
-    skillId: args.skill.id,
-    input: args.input,
-    overrides: args.overrides ?? {},
-  });
+  // survives a restart and retries transient failures. If the enqueue write itself
+  // fails, the run row already exists as "running" with no job to settle it — mark
+  // it failed so it doesn't strand in "running" forever (recoverStuckJobs only
+  // reconciles the jobs table, not runs that never got a job).
+  try {
+    await enqueueRunJob({
+      runId: run.id,
+      runner: args.runner,
+      skillId: args.skill.id,
+      input: args.input,
+      overrides: args.overrides ?? {},
+    });
+  } catch (e) {
+    await finishRun(run.id, { status: "failed", error: "Could not queue the run." }).catch(() => {});
+    throw e;
+  }
   return run; // status: "running"
 }
 
@@ -90,20 +101,28 @@ export async function startRun(args: RunArgs): Promise<Run> {
 const TERMINAL = new Set(["completed", "failed", "needs_review"]);
 
 export async function completeRun(runId: string, args: RunArgs): Promise<void> {
-  // Idempotency guard: if a job is requeued by recoverStuckJobs (worker crash or
-  // a slow finalize) AFTER the run already finished, it can be re-claimed. Don't
-  // re-execute the browser run or re-fire bookkeeping/webhooks/metrics for a run
-  // that already reached a terminal state — just let the worker mark the job done.
+  // Idempotency guard: if a job is requeued by recoverStuckJobs (worker crash or a
+  // slow finalize) AFTER the run already finished, it can be re-claimed. A terminal
+  // run must not RE-execute the browser — but we must still distinguish:
+  //   - terminal AND already bookkept → fully done; let the worker mark the job done.
+  //   - terminal but NOT bookkept → the worker crashed between finishRun() and the
+  //     bookkeeping below (a multi-second window: executeRun does a post-finish
+  //     verifyOutcome LLM call before returning). Skip re-execution but STILL run the
+  //     once-latched bookkeeping, or the completed run silently loses its
+  //     earnings/run_count/webhook forever (no reconciler scans for this).
   const prior = await getRun(runId);
-  if (prior && TERMINAL.has(prior.status)) return;
+  const alreadyTerminal = !!prior && TERMINAL.has(prior.status);
+  if (alreadyTerminal && (await isRunBookkept(runId))) return;
 
-  const final = await executeRun(
-    args.skill,
-    runId,
-    args.runner,
-    args.input,
-    args.overrides ?? {},
-  );
+  const final = alreadyTerminal
+    ? prior! // alreadyTerminal ⇒ prior is non-null
+    : await executeRun(
+        args.skill,
+        runId,
+        args.runner,
+        args.input,
+        args.overrides ?? {},
+      );
   // Exactly-once latch: the terminal short-circuit above stops a SEQUENTIAL
   // re-run, but two executions can still run CONCURRENTLY (a job requeued while
   // a multi-checkpoint run is still alive). Only the latch winner does the
@@ -120,7 +139,12 @@ export async function completeRun(runId: string, args: RunArgs): Promise<void> {
     args.skill.owner &&
     args.skill.owner !== args.runner
   ) {
-    await incrementRunCount(args.skill.id);
+    // Count DISTINCT adopters, not raw runs: only the runner's FIRST completed run
+    // bumps run_count. Otherwise one funded burner wallet (e.g. via a schedule) farms
+    // the ranking indefinitely — the same anti-Sybil rule the earnings credit uses.
+    if (await isFirstCompletedRunByRunner(args.skill.id, args.runner, runId)) {
+      await incrementRunCount(args.skill.id);
+    }
     // Atomic credit-once per (skill, runner): the anti-Sybil first-run rule,
     // safe against two concurrent completions racing a check-then-insert.
     await creditEarningOnce({

@@ -75,6 +75,12 @@ export type Tier = {
 /** Map a token balance to an access tier. */
 export function computeTier(balance: number): Tier {
   if (!gatingEnabled()) return { name: "Open", level: 3, allowed: true };
+  // A non-positive balance is ALWAYS Locked while gating is on — even if a threshold
+  // was misconfigured to 0 or negative. minNum clamps a negative min to 0, and a
+  // `balance >= 0` comparison would then admit a zero-balance / no-token wallet to
+  // Holder (or, with proMin/whaleMin=0, to Whale), silently collapsing the whole gate.
+  // Access requires an ACTUAL positive holding.
+  if (!(balance > 0)) return { name: "Locked", level: 0, allowed: false };
   if (balance >= SOLANA.whaleMin) return { name: "Whale", level: 3, allowed: true };
   if (balance >= SOLANA.proMin) return { name: "Pro", level: 2, allowed: true };
   if (balance >= SOLANA.holderMin) return { name: "Holder", level: 1, allowed: true };
@@ -87,17 +93,19 @@ function connection(): Connection {
 }
 
 /**
- * Read a wallet's total $AEMU balance (UI amount, summed across token
- * accounts). Returns 0 when gating is off, on any RPC error, or no holdings.
+ * Read a wallet's total $AEMU balance (UI amount, summed across token accounts),
+ * returning NULL when the read could not be completed (RPC error/timeout) — as
+ * distinct from a confirmed 0 balance. Use this (not getAemulusBalance) where a
+ * transient failure must NOT trigger a destructive action: the scheduler must skip
+ * a tick and retry rather than permanently deactivate a legit schedule on one blip.
+ * Returns 0 (not null) when gating is off. Bounds the RPC read (web3.js has no
+ * request timeout) at 8s.
  */
-export async function getAemulusBalance(owner: string): Promise<number> {
+export async function readAemulusBalance(owner: string): Promise<number | null> {
   if (!gatingEnabled()) return 0;
-  // Bound the RPC read: web3.js has no request timeout, so a connected-but-
-  // unresponsive RPC would otherwise hang this call forever - and it's on the
-  // gating-critical path (sign-in, scheduler, MCP). Time out → 0 (fails closed).
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<number>((res) => {
-    timer = setTimeout(() => res(0), 8_000);
+  const timeout = new Promise<null>((res) => {
+    timer = setTimeout(() => res(null), 8_000);
   });
   try {
     const read = (async () => {
@@ -119,8 +127,18 @@ export async function getAemulusBalance(owner: string): Promise<number> {
     })();
     return await Promise.race([read, timeout]);
   } catch {
-    return 0;
+    return null;
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Fail-closed balance read: returns 0 when gating is off, on any RPC error/timeout,
+ * or no holdings. Use for gating checks that should deny on an unresolved read
+ * (sign-in, quota). Callers that must not take a destructive/irreversible action on
+ * a transient failure should use readAemulusBalance and handle null explicitly.
+ */
+export async function getAemulusBalance(owner: string): Promise<number> {
+  return (await readAemulusBalance(owner)) ?? 0;
 }

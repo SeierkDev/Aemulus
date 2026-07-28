@@ -6,7 +6,7 @@ vi.mock("../../lib/runner", () => ({ executeRun: vi.fn() }));
 
 import { ready } from "../../lib/db";
 import { createSkill, getSkill } from "../../lib/skills";
-import { createRun, finishRun, getRun } from "../../lib/runs";
+import { createRun, finishRun, getRun, claimRunBookkeeping, isFirstCompletedRunByRunner } from "../../lib/runs";
 import { completeRun } from "../../lib/run-service";
 import { getEarningsSummary } from "../../lib/earnings";
 import { executeRun } from "../../lib/runner";
@@ -58,18 +58,32 @@ describe("completeRun creator credit rules", () => {
     expect((await getEarningsSummary("CREATOR_A")).total).toBe(SOLANA.runFee);
   });
 
-  it("is a no-op on an already-terminal run (recovered/duplicate job can't re-run or re-credit)", async () => {
-    const skill = await createSkill({
-      owner: "CREATOR_DUP",
-      generalized: GEN,
-      sourceDemoId: null,
-    });
+  it("already-terminal AND bookkept: no re-execution, no re-credit", async () => {
+    const skill = await createSkill({ owner: "CREATOR_DUP", generalized: GEN, sourceDemoId: null });
     const run = await createRun({ owner: "RUNNER_X", skillId: skill.id, input: {}, overrides: {} });
     await finishRun(run.id, { status: "completed", result: "done" });
+    await claimRunBookkeeping(run.id); // bookkeeping already ran
     returns("completed"); // would credit if the run executed again
     await completeRun(run.id, { skill, input: {}, runner: "RUNNER_X" });
     expect(mockExec).not.toHaveBeenCalled(); // short-circuited, no second execution
     expect((await getEarningsSummary("CREATOR_DUP")).total).toBe(0); // no double credit
+  });
+
+  it("terminal but NOT bookkept (crash window): recovers bookkeeping once, without re-executing", async () => {
+    // A worker crash between finishRun() and the bookkeeping block leaves a completed
+    // run bookkept=0. A recovered job must NOT re-run the browser, but MUST still run
+    // the once-latched bookkeeping so the completed run isn't robbed of its credit.
+    const skill = await createSkill({ owner: "CREATOR_CRASH", generalized: GEN, sourceDemoId: null });
+    const run = await createRun({ owner: "RUNNER_CR", skillId: skill.id, input: {}, overrides: {} });
+    await finishRun(run.id, { status: "completed", result: "done" }); // finished; bookkeeping never ran
+    returns("completed");
+    await completeRun(run.id, { skill, input: {}, runner: "RUNNER_CR" });
+    expect(mockExec).not.toHaveBeenCalled(); // no browser RE-execution
+    expect((await getEarningsSummary("CREATOR_CRASH")).total).toBe(SOLANA.runFee); // credited exactly once
+    expect((await getSkill(skill.id))!.runCount).toBe(1);
+    // A further duplicate now finds it bookkept → no double credit.
+    await completeRun(run.id, { skill, input: {}, runner: "RUNNER_CR" });
+    expect((await getEarningsSummary("CREATOR_CRASH")).total).toBe(SOLANA.runFee);
   });
 
   it("bookkeeping fires exactly once if completeRun runs twice (latch)", async () => {
@@ -135,5 +149,19 @@ describe("completeRun creator credit rules", () => {
     expect((await getEarningsSummary("CREATOR_D")).total).toBe(
       SOLANA.runFee * 2,
     );
+  });
+
+  it("run_count dedup rule: only a runner's FIRST completed run counts (anti-Sybil ranking)", async () => {
+    // completeRun gates incrementRunCount on this, so one funded burner can't farm the
+    // marketplace sort key by re-running (e.g. via a schedule). The caller's run is
+    // already 'completed' in the DB at bookkeeping time (runner.ts:482), hence excluded.
+    const skill = await createSkill({ owner: "CREATOR_RC", generalized: GEN, sourceDemoId: null });
+    const r1 = await createRun({ owner: "BURNER", skillId: skill.id, input: {}, overrides: {} });
+    expect(await isFirstCompletedRunByRunner(skill.id, "BURNER", r1.id)).toBe(true); // no prior completed
+    await finishRun(r1.id, { status: "completed" });
+    const r2 = await createRun({ owner: "BURNER", skillId: skill.id, input: {}, overrides: {} });
+    expect(await isFirstCompletedRunByRunner(skill.id, "BURNER", r2.id)).toBe(false); // r1 already completed → farming
+    const r3 = await createRun({ owner: "OTHER", skillId: skill.id, input: {}, overrides: {} });
+    expect(await isFirstCompletedRunByRunner(skill.id, "OTHER", r3.id)).toBe(true); // a distinct adopter
   });
 });

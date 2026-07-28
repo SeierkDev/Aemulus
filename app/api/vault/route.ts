@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
-import { setCredential, listCredentials } from "@/lib/vault";
+import { setCredential, listCredentials, VaultLimitError } from "@/lib/vault";
 import { readJson, VaultBody } from "@/lib/validate";
 import { logError } from "@/lib/log";
 
@@ -29,6 +29,9 @@ export async function POST(req: Request) {
     await setCredential(session.pubkey, host, key, value);
     return NextResponse.json({ ok: true });
   } catch (err) {
+    if (err instanceof VaultLimitError) {
+      return NextResponse.json({ error: err.message }, { status: 409 });
+    }
     logError("api/vault", err);
     return NextResponse.json({ error: "Failed to save credential" }, { status: 500 });
   }

@@ -38,6 +38,15 @@ function valueSlots(demo: Demonstration): string[] {
     .map((a) => a.value ?? "");
 }
 
+/** Which typed slots were recorded sensitive (value blanked at capture), aligned
+ *  1:1 with valueSlots. A sensitive slot is per-run data by definition — its blanked
+ *  "" would otherwise look identical across demos and be miscalled a constant. */
+function sensitiveSlots(demo: Demonstration): boolean[] {
+  return demo.trace
+    .filter((a) => a.type === "input" || a.type === "select")
+    .map((a) => a.sensitive === true);
+}
+
 /**
  * Deterministic verifier: align demos by typed-value position and confirm the
  * skill classifies each as input (varies across demos) or constant (stable).
@@ -49,6 +58,7 @@ export function varianceIssues(
 ): string[] {
   const issues: string[] = [];
   const slots = demos.map(valueSlots);
+  const sens = demos.map(sensitiveSlots);
   const counts = slots.map((s) => s.length);
   if (new Set(counts).size > 1) {
     issues.push(
@@ -71,7 +81,11 @@ export function varianceIssues(
   }
   for (let i = 0; i < k; i++) {
     const vals = slots.map((s) => s[i]);
-    const varies = new Set(vals).size > 1;
+    // A slot recorded sensitive in any demo is always per-run input, never a
+    // constant — its value was blanked at capture, so a plain equality check would
+    // see all-"" and wrongly demand it be a constant (which would un-mark the secret).
+    const isSensitive = sens.some((s) => s[i]);
+    const varies = isSensitive || new Set(vals).size > 1;
     const step = planValueSteps[i];
     if (!step) {
       issues.push(

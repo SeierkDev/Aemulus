@@ -68,9 +68,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "limit_reached" }, { status: 400 });
     }
   }
-  const r = await intakeEnter(fields, "upload", now, viewerActor(viewer), viewer.workspaceId);
+  let r;
+  try {
+    r = await intakeEnter(fields, "upload", now, viewerActor(viewer), viewer.workspaceId);
+  } finally {
+    // Always release the transient hold — the sealed invoice.submitted event is the
+    // durable usage record now (see reserveApEntry), so the reservation isn't kept to
+    // represent the entry; it only guarded the concurrent check-then-act.
+    if (reservation) await releaseApEntry(reservation);
+  }
   if (!r.ok) {
-    if (reservation) await releaseApEntry(reservation); // entry failed → return the slot
     return NextResponse.json({ ok: false, error: r.error }, { status: r.error === "in_progress" ? 409 : 400 });
   }
   return NextResponse.json({

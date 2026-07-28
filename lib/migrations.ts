@@ -490,4 +490,15 @@ export const MIGRATIONS: Migration[] = [
     name: "skill_versions_allowed_hosts",
     addColumns: [{ table: "skill_versions", column: "allowed_hosts", def: "TEXT" }],
   },
+
+  // 34 - timestamp a run's Merkle-batch claim so the boot recovery sweep can tell a
+  // genuinely-crashed claim from a peer instance's LIVE batch (which sits claimed-
+  // but-unproven for up to the anchor timeout). Without an age guard, a second
+  // instance booting mid-batch would wipe the first's in-flight batch → duplicate
+  // on-chain anchoring + phantom batch rows.
+  {
+    id: 34,
+    name: "runs_batched_at",
+    addColumns: [{ table: "runs", column: "batched_at", def: "INTEGER" }],
+  },
 ];

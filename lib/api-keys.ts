@@ -47,6 +47,19 @@ function parseScopes(raw: unknown): Scope[] {
   return set.size ? [...set] : ["read"];
 }
 
+/** Per-owner active (non-revoked) API-key cap — bounds api_keys row growth. */
+export const MAX_API_KEYS_PER_OWNER = 25;
+
+/** Count of a wallet's active (non-revoked) API keys — for the create cap. */
+export async function countActiveApiKeys(owner: string): Promise<number> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT COUNT(*) AS c FROM api_keys WHERE owner = ? AND revoked = 0`,
+    args: [owner],
+  });
+  return Number((r.rows[0] as Record<string, unknown>).c);
+}
+
 export async function createApiKey(
   owner: string,
   name: string,
@@ -98,8 +111,13 @@ export async function revokeApiKey(
   owner: string,
 ): Promise<boolean> {
   await ready();
+  // Hard-DELETE, not a soft `revoked=1` flag: nothing ever reads a revoked row (the
+  // auth lookup, the listing, and the per-owner cap all filter `revoked=0`), so a
+  // soft flag was pure dead weight that a create→revoke→create loop could grow without
+  // bound while the active-count cap stayed satisfied. Deleting keeps the table ≤ the
+  // active cap per owner. A revoked key still stops authenticating (its row is gone).
   const r = await db.execute({
-    sql: `UPDATE api_keys SET revoked = 1 WHERE id = ? AND owner = ?`,
+    sql: `DELETE FROM api_keys WHERE id = ? AND owner = ?`,
     args: [keyId, owner],
   });
   return r.rowsAffected > 0;

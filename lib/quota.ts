@@ -1,4 +1,4 @@
-import { limitForLevel } from "./solana";
+import { limitForLevel, computeTier, getAemulusBalance } from "./solana";
 import { countRecentRuns } from "./runs";
 import type { QuotaReserve } from "./runs";
 import type { Session } from "./auth";
@@ -44,4 +44,16 @@ export async function getQuota(session: Session): Promise<QuotaStatus> {
  */
 export function quotaReserve(session: Session): QuotaReserve {
   return { limit: limitForLevel(session.level), windowMs: QUOTA_WINDOW_MS };
+}
+
+/**
+ * An atomic quota reserve for an OWNER pubkey rather than a request session —
+ * derives the tier limit from the wallet's live $AEMU balance. Used by detached run
+ * paths (skill chaining) that start a run without a session but must still meter it,
+ * so a parent skill's `run_skill` steps can't spawn unlimited unmetered child runs.
+ * Unlimited tiers (limit < 0) make the reserve a no-op in createRun.
+ */
+export async function quotaReserveForOwner(owner: string): Promise<QuotaReserve> {
+  const level = computeTier(await getAemulusBalance(owner)).level;
+  return { limit: limitForLevel(level), windowMs: QUOTA_WINDOW_MS };
 }

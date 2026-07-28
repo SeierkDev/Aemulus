@@ -88,7 +88,10 @@ export function toCsv(headers: string[], rows: Record<string, string>[]): string
   const neutralize = (v: string) => (/^[=+\-@\t\r]/.test(v) ? `'${v}` : v);
   const esc = (v: string) => {
     const s = neutralize(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    // Quote on a lone \r too, not just \n/comma/quote: parseCsv (and Excel) treat a
+    // bare carriage return as a record separator, so an unquoted \r in a field would
+    // split it into extra rows on round-trip.
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const lines = [headers.map(esc).join(",")];
   for (const r of rows) lines.push(headers.map((h) => esc(r[h] ?? "")).join(","));

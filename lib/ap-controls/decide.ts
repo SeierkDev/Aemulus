@@ -1,5 +1,5 @@
 import { id as newId } from "../ids";
-import { appendApEvent, verifyAggregate } from "./store";
+import { appendApEvent, verifyAggregate, SequenceConflictError } from "./store";
 import { projectInvoiceEntry } from "./projections";
 import { enterInvoice } from "./qbo-submit";
 
@@ -21,7 +21,10 @@ export interface DecideInput {
 
 export type DecideResult =
   | { ok: true; status: "rejected" }
-  | { ok: true; status: "submitted"; billNumber: string; target: string; verify: { valid: boolean; length: number }; seal: string }
+  // `deduped` mirrors enterInvoice: true when this approve didn't actually seal a
+  // new entry (idempotent replay / lost the concurrent seq race), so the caller
+  // releases the speculative quota slot instead of consuming it twice.
+  | { ok: true; status: "submitted"; billNumber: string; target: string; verify: { valid: boolean; length: number }; seal: string; deduped?: boolean }
   | { ok: false; error: string; httpStatus: number };
 
 export async function decideInvoice(input: DecideInput): Promise<DecideResult> {
@@ -56,11 +59,19 @@ export async function decideInvoice(input: DecideInput): Promise<DecideResult> {
   // deduped, not an unrelated override (e.g. a duplicate-flag clearance).
   const alreadyCleared = state.overrides.some((o) => o.field === "review");
   if (!alreadyCleared) {
-    await appendApEvent({
-      workspaceId, aggregateType: "invoice", aggregateId: invoiceId, eventType: "invoice.override",
-      payload: { type: "review", field: "review", originalValue: "flagged", newValue: "cleared", reasonCode, note },
-      actor, now, id: newId("evt"),
-    });
+    try {
+      await appendApEvent({
+        workspaceId, aggregateType: "invoice", aggregateId: invoiceId, eventType: "invoice.override",
+        payload: { type: "review", field: "review", originalValue: "flagged", newValue: "cleared", reasonCode, note },
+        actor, now, id: newId("evt"),
+      });
+    } catch (e) {
+      // A concurrent approve of the same invoice took this seq. Treat it as an
+      // idempotent replay rather than letting it escape (which would skip the
+      // caller's reservation release and leak a quota slot).
+      if (e instanceof SequenceConflictError) return { ok: false, error: "in_progress", httpStatus: 409 };
+      throw e;
+    }
   }
 
   const r = await enterInvoice({
@@ -80,5 +91,5 @@ export async function decideInvoice(input: DecideInput): Promise<DecideResult> {
     return { ok: false, error: r.error, httpStatus: r.error === "in_progress" ? 409 : 400 };
   }
   const verify = await verifyAggregate("invoice", invoiceId, workspaceId);
-  return { ok: true, status: "submitted", billNumber: r.billNumber, target: r.target, verify, seal: r.seal };
+  return { ok: true, status: "submitted", billNumber: r.billNumber, target: r.target, verify, seal: r.seal, deduped: r.deduped };
 }

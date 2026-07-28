@@ -11,6 +11,22 @@ import type {
   SkillVersionMeta,
 } from "./types";
 
+/** Retained version snapshots per skill (bounds skill_versions growth from an edit
+ *  loop) and the per-owner active-skill cap (bounds skills growth), mirroring the
+ *  triggers/webhooks/schedules per-owner caps. */
+export const MAX_VERSION_HISTORY = 100;
+export const MAX_SKILLS_PER_OWNER = 500;
+
+/** Count of skills a wallet owns — for the create cap. */
+export async function countSkillsByOwner(owner: string): Promise<number> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT COUNT(*) AS c FROM skills WHERE owner = ?`,
+    args: [owner],
+  });
+  return Number((r.rows[0] as Record<string, unknown>).c);
+}
+
 /** Parse a JSON column without throwing out of a read path. `|| "[]"` only
  *  covers NULL/empty; a corrupt (truncated/malformed) value still throws. */
 function parseJson<T>(raw: unknown, fallback: T): T {
@@ -48,6 +64,16 @@ async function snapshotVersion(s: {
       JSON.stringify(s.allowedHosts ?? []),
       Date.now(),
     ],
+  });
+  // Bound version history: a snapshot is appended on create AND on every edit/restore,
+  // so an unthrottled edit loop would grow skill_versions without limit (each row holds
+  // the full plan + input_schema JSON). Keep only the most recent MAX_VERSION_HISTORY
+  // per skill; restore still works within that window.
+  await db.execute({
+    sql: `DELETE FROM skill_versions
+          WHERE skill_id = ?
+            AND version <= (SELECT MAX(version) - ? FROM skill_versions WHERE skill_id = ?)`,
+    args: [s.id, MAX_VERSION_HISTORY, s.id],
   });
 }
 
@@ -269,9 +295,16 @@ export async function updateSkill(
   const version = Number(maxRow.rows[0]?.v ?? 0) + 1;
   // Keep the current allowlist unless the patch explicitly sets one.
   const allowedHosts = patch.allowedHosts ?? cur.allowedHosts;
+  // If this edit (or a version restore, which routes through here) makes a PUBLISHED
+  // skill unrunnable — 0 steps, or an input step bound to a field the patch no longer
+  // declares — auto-unpublish it. Otherwise the edit/restore path silently bypasses
+  // setPublished's guard and leaves a broken skill live in the marketplace.
+  const nextState = { ...cur, plan: patch.plan, inputSchema: patch.inputSchema } as Skill;
+  const unpublish = cur.published && unpublishableReason(nextState) !== null;
   await db.execute({
-    sql: `UPDATE skills SET name = ?, description = ?, plan = ?, input_schema = ?, allowed_hosts = ?, version = ?, updated_at = ?
-          WHERE id = ?`,
+    sql: `UPDATE skills SET name = ?, description = ?, plan = ?, input_schema = ?, allowed_hosts = ?, version = ?, updated_at = ?${
+      unpublish ? ", published = 0, published_at = NULL" : ""
+    } WHERE id = ?`,
     args: [
       patch.name,
       patch.description,

@@ -8,7 +8,7 @@ import {
 import { getSkill } from "./skills";
 import { getQuota } from "./quota";
 import { startRun } from "./run-service";
-import { computeTier, gatingEnabled, getAemulusBalance } from "./solana";
+import { computeTier, gatingEnabled, readAemulusBalance } from "./solana";
 import { logError, logInfo } from "./log";
 import type { Session } from "./siws";
 
@@ -57,11 +57,20 @@ async function runDue(): Promise<void> {
       let level = s.level;
       let tier = s.tier;
       if (gatingEnabled()) {
-        const t = computeTier(await getAemulusBalance(s.owner));
+        const bal = await readAemulusBalance(s.owner);
+        if (bal === null) {
+          // Transient RPC failure — do NOT deactivate a legitimate schedule on an
+          // unresolved read (a Whale whose balance blips once would otherwise lose
+          // their automation forever). Skip this tick; the claim already advanced
+          // next_run_at, so it retries next cadence.
+          logInfo("scheduler.skip", "balance read failed; retrying next cadence", { schedule: s.id });
+          continue;
+        }
+        const t = computeTier(bal);
         level = t.level;
         tier = t.name;
         if (!t.allowed) {
-          await deactivate(s.id); // wallet no longer holds enough - stop it
+          await deactivate(s.id); // CONFIRMED no longer holds enough - stop it
           logInfo("scheduler.skip", "no longer eligible", { schedule: s.id });
           continue;
         }
