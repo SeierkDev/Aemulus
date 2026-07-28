@@ -2,6 +2,7 @@
   "name": "aemulus",
   "version": "0.1.0",
   "private": true,
+  "license": "AGPL-3.0-only",
   "scripts": {
     "predev": "node scripts/vendor-rrweb.mjs",
     "dev": "next dev",

@@ -50,3 +50,6 @@ next-env.d.ts
 
 # Local sandbox credentials for the QBO smoke tool (never committed)
 /scripts/qbo/.env.local
+
+# Local-only marketing trailer (videos + render scripts — never pushed)
+/trailer/
