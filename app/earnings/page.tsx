@@ -7,6 +7,7 @@ import { payoutsEnabled } from "@/lib/payout";
 import { getCreatorAnalytics } from "@/lib/analytics";
 import { MiniChart } from "@/components/MiniChart";
 import { ClaimButton } from "@/components/ClaimButton";
+import { ConnectWalletCard } from "@/components/ConnectWalletCard";
 import { SOLANA } from "@/lib/solana";
 import { when } from "@/lib/format";
 
@@ -40,9 +41,7 @@ export default async function EarningsPage() {
         </div>
 
         {!session && (
-          <Card className="mt-6 p-8 text-center text-sm text-ink-2">
-            Connect your wallet to see your creator earnings.
-          </Card>
+          <ConnectWalletCard message="Connect your wallet to see your creator earnings." />
         )}
 
         {summary && (

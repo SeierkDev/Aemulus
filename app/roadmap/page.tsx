@@ -79,28 +79,69 @@ export default function RoadmapPage() {
         </p>
       </section>
 
-      <section className="py-12">
-        <div className="grid gap-3">
-          {ROADMAP.map((r) => (
-            <Card key={r.phase} className="p-5">
-              <div className="flex items-center gap-3">
-                <Badge>{r.phase}</Badge>
-                <h2 className="text-lg font-semibold tracking-tight">
-                  {r.title}
-                </h2>
-              </div>
-              <ul className="mt-3 grid gap-2">
-                {r.body.map((b) => (
-                  <li key={b} className="flex gap-2.5 text-sm text-ink-2">
-                    <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-ink-3" />
-                    <span className="leading-relaxed">{b}</span>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          ))}
+      <section className="py-14">
+        {/* Alternating timeline: a spine down the middle (left rail on mobile),
+            phase cards zig-zagging left/right, each pinned to a node on the line. */}
+        <div className="relative">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute top-2 bottom-2 left-[7px] w-px bg-border md:left-1/2 md:-translate-x-1/2"
+          />
+          <div className="grid gap-10 md:gap-14">
+            {ROADMAP.map((r, i) => {
+              const left = i % 2 === 0;
+              return (
+                <div
+                  key={r.phase}
+                  className="relative md:grid md:grid-cols-2 md:items-start md:gap-12"
+                >
+                  {/* node on the spine */}
+                  <span
+                    aria-hidden
+                    className="absolute left-0 top-4 z-10 h-4 w-4 rounded-full border-4 border-bg bg-ink md:left-1/2 md:-translate-x-1/2"
+                  />
+                  <div
+                    className={
+                      "pl-8 md:pl-0 " +
+                      (left
+                        ? "md:col-start-1 md:pr-12 md:text-right"
+                        : "md:col-start-2 md:pl-12")
+                    }
+                  >
+                    <Card className="p-5">
+                      <div
+                        className={
+                          "flex items-center gap-3 " +
+                          (left ? "md:flex-row-reverse" : "")
+                        }
+                      >
+                        <Badge>{r.phase}</Badge>
+                        <h2 className="text-lg font-semibold tracking-tight">
+                          {r.title}
+                        </h2>
+                      </div>
+                      <ul className="mt-3 grid gap-2">
+                        {r.body.map((b) => (
+                          <li
+                            key={b}
+                            className={
+                              "flex gap-2.5 text-sm text-ink-2 " +
+                              (left ? "md:flex-row-reverse md:text-right" : "")
+                            }
+                          >
+                            <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-ink-3" />
+                            <span className="leading-relaxed">{b}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </Card>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
-        <div className="mt-4 text-xs text-ink-3">
+        <div className="mt-8 text-xs text-ink-3">
           <Label>Note</Label>
           <p className="mt-1">
             Roadmap items are directional, not commitments, and may change as
