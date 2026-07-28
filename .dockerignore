@@ -1,0 +1,20 @@
+# Keep the build context small and never ship local state into the image.
+node_modules
+.next
+.git
+.data
+trailer
+coverage
+*.log
+npm-debug.log*
+.DS_Store
+
+# Never bake secrets into an image layer (the example template is fine).
+.env
+.env.*
+!.env.example
+
+# Local-only tooling
+/scripts/qbo/.env.local
+/anchor/target
+/anchor-zk/target
