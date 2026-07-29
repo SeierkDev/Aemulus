@@ -14,5 +14,9 @@ jobs:
         with:
           node-version: "22"
           cache: npm
+      # Match the npm major used to generate package-lock.json (npm 11). Node
+      # 22 ships npm 10, which resolves optional native deps (utf-8-validate)
+      # differently and rejects the lockfile as out of sync.
+      - run: npm install -g npm@11
       - run: npm ci
       - run: npm run ci # tsc --noEmit && eslint . && vitest run
