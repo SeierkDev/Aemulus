@@ -15,17 +15,12 @@ const VIEW_H = 800;
 const input =
   "w-full rounded-[var(--radius-base)] border border-border-strong bg-surface-2 px-3 py-2 text-sm outline-none placeholder:text-ink-3 focus:border-ink-3";
 
-// Big public sites that aggressively block automation (captcha walls). We don't
+// Sites we've CONFIRMED aggressively block automation (captcha walls). We don't
 // stop the user — just warn them so they don't waste a recording on a site that
-// will loop a captcha no matter what.
+// will loop a captcha no matter what. Only list sites we've actually verified;
+// don't pre-judge untested ones (they may work fine).
 const HARD_SITES: { re: RegExp; name: string }[] = [
   { re: /(^|\.)google\./, name: "Google" },
-  { re: /(^|\.)amazon\./, name: "Amazon" },
-  { re: /(^|\.)(facebook|instagram)\.com$/, name: "Facebook / Instagram" },
-  { re: /(^|\.)(x|twitter)\.com$/, name: "X (Twitter)" },
-  { re: /(^|\.)linkedin\.com$/, name: "LinkedIn" },
-  { re: /(^|\.)tiktok\.com$/, name: "TikTok" },
-  { re: /(^|\.)ticketmaster\./, name: "Ticketmaster" },
 ];
 function hardSiteName(raw: string): string | null {
   const t = raw.trim();
@@ -229,9 +224,10 @@ export default function RecordPage() {
             </p>
             <p className="mt-2 text-sm leading-relaxed text-ink-3">
               <span className="text-ink-2">Works best on</span> the tools you log
-              into and forms - CRMs, invoicing, dashboards, data entry.{" "}
-              <span className="text-ink-2">Not built for</span> big public sites
-              like Google or Amazon, which block automation with captchas.
+              into and forms - CRMs, invoicing, dashboards, data entry. A few big
+              public sites (like <span className="text-ink-2">Google search</span>
+              ) block automation with captchas, but most tools you actually work
+              in are fine.
             </p>
           </div>
 
