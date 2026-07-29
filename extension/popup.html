@@ -5,61 +5,63 @@
     <style>
       :root { color-scheme: dark; }
       body {
-        width: 320px;
-        margin: 0;
-        padding: 16px;
-        background: #0d0e11;
-        color: #e9ebee;
+        width: 340px; margin: 0; padding: 16px;
+        background: #0d0e11; color: #e9ebee;
         font: 13px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
       }
-      h1 {
-        font-size: 14px;
-        margin: 0 0 2px;
-        letter-spacing: -0.01em;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
+      h1 { font-size: 14px; margin: 0 0 2px; display: flex; align-items: center; gap: 8px; letter-spacing: -0.01em; }
       #recdot { width: 8px; height: 8px; border-radius: 50%; background: #e5484d; opacity: 0.2; transition: opacity .2s; }
-      p.sub { margin: 0 0 14px; color: #8b919b; font-size: 11.5px; }
-      label { display: block; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: #8b919b; margin: 10px 0 4px; }
-      input {
+      p.sub { margin: 0 0 12px; color: #8b919b; font-size: 11.5px; }
+      hr { border: 0; border-top: 1px solid #23262d; margin: 16px 0; }
+      .eyebrow { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #6b717b; margin: 0 0 8px; font-weight: 600; }
+      label { display: block; font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: #8b919b; margin: 9px 0 4px; }
+      input, select {
         width: 100%; box-sizing: border-box; padding: 7px 9px; font-size: 12.5px;
         background: #16181c; border: 1px solid #2a2e35; border-radius: 7px; color: #e9ebee; outline: none;
       }
-      input:focus { border-color: #4a4f59; }
-      .row { display: flex; gap: 8px; margin-top: 14px; }
+      input:focus, select:focus { border-color: #4a4f59; }
+      .row { display: flex; gap: 8px; margin-top: 12px; }
       button {
         flex: 1; padding: 8px 10px; font-size: 12.5px; font-weight: 600; border-radius: 7px; cursor: pointer;
         border: 1px solid #2a2e35; background: #1b1e24; color: #e9ebee;
       }
       button.primary { background: #e9ebee; color: #0d0e11; border-color: #e9ebee; }
       button:disabled { opacity: 0.4; cursor: default; }
-      #save { margin-top: 12px; width: 100%; }
+      button.wide { width: 100%; flex: none; margin-top: 10px; }
       #status { margin-top: 12px; font-size: 11.5px; color: #8b919b; min-height: 16px; }
       a { color: #83a8f2; display: none; margin-top: 8px; font-size: 12px; }
+      #fields:empty { display: none; }
+      .hint { color: #6b717b; font-size: 11px; margin-top: 4px; }
     </style>
   </head>
   <body>
-    <h1><span id="recdot"></span> Aemulus Recorder</h1>
-    <p class="sub">Record a task in this tab, then turn it into a skill on the site.</p>
+    <h1><span id="recdot"></span> Aemulus</h1>
+    <p class="sub">Record and run tasks in your own browser.</p>
 
-    <label for="server">Aemulus URL</label>
+    <p class="eyebrow">Connection</p>
     <input id="server" placeholder="https://your-app.up.railway.app" />
-    <label for="key">API key</label>
-    <input id="key" type="password" placeholder="aem_live_…  (from /developers)" />
-    <button id="save">Save connection</button>
+    <input id="key" type="password" placeholder="API key (aem_live_… from /developers)" style="margin-top:8px;" />
+    <button id="save" class="wide">Save connection</button>
 
-    <label for="title">Task name (optional)</label>
-    <input id="title" placeholder="e.g. Add lead to CRM" />
+    <hr />
 
+    <p class="eyebrow">Record a task</p>
+    <input id="title" placeholder="Task name (optional)" />
     <div class="row">
       <button id="start" class="primary">Start recording</button>
       <button id="stop" disabled>Stop &amp; save</button>
     </div>
 
+    <hr />
+
+    <p class="eyebrow">Run a skill in this tab</p>
+    <select id="skill"><option value="">Loading your skills…</option></select>
+    <div id="fields"></div>
+    <button id="run" class="primary wide" disabled>Run in this tab</button>
+    <p class="hint">Runs the skill right here, using your logged-in session.</p>
+
     <div id="status"></div>
-    <a id="link" target="_blank">Open your recordings →</a>
+    <a id="link" target="_blank">Open on the site →</a>
 
     <script src="popup.js"></script>
   </body>

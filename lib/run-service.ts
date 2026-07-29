@@ -127,71 +127,70 @@ export async function completeRun(runId: string, args: RunArgs): Promise<void> {
   // re-run, but two executions can still run CONCURRENTLY (a job requeued while
   // a multi-checkpoint run is still alive). Only the latch winner does the
   // counts/credit/webhooks, so they fire exactly once regardless.
+  await finalizeRunAccounting(runId, args.skill, args.runner, final);
+}
+
+/**
+ * Post-run bookkeeping shared by BOTH execution backends — the cloud Playwright
+ * runner (completeRun above) and the browser-extension runner (which does the
+ * actual clicking in the user's own browser, then reports the terminal run here
+ * to be settled the same way). Single source of truth for: the exactly-once
+ * latch, marketplace run_count, creator earnings, webhooks, and on-chain anchors.
+ * Call it AFTER the run has reached a terminal status and its receipt is attached.
+ */
+export async function finalizeRunAccounting(
+  runId: string,
+  skill: Skill,
+  runner: string,
+  final: Run,
+): Promise<void> {
+  // Exactly-once latch: two executions (a requeued job, or a duplicate finish)
+  // must not double-count. Only the latch winner runs the rest.
   if (!(await claimRunBookkeeping(runId))) return;
   incr(`runs.${final.status}`); // runs.completed / needs_review / failed
-  invalidateReputation(args.skill.id); // success-rate aggregate changed (any terminal status)
-  // Marketplace popularity (run_count, the sort key) AND the creator credit both
-  // count only a COMPLETED run by someone OTHER than the owner. This stops an
-  // owner from inflating their own ranking by re-running their skill, and stops
-  // failed/needs_review runs from counting as "uses".
-  if (
-    final.status === "completed" &&
-    args.skill.owner &&
-    args.skill.owner !== args.runner
-  ) {
-    // Count DISTINCT adopters, not raw runs: only the runner's FIRST completed run
-    // bumps run_count. Otherwise one funded burner wallet (e.g. via a schedule) farms
-    // the ranking indefinitely — the same anti-Sybil rule the earnings credit uses.
-    if (await isFirstCompletedRunByRunner(args.skill.id, args.runner, runId)) {
-      await incrementRunCount(args.skill.id);
+  invalidateReputation(skill.id); // success-rate aggregate changed (any terminal status)
+  // Marketplace popularity (run_count) AND the creator credit both count only a
+  // COMPLETED run by someone OTHER than the owner — so an owner can't inflate
+  // their own ranking/earnings by re-running their own skill.
+  if (final.status === "completed" && skill.owner && skill.owner !== runner) {
+    // Count DISTINCT adopters (first completed run per runner), the same
+    // anti-Sybil rule the earnings credit uses.
+    if (await isFirstCompletedRunByRunner(skill.id, runner, runId)) {
+      await incrementRunCount(skill.id);
     }
-    // Atomic credit-once per (skill, runner): the anti-Sybil first-run rule,
-    // safe against two concurrent completions racing a check-then-insert.
     await creditEarningOnce({
-      owner: args.skill.owner,
-      skillId: args.skill.id,
+      owner: skill.owner,
+      skillId: skill.id,
       runId,
-      runner: args.runner,
+      runner,
       amount: SOLANA.runFee,
     });
   }
-  // Webhook delivery is best-effort and MUST NOT block the run/job from settling
-  // (a slow or dead subscriber would otherwise hold a worker slot). Fire-and-
-  // forget — the worker process is long-lived so the deliveries still run.
-  // The status event carries NO output: extracted data is delivered only via the
-  // opt-in run.output event, so a status-only subscriber doesn't receive it.
-  void dispatchRunEvent(args.runner, eventForStatus(final.status), {
+  // Best-effort, fire-and-forget webhook delivery (never blocks settling). The
+  // status event carries no output; extracted data goes only via run.output.
+  void dispatchRunEvent(runner, eventForStatus(final.status), {
     runId,
-    skillId: args.skill.id,
+    skillId: skill.id,
     status: final.status,
     receiptHash: final.receiptHash,
     at: final.updatedAt,
   }).catch(() => {});
-  // Output destination: a data-only event, fired only when the run actually
-  // captured something — so a results endpoint isn't spammed by empty runs.
   if (final.output && Object.keys(final.output).length > 0) {
-    void dispatchRunEvent(args.runner, "run.output", {
+    void dispatchRunEvent(runner, "run.output", {
       runId,
-      skillId: args.skill.id,
+      skillId: skill.id,
       output: final.output,
       at: final.updatedAt,
     }).catch(() => {});
   }
-
-  // On-chain registry anchor (gated/inert unless configured): record a completed
-  // run's receipt via the aemulus-registry program, then store the tx signature.
-  // Best-effort + fire-and-forget — a chain hiccup never affects the run.
+  // On-chain anchors (gated/inert unless configured), best-effort + fire-and-forget.
   if (final.status === "completed" && final.receiptHash && registryEnabled()) {
-    void recordRunOnChain(args.skill, final)
+    void recordRunOnChain(skill, final)
       .then((res) => {
         if (res) return setRunRegistryAnchor(runId, res.sig, res.cluster);
       })
       .catch((e) => logError("registry.record", e));
   }
-
-  // ZK-compressed receipt anchor (gated/inert unless configured): the same
-  // receipt recorded ~100x cheaper as a Light compressed account. Independent
-  // of the registry above; also best-effort + fire-and-forget.
   if (final.status === "completed" && final.receiptHash && zkReceiptsEnabled()) {
     void recordRunCompressed(final)
       .then((res) => {
