@@ -51,11 +51,29 @@ function getStealthChromium() {
  * when AEMULUS_STEALTH=1, otherwise plain Playwright. Returns the same
  * playwright `Browser` either way, so callers are identical.
  */
+/**
+ * Optional outbound proxy for every run + recording — set AEMULUS_PROXY_SERVER
+ * (e.g. a residential/mobile proxy) to route the browser through a non-datacenter
+ * IP. This is what actually gets past "unusual traffic from your network" walls
+ * (Google, Amazon) that flag Railway/cloud IPs; stealth alone can't fix the IP.
+ */
+function proxyOption(): NonNullable<LaunchOptions["proxy"]> | undefined {
+  const server = process.env.AEMULUS_PROXY_SERVER?.trim();
+  if (!server) return undefined;
+  return {
+    server,
+    username: process.env.AEMULUS_PROXY_USERNAME?.trim() || undefined,
+    password: process.env.AEMULUS_PROXY_PASSWORD?.trim() || undefined,
+  };
+}
+
 export async function launchBrowser(opts?: LaunchOptions): Promise<Browser> {
+  const proxy = proxyOption();
+  const merged: LaunchOptions = proxy ? { ...opts, proxy } : opts ?? {};
   if (stealthEnabled()) {
     try {
       const extra = await getStealthChromium();
-      return await extra.launch(opts);
+      return await extra.launch(merged);
     } catch (e) {
       // The stealth stack (playwright-extra + plugin graph) failed to load or
       // launch in this environment. Never let that block a recording or run —
@@ -65,5 +83,5 @@ export async function launchBrowser(opts?: LaunchOptions): Promise<Browser> {
       stealthChromium = null;
     }
   }
-  return chromium.launch(opts);
+  return chromium.launch(merged);
 }

@@ -69,6 +69,11 @@ const nextConfig: NextConfig = {
   serverExternalPackages: [
     "playwright",
     "playwright-core",
+    // Stealth stack — must be required natively, not bundled, or it fails to
+    // launch (dynamic requires in the puppeteer-extra plugin graph don't bundle).
+    "playwright-extra",
+    "puppeteer-extra",
+    "puppeteer-extra-plugin-stealth",
     "@lightprotocol/stateless.js",
     "@coral-xyz/anchor",
   ],
