@@ -50,7 +50,7 @@ export function Showcase() {
 
       <div className="mt-8 grid gap-4 md:grid-cols-3">
         {/* Record */}
-        <Frame url="example.com/invoices/new">
+        <Frame url="acme.com/invoices/new">
           <Label>Recording</Label>
           <div className="mt-2 divide-y divide-border">
             <TraceRow i="00" action="navigate" label="invoices/new" />

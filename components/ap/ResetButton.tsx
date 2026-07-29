@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export function ResetButton({ label = "Reset demo" }: { label?: string }) {
+export function ResetButton({ label = "Reset" }: { label?: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   return (

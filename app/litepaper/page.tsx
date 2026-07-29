@@ -14,7 +14,7 @@ export const metadata = {
 
 const LIVE_TODAY = [
   ["Teach by demonstration", "Record a browser task once; Claude generalizes it into a reusable, parameterized skill."],
-  ["Multi-demo synthesis", "Record the same task a few times and Aemulus learns what varies vs what's fixed - verified against every demo."],
+  ["Multi-recording synthesis", "Record the same task a few times and Aemulus learns what varies vs what's fixed - verified against every recording."],
   ["Calibrated autonomy", "Every step carries a confidence score; uncertain steps pause for review instead of guessing."],
   ["Proof on every run", "Each step is screenshotted, and each run gets a tamper-evident receipt."],
   ["Private verifiable receipts", "Run receipts are committed to a Merkle root and anchored on-chain - anyone can verify a run, and the owner can prove any single field (an output, an input) without revealing the rest."],

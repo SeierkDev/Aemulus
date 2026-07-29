@@ -98,9 +98,9 @@ export default async function ApQueuePage() {
         <IntakeUpload />
       </div>
 
-      {/* Demo controls — deliberately quiet, out of the primary flow. */}
+      {/* Guided walkthrough controls — deliberately quiet, out of the primary flow. */}
       <div className="mt-auto flex items-center gap-3 py-8 text-xs text-ink-3">
-        <span>Demo controls</span>
+        <span>Walkthrough</span>
         <span>·</span>
         <ResetButton label={queue.length === 0 ? "Replay the walkthrough" : "Reset"} />
       </div>

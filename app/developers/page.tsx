@@ -6,6 +6,7 @@ import { WebhooksManager } from "@/components/WebhooksManager";
 import { getSession } from "@/lib/auth";
 import { listApiKeys } from "@/lib/api-keys";
 import { listWebhooks } from "@/lib/webhooks";
+import { publicBaseUrl } from "@/lib/public-url";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +40,7 @@ export default async function DevelopersPage() {
   const session = await getSession();
   const keys = session ? await listApiKeys(session.pubkey) : [];
   const webhooks = session ? await listWebhooks(session.pubkey) : [];
+  const base = publicBaseUrl();
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6">
@@ -92,7 +94,7 @@ export default async function DevelopersPage() {
         <div className="mt-6 grid gap-4">
           <CodeBlock
             title="Run a skill"
-            code={`curl -X POST https://aemulus.app/api/v1/runs \\
+            code={`curl -X POST ${base}/api/v1/runs \\
   -H "Authorization: Bearer aem_live_…" \\
   -H "Content-Type: application/json" \\
   -d '{"skillId":"skl_…","input":{"vendor":"Acme","amount":"1499"}}'
@@ -100,13 +102,13 @@ export default async function DevelopersPage() {
           />
           <CodeBlock
             title="Poll the run + read extracted output"
-            code={`curl https://aemulus.app/api/v1/runs/run_… \\
+            code={`curl ${base}/api/v1/runs/run_… \\
   -H "Authorization: Bearer aem_live_…"
 # → { "status":"completed", "output":{"total":"$42.00"}, "receiptHash":"…" }`}
           />
           <CodeBlock
             title="Verify the receipt - no key, anyone can"
-            code={`curl https://aemulus.app/api/verify/run_…
+            code={`curl ${base}/api/verify/run_…
 # → { "matches": true, "batch": { "proofValid": true, "root": "…" } }`}
           />
         </div>
@@ -163,7 +165,7 @@ console.log(v.batch?.proofValid);  // true`}
             code={`{
   "mcpServers": {
     "aemulus": {
-      "url": "https://aemulus.app/api/mcp",
+      "url": "${base}/api/mcp",
       "headers": { "Authorization": "Bearer aem_live_…" }
     }
   }
