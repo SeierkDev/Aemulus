@@ -17,6 +17,9 @@ const eslintConfig = defineConfig([
     "anchor-zk/**",
     // Vendored third-party bundle (rrweb UMD), copied in at build time.
     "public/vendor/**",
+    // The browser extension is a standalone MV3 artifact (chrome.* globals,
+    // plain JS) with its own runtime — not part of the Next app's lint pass.
+    "extension/**",
   ]),
 ]);
 
