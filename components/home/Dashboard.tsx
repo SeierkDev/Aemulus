@@ -5,7 +5,15 @@ import { when } from "@/lib/format";
 import type { Run, Skill } from "@/lib/types";
 
 /** Returning-user dashboard: review nudge, stats, and recent runs. */
-export function Dashboard({ skills, runs }: { skills: Skill[]; runs: Run[] }) {
+export function Dashboard({
+  skills,
+  runs,
+  platformRuns24h,
+}: {
+  skills: Skill[];
+  runs: Run[];
+  platformRuns24h: number;
+}) {
   const needsReview = runs.filter((r) => r.status === "needs_review");
   const skillName = new Map(skills.map((s) => [s.id, s.name]));
   const recentRuns = runs.slice(0, 5);
@@ -30,8 +38,8 @@ export function Dashboard({ skills, runs }: { skills: Skill[]; runs: Run[] }) {
       )}
 
       <div className="grid grid-cols-3 gap-3">
-        <Stat label="Skills" value={skills.length} href="/skills" />
-        <Stat label="Runs" value={runs.length} href="/runs" />
+        <Stat label="Your skills" value={skills.length} href="/skills" />
+        <Stat label="Runs · 24h" value={platformRuns24h} href="/market" />
         <Stat label="Needs review" value={needsReview.length} href="/runs" />
       </div>
 

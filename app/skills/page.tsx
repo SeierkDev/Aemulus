@@ -12,7 +12,8 @@ export const dynamic = "force-dynamic";
 
 
 export default async function SkillsPage() {
-  const owner = (await getSession())?.pubkey ?? "";
+  const session = await getSession();
+  const owner = session?.pubkey ?? "";
   const [skills, demos] = await Promise.all([
     listSkills(owner),
     listDemonstrations(owner),
@@ -45,7 +46,9 @@ export default async function SkillsPage() {
           {skills.length === 0 && (
             <Card className="p-8 text-center">
               <p className="text-sm text-ink-2">
-                No skills yet. Generalize a recording below to create one.
+                {!session
+                  ? "Connect your wallet to see the skills you've created."
+                  : "You haven't created any skills yet. Generalize a recording below to create one."}
               </p>
             </Card>
           )}

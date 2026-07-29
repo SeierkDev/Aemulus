@@ -12,7 +12,8 @@ export const dynamic = "force-dynamic";
 
 
 export default async function RunsPage() {
-  const owner = (await getSession())?.pubkey ?? "";
+  const session = await getSession();
+  const owner = session?.pubkey ?? "";
   const runs = await listRuns(owner);
   const review = runs.filter((r) => r.status === "needs_review");
   return (
@@ -63,7 +64,9 @@ export default async function RunsPage() {
         <div className="mt-6 grid gap-3">
           {runs.length === 0 && (
             <Card className="p-8 text-center text-sm text-ink-2">
-              No runs yet. Open a skill and hit Run.
+              {!session
+                ? "Connect your wallet to see your runs."
+                : "No runs yet. Open a skill from the marketplace and hit Run."}
             </Card>
           )}
           {runs.map((r) => (

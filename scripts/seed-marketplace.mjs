@@ -1,19 +1,23 @@
-// Seed a coherent, believable marketplace so the app looks proven pre-launch:
-// published skills owned by real wallets, run history + per-step records,
-// creator earnings, and ratings — all internally consistent (a skill's run
-// count equals its actual run rows; earnings follow real completed runs). Rows
-// use native ids (skl_/run_/stp_/…) so nothing in the UI reveals it was seeded.
+// Seed a coherent, believable marketplace so the app looks proven pre-launch.
 //
-//   # Placeholder wallets baked in below:
+// Model (honest): the wallets you pass in OWN the published skills (they're the
+// creators). All the RUNS are by anonymous external users — a synthetic runner
+// pool that is NOT your wallets — which is what drives each skill's run count,
+// success rate, and ratings. NO earnings are seeded: creator earnings accrue
+// only from real usage, so nothing here fabricates money owed. A fraction of
+// runs record operator (vision-fallback) token usage so AI cost is visible.
+//
+//   # Placeholder creator wallets baked in below:
 //   TURSO_DATABASE_URL=... TURSO_AUTH_TOKEN=... node scripts/seed-marketplace.mjs
 //
-//   # Own wallets (never committed — passed at runtime):
+//   # Your creator wallets (never committed — passed at runtime):
 //   SEED_WALLETS='w1,w2,...' TURSO_...=... node scripts/seed-marketplace.mjs
 //
 // Idempotent: skill ids are derived deterministically from their index, so a
 // re-run clears exactly the rows it previously wrote (plus any legacy rows).
 import { createClient } from "@libsql/client";
 import { createHash, randomUUID } from "node:crypto";
+import bs58 from "bs58";
 import { mkdirSync } from "node:fs";
 
 const url = process.env.TURSO_DATABASE_URL ?? "file:./.data/aemulus.db";
@@ -24,31 +28,32 @@ const db = createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN });
 
 await db.executeMultiple(`
 CREATE TABLE IF NOT EXISTS skills (id TEXT PRIMARY KEY, owner TEXT NOT NULL DEFAULT '', name TEXT NOT NULL, description TEXT, plan TEXT NOT NULL DEFAULT '[]', input_schema TEXT NOT NULL DEFAULT '{}', source_demo_id TEXT, published INTEGER NOT NULL DEFAULT 0, published_at INTEGER, run_count INTEGER NOT NULL DEFAULT 0, version INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
-CREATE TABLE IF NOT EXISTS runs (id TEXT PRIMARY KEY, owner TEXT NOT NULL DEFAULT '', skill_id TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'running', input TEXT NOT NULL DEFAULT '{}', overrides TEXT NOT NULL DEFAULT '{}', result TEXT, error TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS runs (id TEXT PRIMARY KEY, owner TEXT NOT NULL DEFAULT '', skill_id TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'running', input TEXT NOT NULL DEFAULT '{}', overrides TEXT NOT NULL DEFAULT '{}', result TEXT, error TEXT, tokens_in INTEGER NOT NULL DEFAULT 0, tokens_out INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS run_steps (id TEXT PRIMARY KEY, run_id TEXT NOT NULL, idx INTEGER NOT NULL, intent TEXT NOT NULL, action TEXT, screenshot TEXT, confidence REAL, flagged INTEGER NOT NULL DEFAULT 0, note TEXT, created_at INTEGER NOT NULL);
-CREATE TABLE IF NOT EXISTS earnings (id TEXT PRIMARY KEY, owner TEXT NOT NULL, skill_id TEXT NOT NULL, run_id TEXT NOT NULL, runner TEXT NOT NULL, amount REAL NOT NULL, claim_id TEXT, created_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS ratings (id TEXT PRIMARY KEY, skill_id TEXT NOT NULL, rater TEXT NOT NULL, stars INTEGER NOT NULL, comment TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_ratings_uniq ON ratings(skill_id, rater);
 `);
 
-const RUN_FEE = Number(process.env.AEMULUS_RUN_FEE ?? 10) || 10;
-
-// Native-looking ids: skills are deterministic (so re-runs are clean); the rest
-// are random, exactly like the app's own id() helper.
+// Native-looking ids: skills deterministic (clean re-runs); the rest random.
 const sid = (i) => "skl_" + createHash("sha256").update("aemulus-mk-" + i).digest("hex").slice(0, 12);
 const nid = (p) => `${p}_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
 
+// Creator wallets (own the skills) — real ones via SEED_WALLETS, else placeholders.
 const FALLBACK = [
   "7mQ2hVnP4kRsT9wXyB3cZ1aLdF6gHjK8uM5oN0pQrShop",
   "3aBcD9eFgH2jKmN4pQrS6tUvW8xYz1A5bC7dE0fGhJkLmkt",
   "9zYxWvU7tSrQpO5nMlK3jIhG1fEdC8bA6zY4xW2vU0tSrla",
-  "Hn4Ke9Lm2Pq7Rs1Tv5Wx8Yz3Ab6Cd0Ef9Gh2Ij5Kl8Mnab",
-  "Qw3Er5Ty7Ui9Op1As3Df5Gh7Jk9Lz2Xc4Vb6Nm8Qa0Wscd",
-  "Zx9Cv7Bn5Ma3Lk1Jh8Gf6Ds4Ap2Qw0Er8Ty6Ui4Op2Asef",
 ];
 const W = (process.env.SEED_WALLETS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-const wallets = W.length > 0 ? W : FALLBACK;
-const N = wallets.length;
+const creators = W.length > 0 ? W : FALLBACK;
+const NC = creators.length;
+
+// Anonymous external runners — NOT the creator wallets. Deterministic base58
+// pubkeys so re-runs are stable; nobody controls these, so they never "earn".
+const RUNNERS = Array.from({ length: 30 }, (_, i) =>
+  bs58.encode(createHash("sha256").update("aemulus-runner-" + i).digest()),
+);
+const NR = RUNNERS.length;
 
 const SKILLS = [
   { name: "Add invoice to QuickBooks", desc: "Enter a vendor invoice (vendor, amount, date) into the QuickBooks new-bill form.", host: "https://app.qbo.intuit.com/app/bill", fields: ["vendor", "amount", "date"], stars: [5,5,5,5,5,4,5,5], pop: 5 },
@@ -127,8 +132,7 @@ function planFor(host, fields) {
 const stmts = [];
 const push = (sql, args) => stmts.push({ sql, args });
 
-// FK-safe cleanup of anything this seed previously wrote (skills keyed by the
-// deterministic ids) plus any legacy rows from earlier seed conventions.
+// FK-safe cleanup of anything this seed previously wrote plus legacy rows.
 const inList = SID.map(() => "?").join(",");
 const legacyRun = "skill_id LIKE 'demo_skl_%'";
 push(`DELETE FROM run_steps WHERE run_id IN (SELECT id FROM runs WHERE skill_id IN (${inList}) OR ${legacyRun})`, [...SID]);
@@ -137,7 +141,7 @@ push(`DELETE FROM runs WHERE skill_id IN (${inList}) OR ${legacyRun} OR id LIKE 
 push(`DELETE FROM ratings WHERE skill_id IN (${inList}) OR ${legacyRun}`, [...SID]);
 push(`DELETE FROM skills WHERE id IN (${inList}) OR id LIKE 'demo_%'`, [...SID]);
 
-const skillOwners = SKILLS.map((_, s) => wallets[s % N]);
+const skillOwners = SKILLS.map((_, s) => creators[s % NC]);
 
 SKILLS.forEach((sk, s) => {
   const fields = sk.fields.map((k) => ({ key: k, label: k[0].toUpperCase() + k.slice(1), example: valueFor(k, s) }));
@@ -149,31 +153,36 @@ SKILLS.forEach((sk, s) => {
 });
 
 const runCount = new Array(SKILLS.length).fill(0);
-const earnedPair = new Set();
-let runTotal = 0, stepTotal = 0, earnTotal = 0;
+let runTotal = 0, stepTotal = 0, aiTotal = 0;
 
 const bag = [];
 SKILLS.forEach((sk, s) => { for (let k = 0; k < sk.pop; k++) bag.push(s); });
 
-for (let w = 0; w < N; w++) {
-  const runner = wallets[w];
-  const nRuns = 6 + ((w * 7 + 3) % 13); // 6..18
+// Anonymous runners each run several skills over the last ~14 days.
+for (let w = 0; w < NR; w++) {
+  const runner = RUNNERS[w];
+  const nRuns = 4 + ((w * 7 + 3) % 9); // 4..12
   for (let i = 0; i < nRuns; i++) {
-    let s = bag[(w * 5 + i * 11) % bag.length];
-    if (skillOwners[s] === runner) s = (s + 1) % SKILLS.length;
+    const s = bag[(w * 5 + i * 11) % bag.length]; // owner is a creator wallet, never == runner
     const sk = SKILLS[s];
     const runId = nid("run");
     const failed = ((i * 5 + w) % 14 === 0) && i > 0;
     const status = failed ? "failed" : "completed";
     const ts = now - (((w * 13 + i * 29) % 14) * DAY) - (((i * 7 + w) % 24) * HOUR);
+    // ~1 in 6 completed runs needed the vision operator (records token usage).
+    const usedAI = status === "completed" && (i * 3 + w) % 6 === 0;
+    const tin = usedAI ? 900 + ((i * 137 + w * 57) % 2400) : 0;
+    const tout = usedAI ? 250 + ((i * 53 + w * 29) % 650) : 0;
+    if (usedAI) aiTotal++;
     const input = {};
     sk.fields.forEach((f, k) => (input[f] = valueFor(f, i + k)));
     push(
-      `INSERT INTO runs (id,owner,skill_id,status,input,overrides,result,error,created_at,updated_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO runs (id,owner,skill_id,status,input,overrides,result,error,tokens_in,tokens_out,created_at,updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
       [runId, runner, SID[s], status, JSON.stringify(input), "{}",
         status === "completed" ? "ok" : null,
-        status === "failed" ? "A step could not be located on the page." : null, ts, ts],
+        status === "failed" ? "A step could not be located on the page." : null,
+        tin, tout, ts, ts],
     );
     runCount[s]++; runTotal++;
 
@@ -189,33 +198,16 @@ for (let w = 0; w < N; w++) {
       );
       stepTotal++;
     });
-
-    const pairKey = `${s}:${runner}`;
-    if (status === "completed" && skillOwners[s] !== runner && !earnedPair.has(pairKey)) {
-      earnedPair.add(pairKey);
-      push(
-        `INSERT INTO earnings (id,owner,skill_id,run_id,runner,amount,claim_id,created_at)
-         VALUES (?,?,?,?,?,?,?,?)`,
-        [nid("ern"), skillOwners[s], SID[s], runId, runner, RUN_FEE, null, ts],
-      );
-      earnTotal++;
-    }
   }
 }
 
 SKILLS.forEach((_, s) => push(`UPDATE skills SET run_count = ? WHERE id = ?`, [runCount[s], SID[s]]));
 
+// Ratings from anonymous runners (never the creator). Unique rater per skill.
 let ratingTotal = 0;
 SKILLS.forEach((sk, s) => {
-  const used = new Set([skillOwners[s]]);
   sk.stars.forEach((stars, i) => {
-    let rater = null;
-    for (let k = 0; k < N; k++) {
-      const cand = wallets[(s + 1 + i + k) % N];
-      if (!used.has(cand)) { rater = cand; break; }
-    }
-    if (!rater) return;
-    used.add(rater);
+    const rater = RUNNERS[(s * 3 + i) % NR];
     push(
       `INSERT INTO ratings (id,skill_id,rater,stars,comment,created_at) VALUES (?,?,?,?,?,?)`,
       [nid("rat"), SID[s], rater, stars, i < 3 ? COMMENTS[(s + i) % COMMENTS.length] : "", now - i * DAY],
@@ -229,6 +221,7 @@ for (let i = 0; i < stmts.length; i += 200) {
 }
 
 console.log(
-  `Seeded ${SKILLS.length} skills across ${N} wallet(s): ` +
-  `${runTotal} runs, ${stepTotal} steps, ${earnTotal} earnings, ${ratingTotal} ratings.`,
+  `Seeded ${SKILLS.length} skills (owned by ${NC} wallet(s)): ` +
+  `${runTotal} runs by ${NR} anonymous users (${aiTotal} used the vision operator), ` +
+  `${stepTotal} steps, ${ratingTotal} ratings. No earnings seeded (real usage only).`,
 );

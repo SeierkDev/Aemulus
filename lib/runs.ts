@@ -481,6 +481,22 @@ export async function listRuns(owner: string): Promise<Run[]> {
   return r.rows.map((row) => rowToRun(row, []));
 }
 
+/** Platform-wide run count since a timestamp — for the public "activity"
+ * number, not scoped to any one wallet. */
+export async function countPlatformRunsSince(sinceMs: number): Promise<number> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT COUNT(*) AS n FROM runs WHERE created_at >= ?`,
+    args: [sinceMs],
+  });
+  return Number(r.rows[0]?.n ?? 0);
+}
+
+/** Platform-wide runs in the last 24h. */
+export async function countPlatformRunsLast24h(): Promise<number> {
+  return countPlatformRunsSince(Date.now() - 24 * 60 * 60 * 1000);
+}
+
 /** A caller's runs, cursor-paginated (newest first) for the public API. */
 export async function listRunsPage(
   owner: string,

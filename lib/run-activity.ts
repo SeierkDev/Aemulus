@@ -1,27 +1,21 @@
+import { randomBytes } from "node:crypto";
+import bs58 from "bs58";
 import { db, ready } from "./db";
-import { creditEarningOnce } from "./earnings";
 import { id as newId } from "./ids";
-import { SOLANA } from "./solana";
 import { logError, logInfo } from "./log";
 
-// Optional marketplace run-activity generator. When AEMULUS_ACTIVITY_RUNS=1
-// (and AEMULUS_ACTIVITY_WALLETS lists wallet pubkeys), it adds a handful of
-// completed runs — with per-step records + creator earnings — against the
-// published skills each day, so a fresh pre-launch deployment keeps showing
-// recent activity. Rows use native ids and never touch the interactive run
-// pipeline. Off by default.
+// Optional marketplace run-activity generator. When AEMULUS_ACTIVITY_RUNS=1, it
+// adds a handful of completed runs per day — by anonymous external users (fresh
+// random pubkeys, never your wallets) — against the published skills, so a
+// pre-launch deployment keeps showing recent activity. It bumps each skill's
+// run count but seeds NO earnings (creator earnings accrue only from real
+// usage). Rows use native ids and never touch the interactive run pipeline. Off
+// by default.
 
 const DAY = 86_400_000;
 
-function activityWallets(): string[] {
-  return (process.env.AEMULUS_ACTIVITY_WALLETS ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
 export function runActivityEnabled(): boolean {
-  return process.env.AEMULUS_ACTIVITY_RUNS === "1" && activityWallets().length > 0;
+  return process.env.AEMULUS_ACTIVITY_RUNS === "1";
 }
 
 const NAMES = ["Jordan Lee", "Sam Rivera", "Alex Chen", "Priya Nair", "Casey Kim"];
@@ -46,55 +40,55 @@ interface PlanStep {
   selectors?: string[];
 }
 
+/** A fresh anonymous external-user pubkey (nobody controls it). */
+function anonRunner(): string {
+  return bs58.encode(randomBytes(32));
+}
+
 /** Add today's batch of activity runs if it hasn't been added yet. Idempotent per UTC day. */
 export async function runActivityTick(now: number): Promise<void> {
-  const wallets = activityWallets();
-  if (wallets.length === 0) return;
   await ready();
 
   const dayIndex = Math.floor(now / DAY);
   const dayStart = dayIndex * DAY;
   const target = 5 + (dayIndex % 11); // 5..15 per day
 
-  // Count this fleet's runs already recorded today, so a restart mid-day doesn't
-  // double the batch.
-  const ph = wallets.map(() => "?").join(",");
+  // Count runs already recorded platform-wide today so a restart doesn't double
+  // the batch (and real usage counts toward the day's activity too).
   const doneRow = await db.execute({
-    sql: `SELECT COUNT(*) AS n FROM runs WHERE owner IN (${ph}) AND created_at >= ?`,
-    args: [...wallets, dayStart],
+    sql: `SELECT COUNT(*) AS n FROM runs WHERE created_at >= ?`,
+    args: [dayStart],
   });
   const done = Number(doneRow.rows[0]?.n ?? 0);
   if (done >= target) return;
 
-  const skillRows = await db.execute(
-    `SELECT id, owner, plan FROM skills WHERE published = 1`,
-  );
+  const skillRows = await db.execute(`SELECT id, plan FROM skills WHERE published = 1`);
   if (skillRows.rows.length === 0) return;
   const skills = skillRows.rows.map((r) => ({
     id: String(r.id),
-    owner: String(r.owner ?? ""),
     plan: safeParse<PlanStep[]>(r.plan, []),
   }));
 
   let added = 0;
   for (let k = done; k < target; k++) {
-    const runner = wallets[(dayIndex + k) % wallets.length];
-    let sIdx = (dayIndex * 3 + k * 7) % skills.length;
-    if (skills[sIdx].owner === runner) sIdx = (sIdx + 1) % skills.length;
-    const skill = skills[sIdx];
+    const runner = anonRunner();
+    const skill = skills[(dayIndex * 3 + k * 7) % skills.length];
     const inputSteps = skill.plan.filter((p) => p.action === "input");
     const host = skill.plan[0]?.target ?? "https://example.com";
     const runId = newId("run");
-    const ts = now - Math.floor(((k * 37) % 600) * 1000); // slight spread within the batch
+    const ts = now - Math.floor(((k * 37) % 600) * 1000);
+    const usedAI = k % 6 === 0;
+    const tin = usedAI ? 900 + ((k * 137) % 2400) : 0;
+    const tout = usedAI ? 250 + ((k * 53) % 650) : 0;
 
     const input: Record<string, string> = {};
     inputSteps.forEach((p, i) => (input[p.inputKey ?? `f${i}`] = valueFor(p.inputKey ?? "", i)));
 
     try {
       await db.execute({
-        sql: `INSERT INTO runs (id,owner,skill_id,status,input,overrides,result,error,created_at,updated_at)
-              VALUES (?,?,?,?,?,?,?,?,?,?)`,
-        args: [runId, runner, skill.id, "completed", JSON.stringify(input), "{}", "ok", null, ts, ts],
+        sql: `INSERT INTO runs (id,owner,skill_id,status,input,overrides,result,error,tokens_in,tokens_out,created_at,updated_at)
+              VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+        args: [runId, runner, skill.id, "completed", JSON.stringify(input), "{}", "ok", null, tin, tout, ts, ts],
       });
 
       const steps = [
@@ -119,13 +113,8 @@ export async function runActivityTick(now: number): Promise<void> {
         });
       }
 
-      // Keep the marketplace count consistent with the actual rows.
+      // Keep the marketplace count consistent with the actual rows. No earnings.
       await db.execute({ sql: `UPDATE skills SET run_count = run_count + 1 WHERE id = ?`, args: [skill.id] });
-
-      // Creator earning (first time this runner ran this skill only).
-      if (skill.owner && skill.owner !== runner) {
-        await creditEarningOnce({ owner: skill.owner, skillId: skill.id, runId, runner, amount: SOLANA.runFee });
-      }
       added++;
     } catch (e) {
       logError("runs.activity.tick", e);

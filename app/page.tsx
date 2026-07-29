@@ -8,7 +8,7 @@ import { Showcase } from "@/components/home/Showcase";
 import { CodeBackdrop } from "@/components/CodeBackdrop";
 import { Reveal } from "@/components/Reveal";
 import { listSkills, listPublishedSkills } from "@/lib/skills";
-import { listRuns } from "@/lib/runs";
+import { listRuns, countPlatformRunsLast24h } from "@/lib/runs";
 import { getReputationBatch } from "@/lib/reputation";
 import { getSession } from "@/lib/auth";
 
@@ -16,10 +16,11 @@ export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const session = await getSession();
-  const [skills, runs, popular] = await Promise.all([
+  const [skills, runs, popular, platformRuns24h] = await Promise.all([
     session ? listSkills(session.pubkey) : Promise.resolve([]),
     session ? listRuns(session.pubkey) : Promise.resolve([]),
     listPublishedSkills(6),
+    countPlatformRunsLast24h(),
   ]);
   const hasData = skills.length > 0 || runs.length > 0;
   const popularRep = await getReputationBatch(popular.map((s) => s.id));
@@ -57,7 +58,9 @@ export default async function Home() {
         </div>
       </section>
 
-        {hasData && <Dashboard skills={skills} runs={runs} />}
+        {hasData && (
+          <Dashboard skills={skills} runs={runs} platformRuns24h={platformRuns24h} />
+        )}
         <Reveal>
           <Showcase />
         </Reveal>
