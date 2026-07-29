@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { useRouter } from "next/navigation";
 import bs58 from "bs58";
 import type { Session } from "@/lib/auth";
 
@@ -30,6 +31,7 @@ export function useAuth(): AuthValue {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { publicKey, signMessage, disconnect } = useWallet();
+  const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [signingIn, setSigningIn] = useState(false);
@@ -73,12 +75,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Sign-in failed");
       setSession(data.session);
+      // Re-render server components (e.g. /earnings, /skills, /runs) so they
+      // pick up the freshly-set session cookie and show the wallet's data.
+      router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Sign-in failed");
     } finally {
       setSigningIn(false);
     }
-  }, [publicKey, signMessage, signingIn]);
+  }, [publicKey, signMessage, signingIn, router]);
 
   const signOut = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
@@ -90,7 +95,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       disconnect().catch(() => {}),
       new Promise((r) => setTimeout(r, 1500)),
     ]);
-  }, [disconnect]);
+    router.refresh(); // reload server components into their signed-out state
+  }, [disconnect, router]);
 
   return (
     <AuthContext.Provider

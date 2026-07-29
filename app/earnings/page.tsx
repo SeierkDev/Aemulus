@@ -7,7 +7,7 @@ import { payoutsEnabled } from "@/lib/payout";
 import { getCreatorAnalytics } from "@/lib/analytics";
 import { MiniChart } from "@/components/MiniChart";
 import { ClaimButton } from "@/components/ClaimButton";
-import { ConnectWalletCard } from "@/components/ConnectWalletCard";
+import { AccountBar } from "@/components/AccountBar";
 import { SOLANA } from "@/lib/solana";
 import { when } from "@/lib/format";
 
@@ -29,7 +29,7 @@ export default async function EarningsPage() {
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6">
       <Nav />
       <div className="border-t border-border pt-8">
-        <div className="flex items-end justify-between">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Earnings</h1>
             <p className="mt-1.5 max-w-2xl text-sm text-ink-2">
@@ -37,11 +37,16 @@ export default async function EarningsPage() {
               published. Accrues here; on-chain claims arrive at token launch.
             </p>
           </div>
-          {summary && <Badge>{summary.runs} paid runs</Badge>}
+          <div className="flex items-center gap-3">
+            {summary && <Badge>{summary.runs} paid runs</Badge>}
+            <AccountBar />
+          </div>
         </div>
 
         {!session && (
-          <ConnectWalletCard message="Connect your wallet to see your creator earnings." />
+          <Card className="mt-6 p-8 text-center text-sm text-ink-2">
+            Connect your wallet to see your creator earnings.
+          </Card>
         )}
 
         {summary && (

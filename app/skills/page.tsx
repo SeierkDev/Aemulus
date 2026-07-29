@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Badge, Card, Label } from "@/components/ui";
 import { Nav } from "@/components/Nav";
+import { AccountBar } from "@/components/AccountBar";
 import { SynthesizePanel } from "@/components/SynthesizePanel";
 import { listDemonstrations } from "@/lib/demonstrations";
 import { listSkills } from "@/lib/skills";
@@ -34,7 +35,10 @@ export default async function SkillsPage() {
               Generalized procedures Aemulus can run on new inputs.
             </p>
           </div>
-          <Badge>{skills.length} skills</Badge>
+          <div className="flex items-center gap-3">
+            <Badge>{skills.length} skills</Badge>
+            <AccountBar />
+          </div>
         </div>
 
         <div className="mt-6 grid gap-3">

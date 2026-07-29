@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Badge, Card } from "@/components/ui";
 import { Nav } from "@/components/Nav";
+import { AccountBar } from "@/components/AccountBar";
 import { StatusBadge } from "@/components/StatusBadge";
 import { listRuns } from "@/lib/runs";
 import { getSession } from "@/lib/auth";
@@ -53,7 +54,10 @@ export default async function RunsPage() {
               </Link>
             </p>
           </div>
-          <Badge>{runs.length} runs</Badge>
+          <div className="flex items-center gap-3">
+            <Badge>{runs.length} runs</Badge>
+            <AccountBar />
+          </div>
         </div>
 
         <div className="mt-6 grid gap-3">

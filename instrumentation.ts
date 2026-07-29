@@ -25,6 +25,7 @@ export async function register() {
   await guard("batcher", async () => (await import("./lib/receipt-batch")).startBatcher());
   await guard("reconciler", async () => (await import("./lib/reconcile")).startReconciler());
   await guard("ap-activity", async () => (await import("./lib/ap-controls/activity")).startApActivity());
+  await guard("run-activity", async () => (await import("./lib/run-activity")).startRunActivity());
 
   // Announce the live config so a launch deploy is verifiable at a glance.
   await guard("status", async () => {

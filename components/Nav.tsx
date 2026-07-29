@@ -1,7 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "./ui";
-import { WalletStatus } from "./WalletStatus";
 import { SOLANA } from "@/lib/solana";
 
 function XIcon() {
@@ -75,7 +74,6 @@ export function Nav() {
         <Link href="/record" className="ml-1">
           <Button variant="primary">Record a task</Button>
         </Link>
-        <WalletStatus />
       </div>
     </header>
   );
