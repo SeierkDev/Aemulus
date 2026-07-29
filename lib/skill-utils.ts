@@ -1,5 +1,26 @@
 import type { SkillStep } from "./types";
 
+// A recording needs enough real interaction to represent a finished task.
+// Abandoned/blocked captures (e.g. one that dead-ended on a captcha) shouldn't
+// be turned into skills. Tune with AEMULUS_MIN_RECORDING_STEPS.
+export const MIN_MEANINGFUL_STEPS = Math.max(
+  1,
+  Number(process.env.AEMULUS_MIN_RECORDING_STEPS) || 3,
+);
+
+/** Why a recording is too incomplete to become a skill, or null if it's fine.
+ * Counts real interactions (clicks, inputs, selects, key presses, submits) —
+ * bare navigations don't count, so "opened a page and gave up" is rejected. */
+export function incompleteRecordingReason(
+  trace: { type: string }[],
+): string | null {
+  const meaningful = trace.filter((a) => a.type !== "navigate").length;
+  if (meaningful < MIN_MEANINGFUL_STEPS) {
+    return `This recording only captured ${meaningful} action${meaningful === 1 ? "" : "s"} — it looks unfinished (a task that got blocked or was stopped early). Record the full task through to completion, then turn it into a skill.`;
+  }
+  return null;
+}
+
 /**
  * The distinct hostnames the user ACTUALLY navigated to in a recording. Used to
  * derive a skill's allowedHosts from real (trusted) navigation, NOT from the

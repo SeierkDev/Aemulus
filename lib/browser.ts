@@ -10,13 +10,15 @@ import { chromium, type Browser, type LaunchOptions } from "playwright";
  * (banks, portals, LinkedIn) those tells get the run blocked outright.
  *
  * Stealth mode routes the launch through playwright-extra + the stealth plugin,
- * which patches each of those tells on every new page. It is OFF by default and
- * fully inert unless AEMULUS_STEALTH=1 — with the flag unset this module is a
- * thin pass-through to plain Playwright, so existing runs are byte-for-byte
- * unchanged and the puppeteer-extra dependency chain is never even loaded.
+ * which patches each of those tells on every new page. It is ON by default
+ * (real-world sites are the norm), and only turned OFF with AEMULUS_STEALTH=0 —
+ * in which case this module is a thin pass-through to plain Playwright and the
+ * puppeteer-extra dependency chain is never even loaded. Stealth also makes a
+ * captcha *solvable by a human*: without it, a session is pre-flagged as a bot
+ * and the challenge loops "try again" no matter who clicks it.
  */
 export function stealthEnabled(): boolean {
-  return process.env.AEMULUS_STEALTH === "1";
+  return process.env.AEMULUS_STEALTH !== "0";
 }
 
 // Built at most once, lazily, and only when stealth is actually turned on — so

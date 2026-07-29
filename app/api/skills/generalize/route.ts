@@ -5,7 +5,7 @@ import { enforceRateLimit } from "@/lib/ratelimit";
 import { getDemonstration } from "@/lib/demonstrations";
 import { generalizeDemonstration } from "@/lib/generalize";
 import { createSkill, countSkillsByOwner, MAX_SKILLS_PER_OWNER } from "@/lib/skills";
-import { recordedNavHosts } from "@/lib/skill-utils";
+import { recordedNavHosts, incompleteRecordingReason } from "@/lib/skill-utils";
 import { readJson, GeneralizeBody } from "@/lib/validate";
 
 export const runtime = "nodejs";
@@ -35,6 +35,10 @@ export async function POST(req: Request) {
         { error: "Demonstration not found" },
         { status: 404 },
       );
+    }
+    const incomplete = incompleteRecordingReason(demo.trace);
+    if (incomplete) {
+      return NextResponse.json({ error: incomplete }, { status: 400 });
     }
     if ((await countSkillsByOwner(session.pubkey)) >= MAX_SKILLS_PER_OWNER) {
       return NextResponse.json({ error: `Skill limit reached (max ${MAX_SKILLS_PER_OWNER}).` }, { status: 409 });

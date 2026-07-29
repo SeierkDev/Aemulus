@@ -76,6 +76,37 @@ const STEP_TIMEOUT_MS = Math.max(
   Number(process.env.AEMULUS_STEP_TIMEOUT_MS) || 20_000,
 );
 
+// How many times a run will pause for a human to clear a captcha before giving
+// up. Each pause opens the live view (like the 2FA handoff) so the person can
+// solve the challenge; if it's still there after this many tries (or nobody
+// shows up), the run parks in needs_review instead of looping forever.
+const MAX_CAPTCHA_PAUSES = Math.max(
+  0,
+  Number(process.env.AEMULUS_CAPTCHA_MAX_PAUSES) || 3,
+);
+
+/** Heuristic: is the page currently showing a bot-challenge / captcha wall? Uses
+ * visible markers (challenge iframes, Cloudflare interstitial, "unusual traffic"
+ * text) so an ordinary reCAPTCHA checkbox on a form doesn't trip it. */
+async function isCaptchaPresent(page: Page): Promise<boolean> {
+  try {
+    return await page.evaluate(() => {
+      const iframe = document.querySelector(
+        'iframe[title*="recaptcha challenge" i], iframe[src*="hcaptcha.com/captcha"], iframe[title*="hcaptcha" i], iframe[src*="challenges.cloudflare.com"]',
+      );
+      const cf = document.querySelector("#challenge-running, #cf-challenge-running");
+      const text = (document.body?.innerText || "").toLowerCase();
+      const textHit =
+        /unusual traffic|verify you are (a )?human|are you a robot|select all (images|squares)/.test(
+          text,
+        );
+      return !!iframe || !!cf || textHit;
+    });
+  } catch {
+    return false;
+  }
+}
+
 export async function executeRun(
   skill: Skill,
   runId: string,
@@ -137,6 +168,7 @@ export async function executeRun(
     });
     page.setDefaultTimeout(STEP_TIMEOUT_MS); // per-action cap (no hanging steps)
     let deadline = Date.now() + RUN_TIMEOUT_MS; // hard wall-clock cap (extended over human pauses)
+    let captchaPauses = 0; // how many times we've paused for a human to clear a captcha
 
     // Credential vault: auto-fill the runner's stored secrets into matching input
     // fields not already provided (explicit input wins). ONLY for a skill the
@@ -181,6 +213,40 @@ export async function executeRun(
         error = "Run exceeded the time limit.";
         break;
       }
+
+      // Bot-wall handling: if a captcha is blocking the page, open the live view
+      // and let a human solve it (stealth makes it solvable), then re-check and
+      // continue. After MAX_CAPTCHA_PAUSES — or if nobody solves it in time — the
+      // run parks in needs_review rather than looping "try again" forever.
+      let captchaBlocked = false;
+      while (await isCaptchaPresent(page)) {
+        if (captchaPauses >= MAX_CAPTCHA_PAUSES) {
+          captchaBlocked = true;
+          break;
+        }
+        captchaPauses += 1;
+        await setRunStatus(runId, "awaiting_input");
+        const pauseStart = Date.now();
+        await registerLive(runId, page);
+        let outcome: "resumed" | "timeout";
+        try {
+          outcome = await waitForResume(runId, LIVE_TIMEOUT_MS);
+        } finally {
+          await unregisterLive(runId);
+        }
+        deadline += Date.now() - pauseStart; // don't bill the human pause to the run
+        if (outcome === "timeout") {
+          captchaBlocked = true;
+          break;
+        }
+        await setRunStatus(runId, "running");
+      }
+      if (captchaBlocked) {
+        finalStatus = "needs_review";
+        error = "Blocked by a captcha the run couldn't get past.";
+        break;
+      }
+
       const value = resolveValue(step, effInput);
       const override = overrides[step.idx];
       const shotFile = `step-${String(step.idx).padStart(4, "0")}.png`;

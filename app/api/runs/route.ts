@@ -6,6 +6,7 @@ import { getSkill, skillAccess } from "@/lib/skills";
 import { startRun, QuotaExceededError } from "@/lib/run-service";
 import { enforceRateLimit, RUNS_PER_MIN } from "@/lib/ratelimit";
 import { readJson, RunBody } from "@/lib/validate";
+import { checkValues } from "@/lib/content-safety";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,6 +28,10 @@ export async function POST(req: Request) {
     const parsed = await readJson(req, RunBody);
     if (!parsed.ok) return parsed.res;
     const { skillId, input } = parsed.data;
+    const safety = await checkValues(input ?? {});
+    if (!safety.allowed) {
+      return NextResponse.json({ error: safety.reason }, { status: 400 });
+    }
     const skill = await getSkill(skillId);
     // Runnable if you own it, an org-mate shared it, or it's published.
     if (!skill || !(await skillAccess(skill, session.pubkey)).run) {

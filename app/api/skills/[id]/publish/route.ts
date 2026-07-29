@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
-import { setPublished, SkillNotPublishableError } from "@/lib/skills";
+import { setPublished, getSkill, SkillNotPublishableError } from "@/lib/skills";
 import { readJson, PublishBody } from "@/lib/validate";
+import { checkText } from "@/lib/content-safety";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +18,17 @@ export async function POST(
   const { id } = await params;
   const parsed = await readJson(req, PublishBody);
   if (!parsed.ok) return parsed.res;
+  // Keep the public marketplace clean: a skill's name/description are moderated
+  // before it can go live.
+  if (parsed.data.published) {
+    const skill = await getSkill(id);
+    if (skill && skill.owner === session.pubkey) {
+      const safety = await checkText(`${skill.name}\n${skill.description}`);
+      if (!safety.allowed) {
+        return NextResponse.json({ error: safety.reason }, { status: 400 });
+      }
+    }
+  }
   try {
     const ok = await setPublished(id, session.pubkey, parsed.data.published);
     if (!ok) {

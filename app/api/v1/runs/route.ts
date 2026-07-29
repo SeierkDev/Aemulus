@@ -10,6 +10,7 @@ import { withIdempotency } from "@/lib/idempotency";
 import { listRunsPage } from "@/lib/runs";
 import { decodeCursor, parseLimit } from "@/lib/pagination";
 import { readJson, RunBody } from "@/lib/validate";
+import { checkValues } from "@/lib/content-safety";
 import type { Session } from "@/lib/siws";
 
 export const runtime = "nodejs";
@@ -85,6 +86,11 @@ export async function POST(req: Request) {
     const parsed = await readJson(req, RunBody);
     if (!parsed.ok) return parsed.res;
     const { skillId, input } = parsed.data;
+
+    const safety = await checkValues(input ?? {});
+    if (!safety.allowed) {
+      return NextResponse.json({ error: safety.reason }, { status: 400 });
+    }
 
     const skill = await getSkill(skillId);
     if (!skill || !(await skillAccess(skill, owner)).run) {
