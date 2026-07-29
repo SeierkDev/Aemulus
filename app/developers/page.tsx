@@ -41,7 +41,7 @@ export default async function DevelopersPage() {
   const webhooks = session ? await listWebhooks(session.pubkey) : [];
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-6">
+    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6">
       <Nav />
 
       <section className="border-t border-border pt-14 text-center">

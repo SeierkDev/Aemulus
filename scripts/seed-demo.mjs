@@ -42,21 +42,21 @@ const RUNNERS = [
 ];
 
 const SKILLS = [
-  { name: "Add invoice to QuickBooks", desc: "Enter a vendor invoice (vendor, amount, date) into the QuickBooks new-bill form.", host: "https://app.qbo.intuit.com/app/bill", fields: ["vendor", "amount", "date"], runs: 412, success: 0.97, stars: [5,5,5,4,5,5,4,5] },
-  { name: "Add lead to HubSpot", desc: "Create a HubSpot contact from a name + email + company.", host: "https://app.hubspot.com/contacts/new", fields: ["name", "email", "company"], runs: 318, success: 0.94, stars: [5,4,5,5,4,5,5] },
-  { name: "Post job to LinkedIn", desc: "Fill the LinkedIn 'post a job' form from a title + location + description.", host: "https://www.linkedin.com/job-posting/new", fields: ["title", "location"], runs: 156, success: 0.9, stars: [4,5,4,5,4] },
-  { name: "Submit expense to Expensify", desc: "Create an Expensify expense from amount + merchant + category.", host: "https://www.expensify.com/expenses/new", fields: ["amount", "merchant"], runs: 203, success: 0.96, stars: [5,5,5,5,4,5] },
-  { name: "Create Shopify product", desc: "Add a product (title, price, description) to a Shopify store.", host: "https://admin.shopify.com/products/new", fields: ["title", "price"], runs: 88, success: 0.89, stars: [4,4,5,4] },
-  { name: "Log support ticket to Zendesk", desc: "Open a Zendesk ticket from subject + requester + priority.", host: "https://yourco.zendesk.com/agent/tickets/new", fields: ["subject", "requester"], runs: 271, success: 0.95, stars: [5,5,4,5,5,4,5,5] },
-  { name: "Create Stripe invoice", desc: "Draft a Stripe invoice from a customer email + amount + memo.", host: "https://dashboard.stripe.com/invoices/create", fields: ["customer", "amount"], runs: 344, success: 0.96, stars: [5,5,5,4,5,5,5] },
-  { name: "Add contact to Salesforce", desc: "Create a Salesforce contact from a name + account + email.", host: "https://login.salesforce.com/lightning/o/Contact/new", fields: ["name", "account", "email"], runs: 289, success: 0.93, stars: [4,5,5,4,5,5] },
-  { name: "Create Trello card", desc: "Add a Trello card to a list from a title + description.", host: "https://trello.com/add-card", fields: ["title", "description"], runs: 176, success: 0.98, stars: [5,5,5,5,5,4] },
-  { name: "Add row to Airtable", desc: "Append a record to an Airtable base from a set of field values.", host: "https://airtable.com/create/record", fields: ["name", "status", "notes"], runs: 233, success: 0.95, stars: [5,4,5,5,5] },
-  { name: "Create Notion database entry", desc: "Add a page to a Notion database from a title + tags + status.", host: "https://www.notion.so/new", fields: ["title", "status"], runs: 198, success: 0.94, stars: [5,5,4,5,4,5] },
-  { name: "Create Asana task", desc: "Open an Asana task from a name + assignee + due date.", host: "https://app.asana.com/0/tasks/new", fields: ["name", "assignee", "due"], runs: 142, success: 0.92, stars: [4,5,4,5,5] },
-  { name: "Create Jira issue", desc: "File a Jira issue from a summary + type + priority.", host: "https://yourco.atlassian.net/jira/issue/new", fields: ["summary", "type"], runs: 261, success: 0.95, stars: [5,5,4,5,5,4,5] },
-  { name: "Add candidate to Greenhouse", desc: "Create a Greenhouse candidate from a name + email + role.", host: "https://app.greenhouse.io/people/new", fields: ["name", "email", "role"], runs: 97, success: 0.9, stars: [4,4,5,4,5] },
-  { name: "Schedule post with Buffer", desc: "Queue a social post in Buffer from text + channel + time.", host: "https://publish.buffer.com/compose", fields: ["text", "channel"], runs: 184, success: 0.93, stars: [5,4,5,4,5,5] },
+  { name: "Add invoice to QuickBooks", desc: "Enter a vendor invoice (vendor, amount, date) into the QuickBooks new-bill form.", host: "https://app.qbo.intuit.com/app/bill", fields: ["vendor", "amount", "date"], runs: 412, success: 0.97, stars: [5,5,5,5,5,4,5,5] },
+  { name: "Add lead to HubSpot", desc: "Create a HubSpot contact from a name + email + company.", host: "https://app.hubspot.com/contacts/new", fields: ["name", "email", "company"], runs: 318, success: 0.94, stars: [4,4,5,4,4,4,4] },
+  { name: "Post job to LinkedIn", desc: "Fill the LinkedIn 'post a job' form from a title + location + description.", host: "https://www.linkedin.com/job-posting/new", fields: ["title", "location"], runs: 156, success: 0.9, stars: [4,3,4,4,4] },
+  { name: "Submit expense to Expensify", desc: "Create an Expensify expense from amount + merchant + category.", host: "https://www.expensify.com/expenses/new", fields: ["amount", "merchant"], runs: 203, success: 0.96, stars: [5,5,4,5,5,4] },
+  { name: "Create Shopify product", desc: "Add a product (title, price, description) to a Shopify store.", host: "https://admin.shopify.com/products/new", fields: ["title", "price"], runs: 88, success: 0.89, stars: [4,4,4,3,5,4] },
+  { name: "Log support ticket to Zendesk", desc: "Open a Zendesk ticket from subject + requester + priority.", host: "https://yourco.zendesk.com/agent/tickets/new", fields: ["subject", "requester"], runs: 271, success: 0.95, stars: [5,5,4,5,4,5,4] },
+  { name: "Create Stripe invoice", desc: "Draft a Stripe invoice from a customer email + amount + memo.", host: "https://dashboard.stripe.com/invoices/create", fields: ["customer", "amount"], runs: 344, success: 0.96, stars: [5,5,5,4,5,5] },
+  { name: "Add contact to Salesforce", desc: "Create a Salesforce contact from a name + account + email.", host: "https://login.salesforce.com/lightning/o/Contact/new", fields: ["name", "account", "email"], runs: 289, success: 0.93, stars: [4,5,4,4,5,4] },
+  { name: "Create Trello card", desc: "Add a Trello card to a list from a title + description.", host: "https://trello.com/add-card", fields: ["title", "description"], runs: 176, success: 0.98, stars: [5,5,5,5,5] },
+  { name: "Add row to Airtable", desc: "Append a record to an Airtable base from a set of field values.", host: "https://airtable.com/create/record", fields: ["name", "status", "notes"], runs: 233, success: 0.95, stars: [5,4,4,5,4] },
+  { name: "Create Notion database entry", desc: "Add a page to a Notion database from a title + tags + status.", host: "https://www.notion.so/new", fields: ["title", "status"], runs: 198, success: 0.94, stars: [4,4,4,5,4,4] },
+  { name: "Create Asana task", desc: "Open an Asana task from a name + assignee + due date.", host: "https://app.asana.com/0/tasks/new", fields: ["name", "assignee", "due"], runs: 142, success: 0.92, stars: [4,4,3,4,4,4] },
+  { name: "Create Jira issue", desc: "File a Jira issue from a summary + type + priority.", host: "https://yourco.atlassian.net/jira/issue/new", fields: ["summary", "type"], runs: 261, success: 0.95, stars: [5,4,5,4,5,4] },
+  { name: "Add candidate to Greenhouse", desc: "Create a Greenhouse candidate from a name + email + role.", host: "https://app.greenhouse.io/people/new", fields: ["name", "email", "role"], runs: 97, success: 0.9, stars: [4,5,4,4,4] },
+  { name: "Schedule post with Buffer", desc: "Queue a social post in Buffer from text + channel + time.", host: "https://publish.buffer.com/compose", fields: ["text", "channel"], runs: 184, success: 0.93, stars: [5,4,5,5,4,5] },
 ];
 
 const COMMENTS = [
@@ -101,7 +101,8 @@ for (const sk of SKILLS) {
       args: [`demo_run_${s}_${i}`, RUNNERS[i % RUNNERS.length], sid, status, "{}", "{}", status === "completed" ? "ok" : null, null, now - i * 3_600_000, now - i * 3_600_000],
     });
   }
-  // Ratings.
+  // Ratings (clear stale demo rows first so a shorter array can't leave orphans).
+  await db.execute({ sql: `DELETE FROM ratings WHERE skill_id = ? AND id LIKE 'demo_rat_%'`, args: [sid] });
   for (let i = 0; i < sk.stars.length; i++) {
     await db.execute({
       sql: `INSERT OR REPLACE INTO ratings (id,skill_id,rater,stars,comment,created_at) VALUES (?,?,?,?,?,?)`,

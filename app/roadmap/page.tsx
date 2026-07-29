@@ -1,6 +1,7 @@
 import { Badge, Card, Label } from "@/components/ui";
 import { Nav } from "@/components/Nav";
 import { SiteFooter } from "@/components/SiteFooter";
+import { Reveal } from "@/components/Reveal";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +63,7 @@ const ROADMAP = [
 
 export default function RoadmapPage() {
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-6">
+    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6">
       <Nav />
 
       <section className="border-t border-border pt-14 text-center">
@@ -91,7 +92,7 @@ export default function RoadmapPage() {
             {ROADMAP.map((r, i) => {
               const left = i % 2 === 0;
               return (
-                <div
+                <Reveal
                   key={r.phase}
                   className="relative md:grid md:grid-cols-2 md:items-start md:gap-12"
                 >
@@ -136,7 +137,7 @@ export default function RoadmapPage() {
                       </ul>
                     </Card>
                   </div>
-                </div>
+                </Reveal>
               );
             })}
           </div>
