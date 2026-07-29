@@ -27,6 +27,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
   if (msg.__aem === "stop") { stopAndSave().then(sendResponse); return true; }
   if (msg.__aem === "run") { runSkill(msg).then(sendResponse); return true; }
+  // Triggered from the site's "Run in your browser" button (relayed by the
+  // content script): run in a fresh tab so it doesn't hijack the site tab.
+  if (msg.__aem === "runExternal") { runSkill({ skillId: msg.skillId, input: msg.input, newTab: true }); return; }
   return undefined;
 });
 
@@ -160,16 +163,25 @@ async function runSkill(msg) {
 
   const { runId, plan, startUrl, secretKeys } = start.data;
   const secret = new Set(secretKeys || []);
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab || tab.id == null) return { ok: false, error: "No active tab." };
-  const tabId = tab.id, windowId = tab.windowId;
+
+  // Pick the tab to run in: a fresh tab for site-triggered runs (so we don't
+  // hijack the site), the active tab for popup-triggered runs.
+  let tabId, windowId;
+  if (msg.newTab) {
+    const created = await chrome.tabs.create({ url: startUrl || "about:blank", active: true });
+    tabId = created.id; windowId = created.windowId;
+    if (startUrl) await waitComplete(tabId, 20000);
+  } else {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab || tab.id == null) { await setStatus({ state: "error", error: "No active tab." }); return { ok: false, error: "No active tab." }; }
+    tabId = tab.id; windowId = tab.windowId;
+    if (startUrl) await navigateAndWait(tabId, startUrl);
+  }
 
   const results = [];
   let status = "completed";
   let error = null;
   let tokensIn = 0, tokensOut = 0;
-
-  if (startUrl) await navigateAndWait(tabId, startUrl);
 
   for (let i = 0; i < plan.length; i++) {
     const step = plan[i];

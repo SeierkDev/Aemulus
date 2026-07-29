@@ -33,6 +33,8 @@ export function RunPanel({
   const [error, setError] = useState<string | null>(null);
   const [quota, setQuota] = useState<QuotaStatus | null>(null);
   const [trusted, setTrusted] = useState(!requireTrust);
+  const [extPresent, setExtPresent] = useState(false);
+  const [browserNote, setBrowserNote] = useState<string | null>(null);
   const { ready, gate, label } = useUsageGate();
 
   useEffect(() => {
@@ -42,6 +44,22 @@ export function RunPanel({
       .then((d) => setQuota(d.quota ?? null))
       .catch(() => {});
   }, [ready]);
+
+  // Detect the Aemulus browser extension (it marks the DOM). If present, offer
+  // to run in your own browser — already logged in, no bot walls.
+  useEffect(() => {
+    const check = () =>
+      setExtPresent(!!document.documentElement.getAttribute("data-aemulus-extension"));
+    check();
+    const t = setTimeout(check, 900); // the content script may attach just after load
+    return () => clearTimeout(t);
+  }, []);
+
+  function runInBrowser() {
+    setError(null);
+    window.postMessage({ __aemulusRun: true, skillId, input: values }, window.location.origin);
+    setBrowserNote("Opening a new tab to run it in your browser… watch it go, then check /runs.");
+  }
 
   const out = quota ? !quota.unlimited && (quota.remaining ?? 0) <= 0 : false;
 
@@ -129,6 +147,11 @@ export function RunPanel({
             {busy ? "Running…" : out ? "Daily limit reached" : "▶ Run now"}
           </Button>
         )}
+        {ready && extPresent && !requireTrust && (
+          <Button variant="default" onClick={runInBrowser} disabled={!trusted}>
+            Run in your browser
+          </Button>
+        )}
         {ready && quota && (
           <span className="text-xs text-ink-3">
             {quota.unlimited
@@ -138,6 +161,7 @@ export function RunPanel({
         )}
         {error && <span className="text-sm text-ink-2">{error}</span>}
       </div>
+      {browserNote && <p className="text-xs text-ink-3">{browserNote}</p>}
       {out && (
         <p className="text-xs text-ink-3">
           You&apos;ve used your daily runs for the {quota?.tier} tier. Hold more

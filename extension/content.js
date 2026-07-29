@@ -222,4 +222,25 @@
     if (msg.__aem === "perform") { reply(performStep(msg.step, msg.value, msg.forcedSelector)); return true; }
     if (msg.__aem === "candidates") { reply({ candidates: collectCandidates() }); return true; }
   });
+
+  // ---------- SITE HANDOFF ----------
+  // Mark the DOM so the Aemulus site can tell the extension is installed and show
+  // a "Run in your browser" button. The DOM is shared with the page (unlike the
+  // isolated content-script `window`).
+  try {
+    document.documentElement.setAttribute("data-aemulus-extension", "0.1.0");
+  } catch { /* ignore */ }
+
+  // Relay a run request the site page posts to us (same-window/origin only) to
+  // the service worker, which runs the skill in a fresh tab.
+  window.addEventListener("message", (e) => {
+    if (e.source !== window || !e.data || e.data.__aemulusRun !== true) return;
+    const skillId = String(e.data.skillId || "");
+    if (!skillId) return;
+    const input = e.data.input && typeof e.data.input === "object" ? e.data.input : {};
+    try {
+      chrome.runtime.sendMessage({ __aem: "runExternal", skillId, input });
+      window.postMessage({ __aemulusAck: true, skillId }, location.origin);
+    } catch { /* extension reloaded */ }
+  });
 })();
