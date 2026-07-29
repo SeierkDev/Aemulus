@@ -53,10 +53,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = useCallback(async () => {
     if (signingIn) return; // guard against double-submit (e.g. via the usage gate)
     setError(null);
-    if (!publicKey || !signMessage) {
-      setError("Connect a wallet first.");
-      return;
-    }
+    // Some wallet adapters expose the account before signMessage is wired up
+    // (or don't support it at all). Bail quietly instead of throwing a raw
+    // "signMessage is not a function" — the button stays available to retry.
+    if (!publicKey || typeof signMessage !== "function") return;
     setSigningIn(true);
     try {
       const { message } = await (await fetch("/api/auth/nonce")).json();

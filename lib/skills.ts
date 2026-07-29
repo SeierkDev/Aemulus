@@ -207,6 +207,13 @@ export async function listPublishedSkills(limit = 50): Promise<Skill[]> {
   return r.rows.map(rowToSkill);
 }
 
+/** Total number of published skills on the platform. */
+export async function countPublishedSkills(): Promise<number> {
+  await ready();
+  const r = await db.execute(`SELECT COUNT(*) AS n FROM skills WHERE published = 1`);
+  return Number(r.rows[0]?.n ?? 0);
+}
+
 /** Lightweight published-skill rows for related-discovery cards: selects only the
  *  display columns so we don't JSON-parse every skill's plan/schema just to show
  *  a few "related" cards. */

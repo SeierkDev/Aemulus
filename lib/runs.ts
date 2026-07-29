@@ -497,6 +497,34 @@ export async function countPlatformRunsLast24h(): Promise<number> {
   return countPlatformRunsSince(Date.now() - 24 * 60 * 60 * 1000);
 }
 
+export interface RecentPlatformRun {
+  id: string;
+  skillId: string;
+  skillName: string;
+  status: RunStatus;
+  createdAt: number;
+}
+
+/** Most recent runs across the whole platform (anonymous) — a public activity
+ * feed of what's being automated, linking to the skill (not the private run). */
+export async function listRecentPlatformRuns(limit = 8): Promise<RecentPlatformRun[]> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT r.id, r.skill_id, r.status, r.created_at, s.name
+          FROM runs r JOIN skills s ON s.id = r.skill_id
+          WHERE s.published = 1
+          ORDER BY r.created_at DESC LIMIT ?`,
+    args: [limit],
+  });
+  return r.rows.map((row) => ({
+    id: String(row.id),
+    skillId: String(row.skill_id),
+    skillName: String(row.name),
+    status: String(row.status) as RunStatus,
+    createdAt: Number(row.created_at),
+  }));
+}
+
 /** A caller's runs, cursor-paginated (newest first) for the public API. */
 export async function listRunsPage(
   owner: string,

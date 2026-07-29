@@ -36,10 +36,14 @@ export async function getCreatorAnalytics(
     return -1;
   };
 
+  // Count only runs that actually earned this creator (a paid run), so the
+  // "Runs" and "$AEMU" series stay consistent — both reflect real income, not
+  // marketplace activity the creator wasn't paid for.
   const runs = await db.execute({
-    sql: `SELECT created_at, status FROM runs
-          WHERE skill_id IN (SELECT id FROM skills WHERE owner = ?)
-            AND created_at >= ?`,
+    sql: `SELECT r.created_at, r.status FROM runs r
+          WHERE r.skill_id IN (SELECT id FROM skills WHERE owner = ?)
+            AND r.created_at >= ?
+            AND EXISTS (SELECT 1 FROM earnings e WHERE e.run_id = r.id)`,
     args: [owner, dayStart],
   });
   for (const r of runs.rows) {

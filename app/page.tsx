@@ -7,8 +7,13 @@ import { Marketing } from "@/components/home/Marketing";
 import { Showcase } from "@/components/home/Showcase";
 import { CodeBackdrop } from "@/components/CodeBackdrop";
 import { Reveal } from "@/components/Reveal";
-import { listSkills, listPublishedSkills } from "@/lib/skills";
-import { listRuns, countPlatformRunsLast24h } from "@/lib/runs";
+import { listSkills, listPublishedSkills, countPublishedSkills } from "@/lib/skills";
+import {
+  listRuns,
+  countPlatformRunsLast24h,
+  countPlatformRunsSince,
+  listRecentPlatformRuns,
+} from "@/lib/runs";
 import { getReputationBatch } from "@/lib/reputation";
 import { getSession } from "@/lib/auth";
 
@@ -16,12 +21,16 @@ export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const session = await getSession();
-  const [skills, runs, popular, platformRuns24h] = await Promise.all([
-    session ? listSkills(session.pubkey) : Promise.resolve([]),
-    session ? listRuns(session.pubkey) : Promise.resolve([]),
-    listPublishedSkills(6),
-    countPlatformRunsLast24h(),
-  ]);
+  const [skills, runs, popular, runs24h, runsTotal, totalSkills, recentRuns] =
+    await Promise.all([
+      session ? listSkills(session.pubkey) : Promise.resolve([]),
+      session ? listRuns(session.pubkey) : Promise.resolve([]),
+      listPublishedSkills(6),
+      countPlatformRunsLast24h(),
+      countPlatformRunsSince(0),
+      countPublishedSkills(),
+      listRecentPlatformRuns(6),
+    ]);
   const hasData = skills.length > 0 || runs.length > 0;
   const popularRep = await getReputationBatch(popular.map((s) => s.id));
 
@@ -58,8 +67,13 @@ export default async function Home() {
         </div>
       </section>
 
-        {hasData && (
-          <Dashboard skills={skills} runs={runs} platformRuns24h={platformRuns24h} />
+        {totalSkills > 0 && (
+          <Dashboard
+            totalSkills={totalSkills}
+            runs24h={runs24h}
+            runsTotal={runsTotal}
+            recentRuns={recentRuns}
+          />
         )}
         <Reveal>
           <Showcase />

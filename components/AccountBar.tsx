@@ -15,21 +15,22 @@ import { short } from "@/lib/format";
  * global wallet button.
  */
 export function AccountBar() {
-  const { connected, publicKey } = useWallet();
+  const { connected, publicKey, signMessage } = useWallet();
   const { setVisible } = useWalletModal();
-  const { session, loading, signingIn, error, signIn, signOut } = useAuth();
+  const { session, loading, signingIn, signIn, signOut } = useAuth();
   const attempted = useRef(false);
 
-  // Once the wallet connects, kick off sign-in automatically so the user isn't
-  // left with a second "Sign in" click. Attempt once per connection; reset when
-  // they disconnect so a later reconnect can try again.
+  // Once the wallet connects (and can actually sign), kick off sign-in
+  // automatically so the user isn't left with a second "Sign in" click. Attempt
+  // once per connection; reset when they disconnect so a reconnect can retry.
   useEffect(() => {
-    if (connected && publicKey && !session && !signingIn && !attempted.current) {
+    const ready = connected && publicKey && typeof signMessage === "function";
+    if (ready && !session && !signingIn && !attempted.current) {
       attempted.current = true;
       void signIn();
     }
     if (!connected) attempted.current = false;
-  }, [connected, publicKey, session, signingIn, signIn]);
+  }, [connected, publicKey, signMessage, session, signingIn, signIn]);
 
   if (loading) return null;
 
@@ -49,15 +50,12 @@ export function AccountBar() {
   }
 
   return (
-    <div className="flex items-center gap-3">
-      {error && <span className="text-xs text-ink-2">{error}</span>}
-      <Button
-        variant="primary"
-        onClick={() => (connected ? void signIn() : setVisible(true))}
-        disabled={signingIn}
-      >
-        {signingIn ? "Check wallet…" : connected ? "Sign in" : "Connect wallet"}
-      </Button>
-    </div>
+    <Button
+      variant="primary"
+      onClick={() => (connected ? void signIn() : setVisible(true))}
+      disabled={signingIn}
+    >
+      {signingIn ? "Check wallet…" : connected ? "Sign in" : "Connect wallet"}
+    </Button>
   );
 }

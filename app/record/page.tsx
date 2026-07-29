@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Badge, Button, Card, Label, cx } from "@/components/ui";
 import { useUsageGate } from "@/components/use-usage-gate";
+import Image from "next/image";
 import { Trace } from "@/components/record/Trace";
 import { LiveView } from "@/components/record/LiveView";
 import type { RecorderState } from "@/lib/types";
@@ -175,8 +176,9 @@ export default function RecordPage() {
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6">
       <header className="flex items-center justify-between py-6">
-        <Link href="/" className="mono text-sm font-semibold tracking-tight">
-          ← aemulus
+        <Link href="/" aria-label="Home" className="flex items-center gap-2 text-ink-3 transition-colors hover:text-ink">
+          <span className="mono text-lg leading-none">←</span>
+          <Image src="/aemulus-mark.png" alt="Aemulus" width={50} height={36} priority />
         </Link>
         <Badge>
           <span

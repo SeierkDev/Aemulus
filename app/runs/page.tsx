@@ -2,8 +2,9 @@ import Link from "next/link";
 import { Badge, Card } from "@/components/ui";
 import { Nav } from "@/components/Nav";
 import { AccountBar } from "@/components/AccountBar";
+import { RecentActivity } from "@/components/RecentActivity";
 import { StatusBadge } from "@/components/StatusBadge";
-import { listRuns } from "@/lib/runs";
+import { listRuns, listRecentPlatformRuns } from "@/lib/runs";
 import { getSession } from "@/lib/auth";
 import type { Run } from "@/lib/types";
 import { when } from "@/lib/format";
@@ -14,7 +15,10 @@ export const dynamic = "force-dynamic";
 export default async function RunsPage() {
   const session = await getSession();
   const owner = session?.pubkey ?? "";
-  const runs = await listRuns(owner);
+  const [runs, recent] = await Promise.all([
+    listRuns(owner),
+    listRecentPlatformRuns(8),
+  ]);
   const review = runs.filter((r) => r.status === "needs_review");
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6">
@@ -76,6 +80,12 @@ export default async function RunsPage() {
           ))}
         </div>
       </div>
+
+      {recent.length > 0 && (
+        <div className="mt-12 border-t border-border pt-8">
+          <RecentActivity runs={recent} title="Recent on the marketplace" />
+        </div>
+      )}
       <div className="py-10" />
     </div>
   );

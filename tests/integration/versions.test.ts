@@ -124,23 +124,27 @@ describe("skill versioning", () => {
 });
 
 describe("creator analytics", () => {
-  it("reports a 14-day window of runs + earnings for a creator's skills", async () => {
+  it("reports a 14-day window of PAID runs + earnings for a creator's skills", async () => {
     const skill = await createSkill({ owner: OWNER, generalized: gen("Earner"), sourceDemoId: null });
+    // Runs of the creator's skill; only the one that earns is counted (paid run).
+    let paidRunId: string | null = null;
     for (const status of ["completed", "completed", "failed"] as const) {
       const r = await createRun({ owner: "RUNNER", skillId: skill.id, input: {} });
       await finishRun(r.id, { status, result: null, error: null });
+      if (status === "completed" && !paidRunId) paidRunId = r.id;
     }
     await creditEarning({
       owner: OWNER,
       skillId: skill.id,
-      runId: "run_x",
+      runId: paidRunId!,
       runner: "RUNNER",
       amount: 20,
     });
 
     const a = await getCreatorAnalytics(OWNER);
     expect(a.days).toHaveLength(14);
-    expect(a.windowRuns).toBeGreaterThanOrEqual(3);
+    // Analytics reflect paid activity only — the single earning run, not all runs.
+    expect(a.windowRuns).toBeGreaterThanOrEqual(1);
     expect(a.windowSuccess).toBeGreaterThan(0);
     expect(a.windowEarnings).toBeGreaterThanOrEqual(20);
     // today's bucket (last) should hold the activity

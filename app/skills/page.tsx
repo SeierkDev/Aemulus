@@ -84,19 +84,25 @@ export default async function SkillsPage() {
           <Badge>{pending.length} to generalize</Badge>
         </div>
         <p className="mt-1.5 text-sm text-ink-2">
-          Raw demonstrations, ready to turn into skills. Record the same task two
-          or more times, select them, and synthesize a skill that learns what
-          varies.
+          Your raw demonstrations, ready to turn into skills. Record the same
+          task two or more times, select them, and synthesize a skill that
+          learns what varies.
         </p>
 
-        <SynthesizePanel
-          demos={pending.map((d) => ({
-            id: d.id,
-            title: d.title,
-            steps: d.trace.length,
-            createdAt: d.createdAt,
-          }))}
-        />
+        {!session ? (
+          <Card className="mt-6 p-8 text-center text-sm text-ink-2">
+            Connect your wallet to see your recordings.
+          </Card>
+        ) : (
+          <SynthesizePanel
+            demos={pending.map((d) => ({
+              id: d.id,
+              title: d.title,
+              steps: d.trace.length,
+              createdAt: d.createdAt,
+            }))}
+          />
+        )}
       </div>
 
       <div className="py-10" />
