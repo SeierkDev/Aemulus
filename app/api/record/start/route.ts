@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAccess } from "@/lib/auth";
 import { assertSafeUrl } from "@/lib/safe-url";
 import { getRecorder } from "@/lib/recorder";
+import { logError } from "@/lib/log";
 import { enforceRateLimit } from "@/lib/ratelimit";
 import { readJson, RecordStartBody } from "@/lib/validate";
 
@@ -51,7 +52,8 @@ export async function POST(req: Request) {
       session.pubkey,
     );
     return NextResponse.json(state);
-  } catch {
+  } catch (e) {
+    logError("api/record/start", e);
     return NextResponse.json(
       { error: "Couldn’t start the recording." },
       { status: 409 },

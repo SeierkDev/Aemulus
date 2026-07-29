@@ -1,4 +1,5 @@
 import { chromium, type Browser, type LaunchOptions } from "playwright";
+import { logError } from "./log";
 
 /**
  * Centralized Chromium launcher for runs and recordings.
@@ -52,8 +53,17 @@ function getStealthChromium() {
  */
 export async function launchBrowser(opts?: LaunchOptions): Promise<Browser> {
   if (stealthEnabled()) {
-    const extra = await getStealthChromium();
-    return extra.launch(opts);
+    try {
+      const extra = await getStealthChromium();
+      return await extra.launch(opts);
+    } catch (e) {
+      // The stealth stack (playwright-extra + plugin graph) failed to load or
+      // launch in this environment. Never let that block a recording or run —
+      // fall back to plain Playwright. Reset the cached instance so a transient
+      // failure can retry next time.
+      logError("browser.stealth-launch", e);
+      stealthChromium = null;
+    }
   }
   return chromium.launch(opts);
 }
