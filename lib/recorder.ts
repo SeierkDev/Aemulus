@@ -87,8 +87,14 @@ class RecorderSession {
     startUrl: string,
     owner: string,
   ): Promise<RecorderState> {
+    // A previous session left open (tab closed / abandoned on a captcha without
+    // Stop & save) would otherwise 409 the user out of ever recording again.
+    // An explicit Start means "begin fresh" — drain and tear down the old
+    // session, then continue.
     if (this.isBusy()) {
-      throw new Error("A recording is already in progress.");
+      await this.tail.catch(() => {});
+      await this.closeBrowser();
+      this.state = null;
     }
     const sid = id("rec");
     this.accepted = 0;
