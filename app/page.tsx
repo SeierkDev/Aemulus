@@ -11,7 +11,7 @@ import { listSkills, listPublishedSkills, countPublishedSkills } from "@/lib/ski
 import {
   listRuns,
   countPlatformRunsLast24h,
-  countPlatformRunsSince,
+  countPlatformNeedsReview,
   listRecentPlatformRuns,
 } from "@/lib/runs";
 import { getReputationBatch } from "@/lib/reputation";
@@ -21,13 +21,13 @@ export const dynamic = "force-dynamic";
 
 export default async function Home() {
   const session = await getSession();
-  const [skills, runs, popular, runs24h, runsTotal, totalSkills, recentRuns] =
+  const [skills, runs, popular, runs24h, needsReview, totalSkills, recentRuns] =
     await Promise.all([
       session ? listSkills(session.pubkey) : Promise.resolve([]),
       session ? listRuns(session.pubkey) : Promise.resolve([]),
       listPublishedSkills(6),
       countPlatformRunsLast24h(),
-      countPlatformRunsSince(0),
+      countPlatformNeedsReview(),
       countPublishedSkills(),
       listRecentPlatformRuns(6),
     ]);
@@ -71,7 +71,7 @@ export default async function Home() {
           <Dashboard
             totalSkills={totalSkills}
             runs24h={runs24h}
-            runsTotal={runsTotal}
+            needsReview={needsReview}
             recentRuns={recentRuns}
           />
         )}

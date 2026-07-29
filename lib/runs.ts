@@ -497,6 +497,15 @@ export async function countPlatformRunsLast24h(): Promise<number> {
   return countPlatformRunsSince(Date.now() - 24 * 60 * 60 * 1000);
 }
 
+/** Platform-wide runs currently paused awaiting review. */
+export async function countPlatformNeedsReview(): Promise<number> {
+  await ready();
+  const r = await db.execute(
+    `SELECT COUNT(*) AS n FROM runs WHERE status = 'needs_review'`,
+  );
+  return Number(r.rows[0]?.n ?? 0);
+}
+
 export interface RecentPlatformRun {
   id: string;
   skillId: string;

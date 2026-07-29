@@ -9,12 +9,12 @@ import type { RecentPlatformRun } from "@/lib/runs";
 export function Dashboard({
   totalSkills,
   runs24h,
-  runsTotal,
+  needsReview,
   recentRuns,
 }: {
   totalSkills: number;
   runs24h: number;
-  runsTotal: number;
+  needsReview: number;
   recentRuns: RecentPlatformRun[];
 }) {
   return (
@@ -22,7 +22,7 @@ export function Dashboard({
       <div className="grid grid-cols-3 gap-3">
         <Stat label="Skills" value={totalSkills} href="/market" />
         <Stat label="Runs · 24h" value={runs24h} href="/market" />
-        <Stat label="Runs · all time" value={runsTotal} href="/market" />
+        <Stat label="Needs review" value={needsReview} href="/runs" />
       </div>
 
       {recentRuns.length > 0 && (

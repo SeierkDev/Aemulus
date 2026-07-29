@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Card, Label } from "@/components/ui";
 import { StatusBadge } from "@/components/StatusBadge";
-import { when } from "@/lib/format";
+import { timeAgo } from "@/lib/format";
 import type { RecentPlatformRun } from "@/lib/runs";
 
 /** Public marketplace activity feed: recent runs across the platform, linking to
@@ -24,7 +24,7 @@ export function RecentActivity({
               <div className="min-w-0">
                 <div className="truncate text-sm">{r.skillName}</div>
                 <div className="mono mt-0.5 text-xs text-ink-3">
-                  {when(r.createdAt)}
+                  {timeAgo(r.createdAt)}
                 </div>
               </div>
               <StatusBadge status={r.status} />
