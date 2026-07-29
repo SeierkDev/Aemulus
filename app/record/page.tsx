@@ -15,6 +15,30 @@ const VIEW_H = 800;
 const input =
   "w-full rounded-[var(--radius-base)] border border-border-strong bg-surface-2 px-3 py-2 text-sm outline-none placeholder:text-ink-3 focus:border-ink-3";
 
+// Big public sites that aggressively block automation (captcha walls). We don't
+// stop the user — just warn them so they don't waste a recording on a site that
+// will loop a captcha no matter what.
+const HARD_SITES: { re: RegExp; name: string }[] = [
+  { re: /(^|\.)google\./, name: "Google" },
+  { re: /(^|\.)amazon\./, name: "Amazon" },
+  { re: /(^|\.)(facebook|instagram)\.com$/, name: "Facebook / Instagram" },
+  { re: /(^|\.)(x|twitter)\.com$/, name: "X (Twitter)" },
+  { re: /(^|\.)linkedin\.com$/, name: "LinkedIn" },
+  { re: /(^|\.)tiktok\.com$/, name: "TikTok" },
+  { re: /(^|\.)ticketmaster\./, name: "Ticketmaster" },
+];
+function hardSiteName(raw: string): string | null {
+  const t = raw.trim();
+  if (!t) return null;
+  let host = "";
+  try {
+    host = new URL(/^https?:\/\//i.test(t) ? t : `https://${t}`).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+  return HARD_SITES.find((s) => s.re.test(host))?.name ?? null;
+}
+
 const SPECIAL_KEYS = new Set([
   "Enter",
   "Tab",
@@ -199,9 +223,15 @@ export default function RecordPage() {
               Record a task
             </h1>
             <p className="mt-1.5 text-sm leading-relaxed text-ink-2">
-              A live browser opens here in your screen. Do the task once - click
-              and type in the view - then stop, and we&apos;ll turn it into a
-              reusable skill.
+              A live browser opens here. Do a repetitive task once - click and
+              type in the view - then stop, and we&apos;ll turn it into a skill
+              that runs itself.
+            </p>
+            <p className="mt-2 text-sm leading-relaxed text-ink-3">
+              <span className="text-ink-2">Works best on</span> the tools you log
+              into and forms - CRMs, invoicing, dashboards, data entry.{" "}
+              <span className="text-ink-2">Not built for</span> big public sites
+              like Google or Amazon, which block automation with captchas.
             </p>
           </div>
 
@@ -212,10 +242,20 @@ export default function RecordPage() {
                 <input
                   value={startUrl}
                   onChange={(e) => setStartUrl(e.target.value)}
-                  placeholder="example.com/form"
+                  placeholder="e.g. your-crm.com/invoices/new"
                   aria-label="Start URL"
                   className={input}
                 />
+                {hardSiteName(startUrl) && (
+                  <div className="mt-1 rounded-[var(--radius-base)] border border-border-strong bg-surface-2 p-3 text-xs leading-relaxed text-ink-2">
+                    <span className="text-ink">⚠ {hardSiteName(startUrl)} blocks
+                    automated browsers.</span>{" "}
+                    You&apos;ll likely hit a captcha that can&apos;t be passed —
+                    even by hand. This tool is built for the tools you log into
+                    (CRMs, invoicing, dashboards) and forms, not big public
+                    search/shopping sites. You can still try, but expect a block.
+                  </div>
+                )}
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label>Task name (optional)</Label>
