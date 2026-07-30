@@ -5,6 +5,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Button } from "./ui";
 import { useAuth } from "./auth-context";
+import { maybePhantomDeepLink } from "./wallet-connect";
 import { short } from "@/lib/format";
 
 /**
@@ -52,7 +53,13 @@ export function AccountBar() {
   return (
     <Button
       variant="primary"
-      onClick={() => (connected ? void signIn() : setVisible(true))}
+      onClick={() => {
+        if (connected) return void signIn();
+        // On mobile with no injected wallet, deep-link into Phantom instead of
+        // opening an empty modal.
+        if (maybePhantomDeepLink()) return;
+        setVisible(true);
+      }}
       disabled={signingIn}
     >
       {signingIn ? "Check wallet…" : connected ? "Sign in" : "Connect wallet"}
