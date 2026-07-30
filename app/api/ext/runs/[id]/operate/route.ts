@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { apiKeyAuth } from "@/lib/api-keys";
+import { apiKeyAuth, hasScope } from "@/lib/api-keys";
 import { getRun } from "@/lib/runs";
 import { operatorChooseSelector, type Candidate } from "@/lib/operate";
+import { rateLimit, RUNS_PER_MIN } from "@/lib/ratelimit";
 import { logError } from "@/lib/log";
 
 export const runtime = "nodejs";
@@ -21,6 +22,20 @@ export async function POST(
     const auth = await apiKeyAuth(req);
     if (!auth) {
       return NextResponse.json({ error: "Invalid or missing API key" }, { status: 401 });
+    }
+    // Each call is a paid Claude-vision request on the platform key. Require the
+    // 'run' scope and rate-limit per owner so a held-open run can't be used to
+    // amplify vision cost. (Vision rescues fire far less often than steps, so the
+    // per-minute run cap is ample headroom for a legitimate run.)
+    if (!hasScope(auth.scopes, "run")) {
+      return NextResponse.json({ error: "Key lacks the 'run' scope" }, { status: 403 });
+    }
+    const rl = rateLimit(`operate:${auth.owner}`, RUNS_PER_MIN, 60_000);
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: `Too many vision rescues (limit ${RUNS_PER_MIN}/min)` },
+        { status: 429, headers: { "Retry-After": String(Math.ceil(rl.retryAfterMs / 1000)) } },
+      );
     }
     const { id } = await params;
     const run = await getRun(id);

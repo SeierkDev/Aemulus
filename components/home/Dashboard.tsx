@@ -20,9 +20,13 @@ export function Dashboard({
   return (
     <section className="mt-14">
       <div className="grid grid-cols-3 gap-3">
+        {/* Only "Skills" has a real public destination. Runs·24h and Needs
+            review are platform-wide metrics with no per-visitor page (a visitor
+            clicking through to /runs would see only their OWN runs), so they're
+            display-only. */}
         <Stat label="Skills" value={totalSkills} href="/market" />
-        <Stat label="Runs · 24h" value={runs24h} href="/market" />
-        <Stat label="Needs review" value={needsReview} href="/runs" />
+        <Stat label="Runs · 24h" value={runs24h} />
+        <Stat label="Needs review" value={needsReview} />
       </div>
 
       {recentRuns.length > 0 && (
@@ -41,18 +45,17 @@ function Stat({
 }: {
   label: string;
   value: number;
-  href: string;
+  href?: string;
 }) {
-  return (
-    <Link href={href}>
-      <Card className="p-5 transition-colors hover:bg-surface-2">
-        <div className="mono text-3xl font-semibold tracking-tight">
-          {value.toLocaleString()}
-        </div>
-        <div className="mono mt-1 text-[0.68rem] uppercase tracking-[0.18em] text-ink-3">
-          {label}
-        </div>
-      </Card>
-    </Link>
+  const body = (
+    <Card className={href ? "p-5 transition-colors hover:bg-surface-2" : "p-5"}>
+      <div className="mono text-3xl font-semibold tracking-tight">
+        {value.toLocaleString()}
+      </div>
+      <div className="mono mt-1 text-[0.68rem] uppercase tracking-[0.18em] text-ink-3">
+        {label}
+      </div>
+    </Card>
   );
+  return href ? <Link href={href}>{body}</Link> : body;
 }
