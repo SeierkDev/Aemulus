@@ -25,13 +25,23 @@ import { logError, logInfo } from "./log";
 const MAX_ATTEMPTS = 3;
 const TICK_MS = 1500;
 const RUN_TIMEOUT_MS = Number(process.env.AEMULUS_RUN_TIMEOUT_MS) || 120_000;
-// A run can legitimately live past RUN_TIMEOUT during an interactive (live
-// takeover) pause of up to LIVE_TIMEOUT. STALE_MS must exceed run + live + a
-// buffer, or recoverStuckJobs would requeue a still-alive paused run and start a
-// second execution of it.
+// A run can legitimately live FAR past RUN_TIMEOUT: each captcha pause (up to
+// MAX_CAPTCHA_PAUSES) and each interactive live-takeover pause waits up to
+// LIVE_TIMEOUT and extends the run's deadline. STALE_MS must exceed the worst-
+// case alive time, or recoverStuckJobs would requeue a still-alive paused run
+// mid-pause and start a SECOND concurrent execution of it (duplicating real
+// side effects). Budget for every captcha pause plus a couple of interactive
+// checkpoints. (locked_at is set once at claim and doesn't advance across pauses,
+// so this constant is the only thing standing between a long pause and a
+// double-execution; a per-pause heartbeat would let us shrink it.)
 const LIVE_TIMEOUT_MS =
   Math.max(30_000, Number(process.env.AEMULUS_LIVE_TIMEOUT_MS) || 300_000);
-const STALE_MS = RUN_TIMEOUT_MS + LIVE_TIMEOUT_MS + 120_000;
+const MAX_CAPTCHA_PAUSES = Math.max(
+  0,
+  Number(process.env.AEMULUS_CAPTCHA_MAX_PAUSES) || 3,
+);
+const STALE_MS =
+  RUN_TIMEOUT_MS + (MAX_CAPTCHA_PAUSES + 2) * LIVE_TIMEOUT_MS + 120_000;
 
 async function processJob(job: Job): Promise<void> {
   const skill = await getSkill(job.skillId);

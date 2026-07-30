@@ -1,4 +1,4 @@
-import { getSkill } from "./skills";
+import { getSkill, templateTool } from "./skills";
 import { createRun, finishRun } from "./runs";
 import { quotaReserveForOwner } from "./quota";
 import { enqueueRunJob } from "./jobs";
@@ -56,6 +56,9 @@ export async function startChainedRun(args: {
   if (sub.owner !== args.owner && !sub.published) {
     return { skipped: "sub-skill not runnable by this owner" };
   }
+  // A marketplace template has placeholder steps and isn't runnable - don't spend
+  // a quota slot on a doomed child run (mirrors the startRun/ext-start guards).
+  if (templateTool(sub)) return { skipped: "sub-skill is a template (record your own)" };
   if (planHasChaining(sub.plan)) return { skipped: "nested chaining is not allowed" };
 
   const input = childInput(sub.inputSchema.fields, args.parentInput, args.parentOutputs);
