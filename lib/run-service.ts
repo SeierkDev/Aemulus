@@ -5,7 +5,6 @@ import {
   finishRun,
   claimRunBookkeeping,
   isRunBookkept,
-  isFirstCompletedRunByRunner,
   setRunRegistryAnchor,
   setRunZkAnchor,
 } from "./runs";
@@ -158,26 +157,33 @@ export async function finalizeRunAccounting(
 ): Promise<void> {
   // Exactly-once latch: two executions (a requeued job, or a duplicate finish)
   // must not double-count. Only the latch winner runs the rest.
-  if (!(await claimRunBookkeeping(runId))) return;
-  incr(`runs.${final.status}`); // runs.completed / needs_review / failed
-  invalidateReputation(skill.id); // success-rate aggregate changed (any terminal status)
-  // Marketplace popularity (run_count) AND the creator credit both count only a
-  // COMPLETED run by someone OTHER than the owner — so an owner can't inflate
-  // their own ranking/earnings by re-running their own skill.
+  // Creator credit + marketplace popularity count only a COMPLETED run by someone
+  // OTHER than the owner (an owner can't inflate their own earnings/ranking).
+  //
+  // Do this BEFORE the at-most-once latch. creditEarningOnce is idempotent (at
+  // most one earnings row per (skill, runner); returns true ONLY when it actually
+  // writes), so running it on every finalize attempt is safe — and crucially, a
+  // transient DB error here retries cleanly on the next completeRun pass instead
+  // of latching the run as "done" with the creator's credit permanently lost.
+  // The run_count bump is tied to the SAME fresh-credit signal, so credit and
+  // count happen exactly once together — even under a concurrent re-execution,
+  // since SQLite serializes the insert and only one caller sees credited === true.
   if (final.status === "completed" && skill.owner && skill.owner !== runner) {
-    // Count DISTINCT adopters (first completed run per runner), the same
-    // anti-Sybil rule the earnings credit uses.
-    if (await isFirstCompletedRunByRunner(skill.id, runner, runId)) {
-      await incrementRunCount(skill.id);
-    }
-    await creditEarningOnce({
+    const credited = await creditEarningOnce({
       owner: skill.owner,
       skillId: skill.id,
       runId,
       runner,
       amount: SOLANA.runFee,
     });
+    if (credited) await incrementRunCount(skill.id);
   }
+  // At-most-once latch for the remaining, non-idempotent side effects (metrics,
+  // webhooks, on-chain anchors). If this run was already bookkept, skip them —
+  // the idempotent credit above already ran, so nothing is lost.
+  if (!(await claimRunBookkeeping(runId))) return;
+  incr(`runs.${final.status}`); // runs.completed / needs_review / failed
+  invalidateReputation(skill.id); // success-rate aggregate changed (any terminal status)
   // Best-effort, fire-and-forget webhook delivery (never blocks settling). The
   // status event carries no output; extracted data goes only via run.output.
   void dispatchRunEvent(runner, eventForStatus(final.status), {
