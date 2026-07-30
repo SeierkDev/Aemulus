@@ -223,13 +223,30 @@ export default function RecordPage() {
               that runs itself.
             </p>
             <p className="mt-2 text-sm leading-relaxed text-ink-3">
-              <span className="text-ink-2">Works best on</span> the tools you log
-              into and forms - CRMs, invoicing, dashboards, data entry. A few big
-              public sites (like <span className="text-ink-2">Google search</span>
-              ) block automation with captchas, but most tools you actually work
-              in are fine.
+              This cloud recorder is best for{" "}
+              <span className="text-ink-2">public sites and forms</span> that
+              don&apos;t need a login. For{" "}
+              <span className="text-ink-2">tools you sign into</span> (CRMs,
+              invoicing, dashboards), record with the browser extension instead -
+              it runs in your own already-signed-in browser, so there&apos;s no
+              login to redo and no bot walls.
             </p>
           </div>
+
+          <Link href="/#extension">
+            <Card className="flex items-center justify-between gap-3 p-4 transition-colors hover:bg-surface-2">
+              <div>
+                <p className="text-sm font-medium">
+                  Recording a tool you log into?
+                </p>
+                <p className="mt-0.5 text-xs leading-relaxed text-ink-3">
+                  Use the browser extension - it records as you, already signed
+                  in.
+                </p>
+              </div>
+              <span className="mono shrink-0 text-sm text-ink-3">→</span>
+            </Card>
+          </Link>
 
           {!recording && !saved && (
             <Card className="flex flex-col gap-4 p-5">
@@ -238,7 +255,7 @@ export default function RecordPage() {
                 <input
                   value={startUrl}
                   onChange={(e) => setStartUrl(e.target.value)}
-                  placeholder="e.g. your-crm.com/invoices/new"
+                  placeholder="e.g. a public site or form (no login needed)"
                   aria-label="Start URL"
                   className={input}
                 />
@@ -247,9 +264,9 @@ export default function RecordPage() {
                     <span className="text-ink">⚠ {hardSiteName(startUrl)} blocks
                     automated browsers.</span>{" "}
                     You&apos;ll likely hit a captcha that can&apos;t be passed —
-                    even by hand. This tool is built for the tools you log into
-                    (CRMs, invoicing, dashboards) and forms, not big public
-                    search/shopping sites. You can still try, but expect a block.
+                    even by hand. Try a different public site, or record with the
+                    browser extension (it runs in your own browser). You can still
+                    try here, but expect a block.
                   </div>
                 )}
               </div>

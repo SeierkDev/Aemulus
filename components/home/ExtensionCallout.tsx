@@ -8,7 +8,7 @@ import { Badge, Card } from "@/components/ui";
  */
 export function ExtensionCallout({ storeUrl }: { storeUrl?: string }) {
   return (
-    <section className="mt-16">
+    <section id="extension" className="mt-16 scroll-mt-24">
       <Card className="flex flex-col items-start gap-5 p-7 sm:flex-row sm:items-center sm:justify-between">
         <div className="max-w-xl">
           <Badge>
