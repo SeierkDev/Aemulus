@@ -28,7 +28,7 @@ export function BulkRunPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Memoize keys on `fields` — otherwise a fresh array every render makes the
+  // Memoize keys on `fields` - otherwise a fresh array every render makes the
   // `parsed` memo re-run csvToRows on every render regardless of `csv`.
   const keys = useMemo(() => fields.map((f) => f.key), [fields]);
   const parsed = useMemo(

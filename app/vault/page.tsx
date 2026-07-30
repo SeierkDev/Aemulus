@@ -24,7 +24,7 @@ export default async function VaultPage() {
         <div className="mt-6">
           <WalletGate
             signedIn={!!session}
-            hint="Connect your wallet to manage your vault — credentials are encrypted and private to your wallet."
+            hint="Connect your wallet to manage your vault - credentials are encrypted and private to your wallet."
           >
             <VaultManager initial={credentials} />
           </WalletGate>

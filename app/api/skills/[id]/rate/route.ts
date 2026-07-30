@@ -32,7 +32,7 @@ export async function POST(
     return NextResponse.json({ error: "Skill not found" }, { status: 404 });
   }
   // A creator can't rate their own skill (they can always run it, so hasRunSkill
-  // wouldn't stop them) — otherwise avgStars is self-gameable. Matches the
+  // wouldn't stop them) - otherwise avgStars is self-gameable. Matches the
   // self-report guard on the report route.
   if (skill.owner === session.pubkey) {
     return NextResponse.json({ error: "You can't rate your own skill." }, { status: 403 });

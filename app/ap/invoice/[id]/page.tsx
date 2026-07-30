@@ -67,7 +67,7 @@ export default async function ApInvoicePage({
     );
   }
 
-  // Already decided — a small sealed summary rather than a dead end.
+  // Already decided - a small sealed summary rather than a dead end.
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-6 pt-8">
       <Link href="/ap/queue" className="text-sm text-ink-3 hover:text-ink">← Review queue</Link>
@@ -75,16 +75,16 @@ export default async function ApInvoicePage({
         <div className="flex items-baseline justify-between">
           <h1 className="text-xl font-semibold tracking-tight">{state.vendor ?? "Invoice"}</h1>
           <span className="tabular-nums text-lg font-semibold text-ink">
-            {state.amount == null ? "—" : `$${state.amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            {state.amount == null ? "-" : `$${state.amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
           </span>
         </div>
         {state.status === "submitted" ? (
           <p className="mt-2 text-sm text-ink-2">
             Entered <span className="mono text-ink">{state.billNumber}</span> in{" "}
-            {state.enterTarget === "quickbooks" ? "QuickBooks" : "your ledger"} — sealed to the audit log.
+            {state.enterTarget === "quickbooks" ? "QuickBooks" : "your ledger"} - sealed to the audit log.
           </p>
         ) : (
-          <p className="mt-2 text-sm text-ink-2">Rejected — sealed to the audit log.</p>
+          <p className="mt-2 text-sm text-ink-2">Rejected - sealed to the audit log.</p>
         )}
       </div>
       <div className="py-10" />

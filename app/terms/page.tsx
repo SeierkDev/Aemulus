@@ -3,7 +3,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
-  title: "Aemulus — Terms of Service",
+  title: "Aemulus - Terms of Service",
   description: "The terms that govern your use of Aemulus.",
 };
 
@@ -62,7 +62,7 @@ export default function TermsPage() {
         <Section title="5. Your data and content">
           <p>
             You retain ownership of the invoices and data you submit. You grant us the limited rights needed to operate
-            the Service — including transmitting invoice images to our extraction provider to read their fields, and
+            the Service - including transmitting invoice images to our extraction provider to read their fields, and
             recording sealed audit events. The audit log is append-only by design; entries are not edited in place. See
             our <a href="/privacy" className="text-ink underline decoration-border-strong underline-offset-2 hover:opacity-80">Privacy Policy</a>.
           </p>
@@ -70,7 +70,7 @@ export default function TermsPage() {
 
         <Section title="6. Third-party services">
           <p>
-            The Service integrates with third parties you choose to use — including your accounting software (e.g.
+            The Service integrates with third parties you choose to use - including your accounting software (e.g.
             QuickBooks Online), the Solana network and RPC providers, and an AI model provider for invoice extraction.
             Your use of those services is governed by their own terms, and we are not responsible for them.
           </p>

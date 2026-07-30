@@ -55,7 +55,7 @@ export async function POST(
     return NextResponse.json({ ok: false, decision: decision.decision, banner: decision.banner, trace }, { status: 400 });
   }
 
-  // 2) Sealed override event (REAL) — enforces reason + evidence-viewed.
+  // 2) Sealed override event (REAL) - enforces reason + evidence-viewed.
   const evidence = evidenceViewed.map(
     (a) => ({ artifact: a as EvidenceView["artifact"], at: now }) as EvidenceView,
   );

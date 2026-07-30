@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   // Unauthenticated: rate-limit and cap the body BEFORE buffering it. The per-IP
   // key uses X-Forwarded-For (spoofable to spread across buckets), so also enforce
   // a fixed global cap that no header trick can bypass.
-  const globalLimited = enforceRateLimit("disclose-verify:global", 600, 60_000, "Service busy — try again shortly.");
+  const globalLimited = enforceRateLimit("disclose-verify:global", 600, 60_000, "Service busy - try again shortly.");
   if (globalLimited) return globalLimited;
   const limited = enforceRateLimit(`disclose-verify:${clientIp(req)}`, 30, 60_000, "Too many requests");
   if (limited) return limited;

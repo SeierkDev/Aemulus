@@ -28,7 +28,7 @@ export async function POST(
       return NextResponse.json({ error: "Run not found" }, { status: 404 });
     }
     if (TERMINAL.has(run.status)) {
-      // Already settled (e.g. a duplicate finish) — idempotent success.
+      // Already settled (e.g. a duplicate finish) - idempotent success.
       return NextResponse.json({ ok: true, status: run.status, receiptHash: run.receiptHash });
     }
 

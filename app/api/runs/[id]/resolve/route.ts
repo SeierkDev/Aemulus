@@ -76,7 +76,7 @@ export async function POST(
       input: original.input,
       overrides,
       runner: session.pubkey,
-      // Atomic reserve, matching the main run route — the soft getQuota above races.
+      // Atomic reserve, matching the main run route - the soft getQuota above races.
       quota: quotaReserve(session),
     });
     return NextResponse.json({ run });

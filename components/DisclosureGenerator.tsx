@@ -61,7 +61,7 @@ export function DisclosureGenerator({
     <Card className="p-5">
       <Label>Selective disclosure</Label>
       <p className="mt-1.5 text-sm text-ink-2">
-        Prove one field of this run to anyone — an output or input — without
+        Prove one field of this run to anyone - an output or input - without
         revealing the rest. The proof checks against this run&apos;s anchored
         commitment root.
       </p>

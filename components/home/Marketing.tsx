@@ -35,7 +35,7 @@ export function Marketing() {
       </section>
       </Reveal>
 
-      {/* Verifiable receipts — the differentiator */}
+      {/* Verifiable receipts - the differentiator */}
       <Reveal>
       <section className="border-t border-border py-20">
         <div className="text-center">
@@ -43,7 +43,7 @@ export function Marketing() {
             Every run leaves a proof
           </h2>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-ink-2">
-            Not a log you have to trust — a tamper-evident receipt anyone can
+            Not a log you have to trust - a tamper-evident receipt anyone can
             check, on their own.
           </p>
         </div>
@@ -64,7 +64,7 @@ export function Marketing() {
               Anchored on Solana
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-ink-2">
-              Receipts are Merkle-batched and the root is anchored on-chain —
+              Receipts are Merkle-batched and the root is anchored on-chain -
               independently confirmable, scalable to millions of runs.
             </p>
           </Card>

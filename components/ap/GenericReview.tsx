@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 
 const APPROVE_REASONS = [
   { code: "LEGITIMATE", label: "Legitimate charge" },
-  { code: "REVIEWED_CORRECT", label: "Reviewed — correct" },
+  { code: "REVIEWED_CORRECT", label: "Reviewed - correct" },
   { code: "APPROVED_FOR_PAYMENT", label: "Approved for payment" },
 ];
 const REJECT_REASONS = [
@@ -19,7 +19,7 @@ const REJECT_REASONS = [
 const select = "rounded-md border border-border bg-bg px-3 py-2 text-sm text-ink focus:border-border-strong focus:outline-none";
 
 function money(n: number | null, c: string | null): string {
-  if (n == null) return "—";
+  if (n == null) return "-";
   return `${c && c !== "USD" ? c + " " : "$"}${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
@@ -83,7 +83,7 @@ export function GenericReview({
         <p className="mt-2 flex items-center gap-1.5 text-sm text-ink-2">
           <span aria-hidden>⚑</span> {reasonLabel}
         </p>
-        <p className="mt-1 text-xs text-ink-3">Aemulus held this for you — it won’t enter it without your decision.</p>
+        <p className="mt-1 text-xs text-ink-3">Aemulus held this for you - it won’t enter it without your decision.</p>
       </div>
 
       {done ? (
@@ -91,11 +91,11 @@ export function GenericReview({
           {done.status === "submitted" ? (
             <p className="text-sm text-ink-2">
               Entered <span className="mono text-ink">{done.billNumber}</span> in{" "}
-              {done.target === "quickbooks" ? "QuickBooks" : "your ledger"} —{" "}
+              {done.target === "quickbooks" ? "QuickBooks" : "your ledger"} -{" "}
               {done.verify.valid ? "sealed and verified ✓" : "seal check failed"}.
             </p>
           ) : (
-            <p className="text-sm text-ink-2">Rejected — sealed to the audit log. It’s out of your queue.</p>
+            <p className="text-sm text-ink-2">Rejected - sealed to the audit log. It’s out of your queue.</p>
           )}
           <Link href="/ap/queue" className="mt-3 inline-block text-sm text-ink underline decoration-border-strong underline-offset-2 hover:opacity-80">
             Back to the queue
@@ -113,7 +113,7 @@ export function GenericReview({
               onClick={() => decide("approve", approveReason)}
               className="rounded-md bg-ink px-5 py-2.5 text-sm font-semibold text-bg hover:opacity-90 disabled:opacity-30"
             >
-              It’s legitimate — enter it →
+              It’s legitimate - enter it →
             </button>
           </div>
           <p className="text-xs text-ink-3">

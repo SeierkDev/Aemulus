@@ -153,7 +153,7 @@ export function ApReview({
             </div>
 
             <p className="mt-4 text-sm text-ink-2">
-              Vendor and amount match, but the <span className="text-ink">invoice number and date differ</span> — this looks like a separate charge, not a re-entry of Bill {fixture.duplicateOf.billNumber}.
+              Vendor and amount match, but the <span className="text-ink">invoice number and date differ</span> - this looks like a separate charge, not a re-entry of Bill {fixture.duplicateOf.billNumber}.
             </p>
           </Card>
 
@@ -218,7 +218,7 @@ export function ApReview({
             <div className="flex flex-wrap items-center gap-3">
               <button type="button" disabled={!canEnter} onClick={() => setModalOpen(true)}
                 className="rounded-md bg-ink px-5 py-2.5 text-sm font-semibold text-bg hover:opacity-90 disabled:opacity-30">
-                It’s a new charge — enter it →
+                It’s a new charge - enter it →
               </button>
               <button type="button" onClick={() => setPhase("rejected")}
                 className="text-sm text-ink-3 underline decoration-border-strong underline-offset-2 hover:text-ink">
@@ -243,7 +243,7 @@ export function ApReview({
         </Card>
       )}
 
-      {/* PROOF — the sealed record */}
+      {/* PROOF - the sealed record */}
       {phase === "done" && (
         <div className="mt-8 overflow-hidden rounded-xl border border-ink-3 bg-surface">
           <div className="border-b border-border bg-surface-2 px-6 py-4">
@@ -254,15 +254,15 @@ export function ApReview({
           </div>
           <div className="px-6 py-5">
             <p className="text-sm text-ink-2">
-              Bill <span className="mono text-ink">{bill}</span> · <span className="tabular-nums text-ink">{money(fixture.amount)}</span> · {fixture.vendor} — entered in {target === "quickbooks" ? "QuickBooks" : "your ledger"} and sealed to the audit log.
+              Bill <span className="mono text-ink">{bill}</span> · <span className="tabular-nums text-ink">{money(fixture.amount)}</span> · {fixture.vendor} - entered in {target === "quickbooks" ? "QuickBooks" : "your ledger"} and sealed to the audit log.
             </p>
 
             <div className="mt-4 rounded-lg border border-border p-4 text-sm">
               <p className="text-ink-2">
-                You cleared the duplicate flag — reason <span className="text-ink">{reasonLabel || "Legitimate re-bill"}</span>. Evidence reviewed: comparison, replay.
+                You cleared the duplicate flag - reason <span className="text-ink">{reasonLabel || "Legitimate re-bill"}</span>. Evidence reviewed: comparison, replay.
               </p>
               <p className="mt-2 text-ink-2">
-                {verify ? `Verified — ${verify.length} sealed events replay intact.` : "Sealed & verifiable."}
+                {verify ? `Verified - ${verify.length} sealed events replay intact.` : "Sealed & verifiable."}
                 {seal && <> · <span className="mono text-ink">aem_{seal.slice(0, 12)}</span></>}
               </p>
             </div>
@@ -279,8 +279,8 @@ export function ApReview({
 
             {auditOpen && (
               <ol className="mt-4 grid gap-2 rounded-lg border border-border p-4 text-sm">
-                <AuditRow n={1} t="Held for review — possible duplicate of Bill #1043" />
-                <AuditRow n={2} t={`Duplicate flag cleared by ${reviewer} — ${reasonLabel || "Legitimate re-bill"}`} />
+                <AuditRow n={1} t="Held for review - possible duplicate of Bill #1043" />
+                <AuditRow n={2} t={`Duplicate flag cleared by ${reviewer} - ${reasonLabel || "Legitimate re-bill"}`} />
                 <AuditRow n={3} t={`Entered in QuickBooks as ${bill}`} />
                 <div className="border-t border-border pt-2 text-xs text-ink-3">Every step above is sealed; the record verifies as intact.</div>
               </ol>

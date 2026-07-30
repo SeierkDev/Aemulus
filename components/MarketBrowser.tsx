@@ -64,7 +64,7 @@ export function MarketBrowser({
   }, [items]);
 
   // Effective category falls back to "All" when the selected one isn't in the
-  // current (search) results — so a stale pill can't hide valid matches.
+  // current (search) results - so a stale pill can't hide valid matches.
   const activeCat = categories.includes(cat) ? cat : "All";
 
   const filtered = useMemo(

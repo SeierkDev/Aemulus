@@ -27,7 +27,7 @@ export default async function ApActivityPage() {
   ]);
   // A ledger bill only exists because an invoice.submitted event was sealed, so its
   // backing chain must be NON-EMPTY. `length === 0` means the events were erased
-  // (verifyAggregate treats a truly-empty aggregate as vacuously valid) — that's a
+  // (verifyAggregate treats a truly-empty aggregate as vacuously valid) - that's a
   // tampered/orphaned bill, not a verified one, so require valid AND non-empty.
   const verified = await Promise.all(
     bills.map((b) => verifyAggregate("invoice", b.invoiceId, ws).then((v) => v.valid && v.length > 0)),
@@ -41,7 +41,7 @@ export default async function ApActivityPage() {
           <Link href="/ap/queue" className="mt-1 text-sm text-ink hover:underline">← Review queue</Link>
         </div>
         <p className="mt-1 text-sm text-ink-3">
-          Every invoice Aemulus has entered — each one sealed and independently verifiable.
+          Every invoice Aemulus has entered - each one sealed and independently verifiable.
         </p>
       </header>
 
@@ -79,7 +79,7 @@ export default async function ApActivityPage() {
       </div>
 
       <p className="mt-4 text-xs text-ink-3">
-        Each row is a real, tamper-evident record — the seal is recomputed live and confirmed on load.
+        Each row is a real, tamper-evident record - the seal is recomputed live and confirmed on load.
       </p>
       <div className="py-10" />
     </div>

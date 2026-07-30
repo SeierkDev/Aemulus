@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     // Some wallet adapters expose the account before signMessage is wired up
     // (or don't support it at all). Bail quietly instead of throwing a raw
-    // "signMessage is not a function" — the button stays available to retry.
+    // "signMessage is not a function" - the button stays available to retry.
     if (!publicKey || typeof signMessage !== "function") return;
     setSigningIn(true);
     try {

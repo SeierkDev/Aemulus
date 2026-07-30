@@ -15,7 +15,7 @@ function fmtAge(ms: number): string {
   return `${h}h ${m % 60}m`;
 }
 function money(n: number | null): string {
-  if (n == null) return "—";
+  if (n == null) return "-";
   return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 function reasonLabel(code: string | null): string {
@@ -98,7 +98,7 @@ export default async function ApQueuePage() {
         <IntakeUpload />
       </div>
 
-      {/* Guided walkthrough controls — deliberately quiet, out of the primary flow. */}
+      {/* Guided walkthrough controls - deliberately quiet, out of the primary flow. */}
       <div className="mt-auto flex items-center gap-3 py-8 text-xs text-ink-3">
         <span>Walkthrough</span>
         <span>·</span>

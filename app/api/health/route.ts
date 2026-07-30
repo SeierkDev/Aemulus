@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  * Liveness/readiness probe. The PUBLIC body is minimal (ok/db/uptime) so a load
  * balancer can poll it without exposing internal state. The detailed telemetry
  * (throughput/error counters, queue depth, whether gating is on) is recon-useful
- * — an anonymous caller learning gating is off could time an attack — so it's
+ * - an anonymous caller learning gating is off could time an attack - so it's
  * returned ONLY to an ops caller presenting AEMULUS_METRICS_TOKEN. Returns 503 if
  * the database isn't reachable.
  */

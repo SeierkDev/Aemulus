@@ -26,7 +26,7 @@ export function IntakeUpload() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.type && !ALLOWED_TYPES.includes(file.type)) {
-      setError("Unsupported file type — upload a PDF, PNG, or JPEG.");
+      setError("Unsupported file type - upload a PDF, PNG, or JPEG.");
       if (fileRef.current) fileRef.current.value = "";
       return;
     }
@@ -114,7 +114,7 @@ export function IntakeUpload() {
         <div className="mt-3">
           <p className="text-sm text-ink-2">
             Entered <span className="mono text-ink">{done.billNumber}</span> in{" "}
-            {done.target === "quickbooks" ? "QuickBooks" : "your ledger"} — sealed{" "}
+            {done.target === "quickbooks" ? "QuickBooks" : "your ledger"} - sealed{" "}
             {done.verify.valid ? "and verified ✓" : "(verify failed)"}.
           </p>
           <button type="button" onClick={reset} className="mt-3 text-sm text-ink underline decoration-border-strong underline-offset-2 hover:opacity-80">
@@ -125,7 +125,7 @@ export function IntakeUpload() {
         <div className="mt-3">
           <p className="text-xs text-ink-3">
             Read from <span className="text-ink-2">{fileName}</span>. Check the details, then enter it.
-            {lowConfidence && <span className="text-ink"> Low confidence — double-check the fields.</span>}
+            {lowConfidence && <span className="text-ink"> Low confidence - double-check the fields.</span>}
           </p>
           <div className="mt-3 grid grid-cols-2 gap-3">
             <label className="col-span-2 text-xs text-ink-3">

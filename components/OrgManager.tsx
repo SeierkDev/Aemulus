@@ -36,7 +36,7 @@ export function OrgManager({ initial, me }: { initial: Org[]; me: string }) {
       });
       const d = await r.json();
       if (r.ok) {
-        // The creator is added as an admin server-side (createOrg) — reflect it.
+        // The creator is added as an admin server-side (createOrg) - reflect it.
         setOrgs((o) => [
           { ...d.org, members: [{ wallet: me, role: "admin" }] },
           ...o,

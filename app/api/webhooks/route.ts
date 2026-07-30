@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     if (err instanceof WebhookLimitError) {
       return NextResponse.json({ error: err.message }, { status: 400 });
     }
-    // assertSafeUrl throws on unsafe/private/unreachable URLs — return a GENERIC
+    // assertSafeUrl throws on unsafe/private/unreachable URLs - return a GENERIC
     // message so this endpoint isn't a DNS oracle (distinct "private address" vs
     // "could not resolve" errors would leak whether an internal host exists).
     logError("api/webhooks", err);

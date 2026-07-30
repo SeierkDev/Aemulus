@@ -61,7 +61,7 @@ export function SkillEditor({
   const [saveError, setSaveError] = useState(false);
 
   // Stable client-side keys for the editable lists so React reconciles by
-  // identity, not array index — otherwise removing/reordering a field or step
+  // identity, not array index - otherwise removing/reordering a field or step
   // bleeds focus, cursor, and <select> state into the adjacent row.
   const seq = useRef(0); // only incremented in add handlers (never read in render)
   const [fieldKeys, setFieldKeys] = useState<string[]>(() =>
@@ -80,7 +80,7 @@ export function SkillEditor({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orgId: next || null }),
       });
-      if (!r.ok) setOrgId(prev); // server rejected — don't lie about the state
+      if (!r.ok) setOrgId(prev); // server rejected - don't lie about the state
     } catch {
       setOrgId(prev);
     }
@@ -169,7 +169,7 @@ export function SkillEditor({
           {saved && <span className="text-xs text-ink-3">Saved</span>}
           {saveError && (
             <span className="text-xs text-ink" role="alert">
-              Save failed — try again
+              Save failed - try again
             </span>
           )}
           <Button variant="primary" onClick={save} disabled={busy}>
@@ -290,7 +290,7 @@ export function SkillEditor({
           />
         </div>
 
-        {/* Trigger URLs (event-driven runs) — owner only */}
+        {/* Trigger URLs (event-driven runs) - owner only */}
         {isOwner && (
           <div className="mt-6">
             <TriggerPanel skillId={initial.id} initial={triggers} />
@@ -423,7 +423,7 @@ export function SkillEditor({
                     aria-label={`Step ${i + 1} sub-skill`}
                     onChange={(e) => patchStep(i, { subSkillId: e.target.value })}
                   >
-                    <option value="">— pick a skill —</option>
+                    <option value="">- pick a skill -</option>
                     {otherSkills.map((o) => (
                       <option key={o.id} value={o.id}>
                         {o.name}

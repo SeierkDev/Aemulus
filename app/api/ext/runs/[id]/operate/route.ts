@@ -11,7 +11,7 @@ export const maxDuration = 60;
 
 // Vision fallback for extension runs: when a recorded selector no longer matches
 // in the user's browser, the extension sends the page's candidate elements + a
-// screenshot here; the operator (Claude, server-side — the key never leaves the
+// screenshot here; the operator (Claude, server-side - the key never leaves the
 // server) picks the element and returns a selector + confidence. The extension
 // retries the step with it.
 export async function POST(
@@ -83,7 +83,7 @@ export async function POST(
         tokensOut: decision.tokensOut,
       });
     } catch (e) {
-      // No API key configured, or the model errored — no rescue available.
+      // No API key configured, or the model errored - no rescue available.
       logError("api/ext/runs/operate", e);
       return NextResponse.json({ selector: "", confidence: 0, tokensIn: 0, tokensOut: 0 });
     }

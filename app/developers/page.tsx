@@ -186,7 +186,7 @@ console.log(v.batch?.proofValid);  // true`}
         <div className="mt-6">
           <WalletGate
             signedIn={!!session}
-            hint="Connect your wallet to create an API key. Keys belong to your wallet — only you can ever see them, and they're hidden the moment you sign out."
+            hint="Connect your wallet to create an API key. Keys belong to your wallet - only you can ever see them, and they're hidden the moment you sign out."
           >
             <ApiKeysManager initial={keys} />
           </WalletGate>
@@ -226,7 +226,7 @@ const ok = timingSafeEqual(Buffer.from(sig), Buffer.from(mac));
         <div className="mt-6">
           <WalletGate
             signedIn={!!session}
-            hint="Connect your wallet to register webhooks — they belong to your wallet."
+            hint="Connect your wallet to register webhooks - they belong to your wallet."
           >
             <WebhooksManager initial={webhooks} />
           </WalletGate>

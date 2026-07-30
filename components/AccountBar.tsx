@@ -9,8 +9,8 @@ import { short } from "@/lib/format";
 
 /**
  * Self-contained account control for wallet-scoped pages (earnings, skills,
- * runs). Connecting and signing in happen as one flow — picking a wallet in the
- * modal auto-triggers the SIWS sign-in — and once signed in it shows the wallet
+ * runs). Connecting and signing in happen as one flow - picking a wallet in the
+ * modal auto-triggers the SIWS sign-in - and once signed in it shows the wallet
  * identity + Sign out right here on the page. The nav stays clean; there is no
  * global wallet button.
  */

@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 // The Aemulus browser extension records a task in the user's OWN browser (so
 // it's already logged in and looks like a real user) and posts the captured
 // trace here. We authenticate with the user's API key and turn the trace into a
-// demonstration — identical to a server-side recording — which the site then
+// demonstration - identical to a server-side recording - which the site then
 // generalizes into a skill via the existing pipeline.
 
 const ACTION_TYPES = new Set<ActionType>([
@@ -60,7 +60,7 @@ export async function POST(req: Request) {
           role: str(a.role, 40),
           name: str(a.name, 200),
           text: str(a.text, 200),
-          // Never persist a secret's value — record it empty + flagged so the
+          // Never persist a secret's value - record it empty + flagged so the
           // generalizer treats it as a required per-run input (same as server capture).
           value: sensitive ? "" : str(a.value, 2000),
           sensitive,

@@ -16,7 +16,7 @@ const input =
   "w-full rounded-[var(--radius-base)] border border-border-strong bg-surface-2 px-3 py-2 text-sm outline-none placeholder:text-ink-3 focus:border-ink-3";
 
 // Sites we've CONFIRMED aggressively block automation (captcha walls). We don't
-// stop the user — just warn them so they don't waste a recording on a site that
+// stop the user - just warn them so they don't waste a recording on a site that
 // will loop a captcha no matter what. Only list sites we've actually verified;
 // don't pre-judge untested ones (they may work fine).
 const HARD_SITES: { re: RegExp; name: string }[] = [
@@ -263,7 +263,7 @@ export default function RecordPage() {
                   <div className="mt-1 rounded-[var(--radius-base)] border border-border-strong bg-surface-2 p-3 text-xs leading-relaxed text-ink-2">
                     <span className="text-ink">⚠ {hardSiteName(startUrl)} blocks
                     automated browsers.</span>{" "}
-                    You&apos;ll likely hit a captcha that can&apos;t be passed —
+                    You&apos;ll likely hit a captcha that can&apos;t be passed -
                     even by hand. Try a different public site, or record with the
                     browser extension (it runs in your own browser). You can still
                     try here, but expect a block.

@@ -14,7 +14,7 @@ interface Result {
 
 /**
  * Public: paste a selective-disclosure bundle and verify it. Proves a single
- * field's value against a run's committed (on-chain anchored) root — without
+ * field's value against a run's committed (on-chain anchored) root - without
  * exposing any other field. No sign-in, no private data.
  */
 export function DisclosureVerifier({ initial = "" }: { initial?: string }) {
@@ -62,7 +62,7 @@ export function DisclosureVerifier({ initial = "" }: { initial?: string }) {
       <Label>Verify a disclosure</Label>
       <p className="mt-1.5 text-sm text-ink-2">
         Paste a disclosure bundle to check it against the run&apos;s committed
-        root. It proves one field — nothing else is revealed.
+        root. It proves one field - nothing else is revealed.
       </p>
       <textarea
         value={text}
@@ -91,7 +91,7 @@ export function DisclosureVerifier({ initial = "" }: { initial?: string }) {
               <p className="mt-1.5 text-sm text-ink-2">
                 The field below is provably part of run{" "}
                 <span className="mono text-ink">{result.runId}</span>&apos;s committed
-                (on-chain anchored) root — and nothing else about the run is revealed.
+                (on-chain anchored) root - and nothing else about the run is revealed.
               </p>
               <div className="mt-3 grid gap-1.5 text-sm">
                 <div className="flex items-baseline gap-2">
@@ -114,7 +114,7 @@ export function DisclosureVerifier({ initial = "" }: { initial?: string }) {
             </>
           ) : (
             <div className="text-sm font-semibold text-ink">
-              ✗ This proof does not verify — its root doesn&apos;t match the run&apos;s
+              ✗ This proof does not verify - its root doesn&apos;t match the run&apos;s
               committed root, or the field isn&apos;t part of it.
             </div>
           )}

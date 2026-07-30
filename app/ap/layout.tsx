@@ -3,7 +3,7 @@ import { loadConnection } from "@/lib/qbo/oauth";
 import { getApViewer } from "@/lib/ap-controls/ap-viewer";
 import { LogoutButton } from "@/components/ap/LogoutButton";
 
-// A quiet control-surface header — no token banner, no global nav. Flat
+// A quiet control-surface header - no token banner, no global nav. Flat
 // background (bg-bg) paints over the site's dotted grid so this reads as a
 // ledger environment, not a design canvas.
 export default async function ApLayout({ children }: { children: React.ReactNode }) {

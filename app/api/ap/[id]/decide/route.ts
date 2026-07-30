@@ -18,7 +18,7 @@ export async function POST(
   const viewer = await getApViewer().catch(() => null);
   if (!viewer) return NextResponse.json({ ok: false, error: "Sign in first." }, { status: 401 });
   if (id === DEMO_INVOICE_ID) return NextResponse.json({ ok: false, error: "Use the walkthrough for this invoice." }, { status: 404 });
-  // Throttle per workspace, matching the intake/enter sibling — approving enters an
+  // Throttle per workspace, matching the intake/enter sibling - approving enters an
   // invoice (a seal + quota reservation), so an unmetered burst shouldn't hammer it.
   const limited = enforceRateLimit(`ap-decide:${viewer.workspaceId}`, 30, 60_000, "Too many decisions");
   if (limited) return limited;
@@ -30,7 +30,7 @@ export async function POST(
   const now = Date.now();
   const ent = await viewerEntitlement(viewer, now);
 
-  // Approving enters the invoice, so it consumes a quota slot — reserve it
+  // Approving enters the invoice, so it consumes a quota slot - reserve it
   // atomically (a reject never enters, so it needs no slot). canEnter reflects the
   // reservation; the slot is released below if the entry didn't actually happen.
   const capped = ent.enforced && ent.limit !== null;
@@ -61,7 +61,7 @@ export async function POST(
 
   // Always release the reservation: it's a transient concurrency HOLD, not the usage
   // record. The durable count is the sealed invoice.submitted event (see
-  // reserveApEntry), which the entry just wrote (or didn't) — so releasing after the
+  // reserveApEntry), which the entry just wrote (or didn't) - so releasing after the
   // decision, sealed or not, is correct and makes a double-clicked / idempotent approve
   // naturally count once (one event, one slot).
   if (reservation) await releaseApEntry(reservation);

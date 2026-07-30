@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     );
   }
   // Total-rows cap: paused schedules are kept (re-activatable), so cap active+paused
-  // too — otherwise a create→pause loop grows rows unbounded. Delete some to free room.
+  // too - otherwise a create→pause loop grows rows unbounded. Delete some to free room.
   if ((await countAllSchedules(session.pubkey)) >= MAX_TOTAL_SCHEDULES) {
     return NextResponse.json(
       { error: `Total schedule limit reached (max ${MAX_TOTAL_SCHEDULES}); delete some to add more.` },

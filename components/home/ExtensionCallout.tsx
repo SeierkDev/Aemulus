@@ -19,7 +19,7 @@ export function ExtensionCallout({ storeUrl }: { storeUrl?: string }) {
             Run skills on the tools you log into
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-ink-2">
-            Automations run right in your own browser — already signed in, on your
+            Automations run right in your own browser - already signed in, on your
             own connection, so there&apos;s no login to redo and no bot walls. Add
             the extension to run skills on your CRM, spreadsheets, dashboards, and
             anything else behind a login. Public-site skills run without it.

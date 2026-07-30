@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // The extension popup lists the skills you can run in your own browser, with the
-// inputs each one needs. Scoped to skills you OWN — a marketplace skill's plan
+// inputs each one needs. Scoped to skills you OWN - a marketplace skill's plan
 // isn't handed to a third party's extension (that stays a cloud run).
 export async function GET(req: Request) {
   const auth = await apiKeyAuth(req);

@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Start a run the EXTENSION will execute in the user's own browser. Same gates as
-// a cloud run (moderation, access tier, daily quota) — but instead of enqueueing
+// a cloud run (moderation, access tier, daily quota) - but instead of enqueueing
 // the Playwright job, we create the run row and hand the plan back to the
 // extension, which does the clicking and reports the result to /finish.
 export async function POST(req: Request) {
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     }
 
     const skill = await getSkill(skillId);
-    // Runnable if you own it, an org-mate shared it, or it's published — same
+    // Runnable if you own it, an org-mate shared it, or it's published - same
     // access rule as a cloud run. The plan is handed to the extension so it can
     // execute in the user's browser (published skills are meant to be run/copied).
     if (!skill || !(await skillAccess(skill, owner)).run) {

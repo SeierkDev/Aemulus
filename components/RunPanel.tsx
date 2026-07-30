@@ -46,7 +46,7 @@ export function RunPanel({
   }, [ready]);
 
   // Detect the Aemulus browser extension (it marks the DOM). If present, offer
-  // to run in your own browser — already logged in, no bot walls.
+  // to run in your own browser - already logged in, no bot walls.
   useEffect(() => {
     const check = () =>
       setExtPresent(!!document.documentElement.getAttribute("data-aemulus-extension"));

@@ -25,7 +25,7 @@ export function WalletGate({
       <div className="flex flex-col items-start gap-3 rounded-[var(--radius-base)] border border-border bg-surface p-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-ink-2">
           {signedIn
-            ? "Signed in — private to your wallet. Only you can see this; sign out to hide it."
+            ? "Signed in - private to your wallet. Only you can see this; sign out to hide it."
             : hint}
         </p>
         <AccountBar />

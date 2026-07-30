@@ -24,8 +24,8 @@ export function LiveTakeover({ runId }: { runId: string }) {
         const d = await r.json();
         // Re-check after the await: if the effect was torn down (e.g. the reviewer
         // navigated to a different paused run and React reused this instance), an
-        // in-flight fetch for the OLD runId must not paint that run's frame — and
-        // route the reviewer's clicks/keystrokes — into the new run's takeover.
+        // in-flight fetch for the OLD runId must not paint that run's frame - and
+        // route the reviewer's clicks/keystrokes - into the new run's takeover.
         if (stop) return;
         if (d.data) setFrame(d.data as string);
       } catch {
@@ -92,7 +92,7 @@ export function LiveTakeover({ runId }: { runId: string }) {
       <div
         className="mt-3 aspect-[16/10] w-full overflow-hidden rounded-[var(--radius-base)] border border-border bg-surface-2"
         role="application"
-        aria-label="Live run view — click and type to control the page"
+        aria-label="Live run view - click and type to control the page"
         tabIndex={0}
         onClick={(e) => {
           const { x, y } = toView(e);

@@ -17,7 +17,7 @@ export async function POST() {
   await ensureApEventsSchema();
   // Delete the sealed events AND the keyed head anchor AND any ledger bill for this
   // invoice. Dropping only the events would leave the head anchor pinned at the old
-  // seq_count (the head upsert only ever advances, never shrinks — store.ts), so the
+  // seq_count (the head upsert only ever advances, never shrinks - store.ts), so the
   // re-seeded stream would fail verifyAggregate as "truncated_tail"/"missing_head"
   // and the replayed demo would falsely report itself tampered. The stale ledger row
   // would likewise resurrect the old bill number on re-entry (INSERT OR IGNORE).

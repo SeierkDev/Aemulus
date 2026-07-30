@@ -32,7 +32,7 @@ export async function POST(req: Request) {
 
   // Normalize the (client-editable) fields at the seal boundary exactly like the
   // extraction path does: round the amount to 2dp, validate the date, and coerce
-  // the currency to a 3-letter code — so a client can't seal an unrounded amount
+  // the currency to a 3-letter code - so a client can't seal an unrounded amount
   // or a bogus currency like "dollars".
   const norm = normalizeExtracted({
     vendor: body.vendor as string,
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Amount must be a positive number." }, { status: 400 });
   }
   if (norm.amount > MAX_ENTER_AMOUNT) {
-    return NextResponse.json({ ok: false, error: "Amount is implausibly large — check the invoice." }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "Amount is implausibly large - check the invoice." }, { status: 400 });
   }
 
   const fields = {
@@ -72,7 +72,7 @@ export async function POST(req: Request) {
   try {
     r = await intakeEnter(fields, "upload", now, viewerActor(viewer), viewer.workspaceId);
   } finally {
-    // Always release the transient hold — the sealed invoice.submitted event is the
+    // Always release the transient hold - the sealed invoice.submitted event is the
     // durable usage record now (see reserveApEntry), so the reservation isn't kept to
     // represent the entry; it only guarded the concurrent check-then-act.
     if (reservation) await releaseApEntry(reservation);
