@@ -48,7 +48,7 @@ export const OPENAPI: OpenApiDoc = {
     description:
       "Run browser-automation skills, read their extracted output, and verify their on-chain receipts. Authenticate with an API key (Bearer); receipt verification is public.",
   },
-  servers: [{ url: "https://aemulus.app" }],
+  servers: [{ url: "https://aemulusai.com" }],
   security: [{ ApiKey: [] }],
   components: {
     securitySchemes: {

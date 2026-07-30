@@ -94,7 +94,7 @@ export class Aemulus {
   constructor(opts: AemulusOptions) {
     if (!opts?.apiKey) throw new Error("Aemulus: apiKey is required");
     this.apiKey = opts.apiKey;
-    this.baseUrl = (opts.baseUrl ?? "https://aemulus.app").replace(/\/$/, "");
+    this.baseUrl = (opts.baseUrl ?? "https://aemulusai.com").replace(/\/$/, "");
   }
 
   private async call<T>(

@@ -8,5 +8,5 @@ export function publicBaseUrl(): string {
   if (explicit) return explicit.replace(/\/+$/, "");
   const railway = process.env.RAILWAY_PUBLIC_DOMAIN?.trim();
   if (railway) return `https://${railway}`;
-  return "https://aemulus.app";
+  return "https://aemulusai.com";
 }

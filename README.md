@@ -6,7 +6,7 @@ Record a browser task once - Aemulus learns the intent behind it and runs it aut
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Tests](https://img.shields.io/badge/tests-378%20passing-brightgreen)](#development)
 
-[Website](https://aemulus.app) · [Litepaper](https://aemulus.app/litepaper) · [Developers](https://aemulus.app/developers) · [SDK](#sdk) · [Roadmap](#roadmap)
+[Website](https://aemulusai.com) · [Litepaper](https://aemulusai.com/litepaper) · [Developers](https://aemulusai.com/developers) · [SDK](#sdk) · [Roadmap](#roadmap)
 
 `$AEMU · Solana / pump.fun - pre-launch`
 
@@ -148,7 +148,7 @@ npm run qbo:smoke
 | 4 | Open ecosystem - published SDK, skill forking, portable on-chain reputation | Planned |
 | 5 | Frontier - multi-chain anchoring, on-chain skill registry, desktop/mobile capture | Planned |
 
-Full roadmap at [aemulus.app/roadmap](https://aemulus.app/roadmap).
+Full roadmap at [aemulusai.com/roadmap](https://aemulusai.com/roadmap).
 
 ---
 
@@ -162,7 +162,7 @@ The **code** is AGPL-3.0. The **"Aemulus" name, logo, and the "$AEMU" token are
 reserved** and are *not* licensed for reuse. You may self-host and modify this
 software, but you must **rebrand any public deployment** - you may not present it
 as "Aemulus" or represent any token as the official $AEMU. See [NOTICE](./NOTICE).
-The official project lives only at [aemulus.app](https://aemulus.app) and
+The official project lives only at [aemulusai.com](https://aemulusai.com) and
 [github.com/SeierkDev/Aemulus](https://github.com/SeierkDev/Aemulus).
 
 Built by [SeierkDev](https://github.com/SeierkDev).
