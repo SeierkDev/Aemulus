@@ -1,6 +1,6 @@
-import { Card } from "@/components/ui";
 import { Nav } from "@/components/Nav";
 import { OrgManager } from "@/components/OrgManager";
+import { WalletGate } from "@/components/WalletGate";
 import { getSession } from "@/lib/auth";
 import { listMyOrgs, listMembers } from "@/lib/orgs";
 
@@ -25,13 +25,12 @@ export default async function OrgPage() {
         </p>
 
         <div className="mt-6">
-          {session ? (
-            <OrgManager initial={withMembers} me={session.pubkey} />
-          ) : (
-            <Card className="p-8 text-center text-sm text-ink-2">
-              Connect your wallet to manage teams.
-            </Card>
-          )}
+          <WalletGate
+            signedIn={!!session}
+            hint="Connect your wallet to manage teams."
+          >
+            <OrgManager initial={withMembers} me={session?.pubkey ?? ""} />
+          </WalletGate>
         </div>
       </div>
       <div className="py-10" />

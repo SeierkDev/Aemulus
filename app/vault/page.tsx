@@ -1,6 +1,6 @@
-import { Card } from "@/components/ui";
 import { Nav } from "@/components/Nav";
 import { VaultManager } from "@/components/VaultManager";
+import { WalletGate } from "@/components/WalletGate";
 import { getSession } from "@/lib/auth";
 import { listCredentials } from "@/lib/vault";
 
@@ -22,13 +22,12 @@ export default async function VaultPage() {
         </p>
 
         <div className="mt-6">
-          {session ? (
+          <WalletGate
+            signedIn={!!session}
+            hint="Connect your wallet to manage your vault — credentials are encrypted and private to your wallet."
+          >
             <VaultManager initial={credentials} />
-          ) : (
-            <Card className="p-8 text-center text-sm text-ink-2">
-              Connect your wallet to manage your vault.
-            </Card>
-          )}
+          </WalletGate>
         </div>
       </div>
       <div className="py-10" />

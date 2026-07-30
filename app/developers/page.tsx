@@ -3,7 +3,7 @@ import { Nav } from "@/components/Nav";
 import { SiteFooter } from "@/components/SiteFooter";
 import { ApiKeysManager } from "@/components/ApiKeysManager";
 import { WebhooksManager } from "@/components/WebhooksManager";
-import { AccountBar } from "@/components/AccountBar";
+import { WalletGate } from "@/components/WalletGate";
 import { getSession } from "@/lib/auth";
 import { listApiKeys } from "@/lib/api-keys";
 import { listWebhooks } from "@/lib/webhooks";
@@ -184,14 +184,12 @@ console.log(v.batch?.proofValid);  // true`}
           apply. Send as a Bearer token.
         </p>
         <div className="mt-6">
-          {session ? (
+          <WalletGate
+            signedIn={!!session}
+            hint="Connect your wallet to create an API key. Keys belong to your wallet — only you can ever see them, and they're hidden the moment you sign out."
+          >
             <ApiKeysManager initial={keys} />
-          ) : (
-            <Card className="flex flex-col items-center gap-4 p-8 text-center text-sm text-ink-2">
-              <p>Connect your wallet to create an API key — keys belong to your wallet and only you can see them.</p>
-              <AccountBar />
-            </Card>
-          )}
+          </WalletGate>
         </div>
       </section>
 
@@ -226,14 +224,12 @@ const ok = timingSafeEqual(Buffer.from(sig), Buffer.from(mac));
           />
         </div>
         <div className="mt-6">
-          {session ? (
+          <WalletGate
+            signedIn={!!session}
+            hint="Connect your wallet to register webhooks — they belong to your wallet."
+          >
             <WebhooksManager initial={webhooks} />
-          ) : (
-            <Card className="flex flex-col items-center gap-4 p-8 text-center text-sm text-ink-2">
-              <p>Connect your wallet to register webhooks.</p>
-              <AccountBar />
-            </Card>
-          )}
+          </WalletGate>
         </div>
       </section>
 

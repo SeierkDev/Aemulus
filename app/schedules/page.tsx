@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Badge, Card } from "@/components/ui";
 import { Nav } from "@/components/Nav";
+import { WalletGate } from "@/components/WalletGate";
 import { ScheduleControls } from "@/components/ScheduleControls";
 import { getSession } from "@/lib/auth";
 import { listSchedules, cadenceLabel } from "@/lib/schedules";
@@ -32,18 +33,18 @@ export default async function SchedulesPage() {
           <Badge>{schedules.filter((s) => s.active).length} active</Badge>
         </div>
 
-        <div className="mt-6 grid gap-3">
-          {!session && (
-            <Card className="p-8 text-center text-sm text-ink-2">
-              Connect your wallet to manage schedules.
-            </Card>
-          )}
-          {session && schedules.length === 0 && (
-            <Card className="p-8 text-center text-sm text-ink-2">
-              No schedules yet. Open a skill and choose “Automate on schedule”.
-            </Card>
-          )}
-          {schedules.map((s) => (
+        <div className="mt-6">
+          <WalletGate
+            signedIn={!!session}
+            hint="Connect your wallet to manage schedules."
+          >
+            <div className="grid gap-3">
+              {schedules.length === 0 && (
+                <Card className="p-8 text-center text-sm text-ink-2">
+                  No schedules yet. Open a skill and choose “Automate on schedule”.
+                </Card>
+              )}
+              {schedules.map((s) => (
             <Card key={s.id} className="flex items-center justify-between p-4">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
@@ -81,14 +82,16 @@ export default async function SchedulesPage() {
               </div>
               <ScheduleControls scheduleId={s.id} active={s.active} />
             </Card>
-          ))}
+              ))}
+            </div>
+            {schedules.length > 0 && (
+              <p className="mt-4 text-xs text-ink-3">
+                Scheduled runs use your daily tier quota and pay skill creators
+                like any other run.
+              </p>
+            )}
+          </WalletGate>
         </div>
-        {session && schedules.length > 0 && (
-          <p className="mt-4 text-xs text-ink-3">
-            Scheduled runs use your daily tier quota and pay skill creators like
-            any other run.
-          </p>
-        )}
       </div>
       <div className="py-10" />
     </div>
