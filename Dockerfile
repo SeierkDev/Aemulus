@@ -23,4 +23,7 @@ EXPOSE 3000
 
 # Starts the web server; instrumentation.ts boots the in-process background
 # workers (scheduler, Merkle batcher, reconciler) on the same instance.
-CMD ["npm", "run", "start"]
+# Exec form (not `npm run start`) so `next` is PID 1 and receives SIGTERM
+# directly — Next shuts down cleanly (exit 0) on a stop/redeploy instead of npm
+# swallowing the signal and exiting non-zero, which Railway would read as a crash.
+CMD ["node_modules/.bin/next", "start"]
