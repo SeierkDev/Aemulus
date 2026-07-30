@@ -4,7 +4,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Aemulus — Privacy Policy",
-  description: "What Aemulus collects and how it is used.",
+  description: "What Aemulus and the Aemulus Recorder browser extension collect and how it is used.",
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -22,7 +22,7 @@ export default function PrivacyPage() {
       <Nav />
       <main className="py-10">
         <h1 className="text-3xl font-semibold tracking-tight">Privacy Policy</h1>
-        <p className="mt-2 text-xs text-ink-3">Last updated: July 17, 2026</p>
+        <p className="mt-2 text-xs text-ink-3">Last updated: July 30, 2026</p>
 
         <Section title="Overview">
           <p>
@@ -79,6 +79,30 @@ export default function PrivacyPage() {
             per wallet so accounts cannot read each other’s records. No system is perfectly secure, and you are
             responsible for safeguarding your wallet.
           </p>
+        </Section>
+
+        <Section title="Browser extension (Aemulus Recorder)">
+          <p>
+            The Aemulus Recorder extension records and replays browser tasks <b>in your own browser</b>, on your
+            instruction, and sends results only to <b>your own Aemulus account</b> on the server you configure.
+          </p>
+          <p>• <b>What it accesses.</b> Page content on the tab you are recording or running — element selectors, the
+            field values you type, and a proof screenshot per step — <b>only while you have explicitly started a
+            recording or a run</b>. When idle, it reads nothing. It also stores the Aemulus server URL and API key you
+            enter, locally in the browser (<span className="mono">chrome.storage.local</span>).</p>
+          <p>• <b>What it sends, and to whom.</b> Recorded traces and run results (including proof screenshots) are sent
+            <b> only to the Aemulus server URL you configure</b> — your own deployment. Nothing is sent to the extension
+            author or any third party. When a recorded selector no longer matches, the current page&apos;s candidate
+            elements and a screenshot are sent to your Aemulus server so its vision fallback can pick the element — again,
+            only to your configured server.</p>
+          <p>• <b>What it never captures.</b> Secret fields (passwords, one-time codes, card numbers, API keys, and
+            similar) are detected and <b>never captured or transmitted</b> — they are recorded as empty, flagged inputs so
+            the skill asks for them per run instead.</p>
+          <p>• <b>No analytics, no tracking.</b> The extension contains no analytics, telemetry, ads, or third-party
+            trackers, and makes network requests only to the Aemulus server URL you configure.</p>
+          <p>• <b>Storage &amp; retention.</b> Settings and a transient action buffer live in your browser&apos;s local
+            storage; uninstalling the extension removes them. Recordings and runs are stored on your Aemulus server under
+            your account, governed by that deployment — not by the extension.</p>
         </Section>
 
         <Section title="Changes and contact">
