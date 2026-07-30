@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -36,6 +37,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [signingIn, setSigningIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // SYNCHRONOUS in-flight latch. The `signingIn` state can't guard this: state
+  // updates are async, so two callers in the same tick (the auto-sign-in effect
+  // of two AccountBars on a page, or a click racing that effect) would both pass
+  // a state check, both GET /api/auth/nonce, and the second nonce would overwrite
+  // the first one's cookie - the signature the user actually produced then fails
+  // to verify. A ref flips before any await, so only one sign-in can be in flight.
+  const inFlight = useRef(false);
 
   // Load any existing session on mount (guard against post-unmount setState).
   useEffect(() => {
@@ -51,12 +59,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = useCallback(async () => {
-    if (signingIn) return; // guard against double-submit (e.g. via the usage gate)
-    setError(null);
+    if (inFlight.current) return; // a sign-in is already running
     // Some wallet adapters expose the account before signMessage is wired up
     // (or don't support it at all). Bail quietly instead of throwing a raw
     // "signMessage is not a function" - the button stays available to retry.
     if (!publicKey || typeof signMessage !== "function") return;
+    inFlight.current = true;
+    setError(null);
     setSigningIn(true);
     try {
       const { message } = await (await fetch("/api/auth/nonce")).json();
@@ -81,9 +90,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Sign-in failed");
     } finally {
+      inFlight.current = false;
       setSigningIn(false);
     }
-  }, [publicKey, signMessage, signingIn, router]);
+    // `signingIn` is deliberately NOT a dependency: the ref above does the
+    // guarding, and keeping it out gives signIn a stable identity so the
+    // auto-sign-in effect that depends on it doesn't re-fire mid-flow.
+  }, [publicKey, signMessage, router]);
 
   const signOut = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
