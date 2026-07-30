@@ -27,7 +27,8 @@ const ROADMAP = [
       "Network-isolated micro-VM sandbox per run, so untrusted marketplace skills can't reach anything they shouldn't.",
       "Permanent receipt + screenshot storage on Arweave - proofs that outlive the app.",
       "More run notifications: email and Telegram (signed webhooks are already live today).",
-      "Marketplace search, categories, and curated collections.",
+      "A creator analytics dashboard - runs, success rate, unique users, and cost over time, per skill (per-skill run count, success rate, and ratings already ship today).",
+      "Curated collections and editorial spotlights - full-text search and auto-categories already ship today.",
     ],
   },
   {
@@ -36,7 +37,7 @@ const ROADMAP = [
     body: [
       "Vision-grounded synthesis - the model sees the page, not just the trace.",
       "Full zk-SNARK proofs of execution - today runs already carry private, selective-disclosure receipts (prove any field without revealing the rest); next, prove a whole run followed its skill with zero knowledge.",
-      "Waiting, dependent multi-step pipelines across chained skills.",
+      "Longer, branching multi-step pipelines with waits and conditionals - single-level skill chaining that passes one skill's outputs into another's inputs already ships today.",
     ],
   },
   {
@@ -56,7 +57,7 @@ const ROADMAP = [
       "Multi-chain receipt anchoring.",
       "An on-chain skill registry anyone can build on.",
       "Agents that discover and compose marketplace skills autonomously.",
-      "Capture beyond the browser - desktop and mobile.",
+      "Capture beyond the browser - desktop and mobile (the browser extension, which runs skills in your own logged-in browser, already ships today).",
     ],
   },
 ];
