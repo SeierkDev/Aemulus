@@ -4,7 +4,7 @@ Record a browser task once - Aemulus learns the intent behind it and runs it aut
 
 [![CI](https://github.com/SeierkDev/Aemulus/actions/workflows/ci.yml/badge.svg)](https://github.com/SeierkDev/Aemulus/actions/workflows/ci.yml)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
-[![Tests](https://img.shields.io/badge/tests-368%20passing-brightgreen)](#development)
+[![Tests](https://img.shields.io/badge/tests-378%20passing-brightgreen)](#development)
 
 [Website](https://aemulus.app) · [Litepaper](https://aemulus.app/litepaper) · [Developers](https://aemulus.app/developers) · [SDK](#sdk) · [Roadmap](#roadmap)
 
@@ -87,7 +87,7 @@ sdk/            In-repo TypeScript SDK
 anchor/         Solana program: aemulus-registry (on-chain run anchoring)
 anchor-zk/      Solana program: Light-compressed ZK receipts
 scripts/        rrweb vendor + QuickBooks smoke tooling
-tests/          368 tests across every layer
+tests/          378 tests across every layer
 ```
 
 Key decisions:
@@ -112,7 +112,7 @@ Key decisions:
 | Chain | Solana · Anchor (Rust programs) · Light Protocol (ZK) |
 | AI | Anthropic Claude (extraction · generalize · operator/agent) |
 | Payments | Solana ($AEMU) · Stripe (billing) · QuickBooks (AP) |
-| Testing | Vitest (368 tests) |
+| Testing | Vitest (378 tests) |
 
 ---
 
@@ -121,7 +121,7 @@ Key decisions:
 ```bash
 npm install          # Install dependencies
 npm run dev          # Dev server at localhost:3000
-npm test             # Run all 368 tests
+npm test             # Run all 378 tests
 npm run typecheck    # tsc --noEmit
 npm run lint         # ESLint
 npm run build        # Production build
@@ -155,5 +155,14 @@ Full roadmap at [aemulus.app/roadmap](https://aemulus.app/roadmap).
 ## License
 
 AGPL v3. See [LICENSE](./LICENSE).
+
+## Trademark & naming
+
+The **code** is AGPL-3.0. The **"Aemulus" name, logo, and the "$AEMU" token are
+reserved** and are *not* licensed for reuse. You may self-host and modify this
+software, but you must **rebrand any public deployment** - you may not present it
+as "Aemulus" or represent any token as the official $AEMU. See [NOTICE](./NOTICE).
+The official project lives only at [aemulus.app](https://aemulus.app) and
+[github.com/SeierkDev/Aemulus](https://github.com/SeierkDev/Aemulus).
 
 Built by [SeierkDev](https://github.com/SeierkDev).

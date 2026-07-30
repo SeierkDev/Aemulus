@@ -1,0 +1,31 @@
+AEMULUS - TRADEMARK & NAMING NOTICE
+===================================
+
+The SOURCE CODE in this repository is licensed under the GNU Affero General
+Public License v3.0 (see the LICENSE file). That license covers the code only.
+
+The following are NOT covered by that license and remain reserved by the Aemulus
+project and its creator:
+
+  * The name "Aemulus" and any confusingly similar names.
+  * The Aemulus logo, mark, and visual brand.
+  * The "$AEMU" token, its ticker, and the official token mint.
+
+You are free to use, modify, and self-host this software under the terms of the
+AGPL-3.0 - including for your own projects. You may NOT, however:
+
+  * present your deployment as "Aemulus",
+  * use the Aemulus name, logo, or branding, or
+  * represent any token as the official $AEMU.
+
+Rebrand any public deployment. This keeps the AGPL-3.0 freedoms intact while
+protecting users from clones impersonating the official project or token.
+
+The OFFICIAL Aemulus:
+
+  * Website:    https://aemulus.app
+  * Repository: https://github.com/SeierkDev/Aemulus
+  * Token:      $AEMU - announced ONLY via the official website and X account.
+
+Anything else using the Aemulus name, logo, or claiming to be $AEMU is
+unofficial and not affiliated with this project.
