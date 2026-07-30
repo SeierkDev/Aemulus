@@ -19,6 +19,8 @@ export interface MarketItem {
   successRate: number;
   runs: number;
   verified: boolean;
+  /** Tool name if this is a starter template (not runnable as-is), else null. */
+  template?: string | null;
 }
 
 const inputCls =
@@ -120,10 +122,15 @@ export function MarketBrowser({
                     </span>
                   )}
                 </h3>
-                {it.ratingCount > 0 && (
+                {!it.template && it.ratingCount > 0 && (
                   <span className="shrink-0 text-xs">
                     <Stars value={it.avgStars} />{" "}
                     <span className="text-ink-3">({it.ratingCount})</span>
+                  </span>
+                )}
+                {it.template && (
+                  <span className="shrink-0 rounded border border-border-strong bg-surface-2 px-1.5 py-0.5 text-[0.6rem] uppercase tracking-wide text-ink-3">
+                    Template
                   </span>
                 )}
               </div>
@@ -135,12 +142,21 @@ export function MarketBrowser({
                   {it.category}
                 </span>
                 <span className="mono">by {short(it.owner)}</span>
-                <span>·</span>
-                <span>{it.runCount} runs</span>
-                {it.runs > 0 && (
+                {it.template ? (
                   <>
                     <span>·</span>
-                    <span>{Math.round(it.successRate * 100)}% success</span>
+                    <span>record your own on {it.template}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>·</span>
+                    <span>{it.runCount} runs</span>
+                    {it.runs > 0 && (
+                      <>
+                        <span>·</span>
+                        <span>{Math.round(it.successRate * 100)}% success</span>
+                      </>
+                    )}
                   </>
                 )}
               </div>

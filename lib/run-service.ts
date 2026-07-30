@@ -9,7 +9,7 @@ import {
   setRunRegistryAnchor,
   setRunZkAnchor,
 } from "./runs";
-import { incrementRunCount } from "./skills";
+import { incrementRunCount, templateTool } from "./skills";
 import { invalidateReputation } from "./reputation";
 import { creditEarningOnce } from "./earnings";
 import { dispatchRunEvent, eventForStatus } from "./webhooks";
@@ -46,6 +46,14 @@ export class QuotaExceededError extends Error {
   }
 }
 
+/** A marketplace template can't be run - it's a starter to record your own from. */
+export class TemplateSkillError extends Error {
+  constructor(tool: string) {
+    super(`This is a template for ${tool}. Record your own version to run it.`);
+    this.name = "TemplateSkillError";
+  }
+}
+
 /**
  * Start a run asynchronously: create the row as "running" and return it
  * immediately, then execute in the background. Concurrency is bounded inside
@@ -54,6 +62,10 @@ export class QuotaExceededError extends Error {
  * progress. The creator is credited a run fee on external (non-owner) runs.
  */
 export async function startRun(args: RunArgs): Promise<Run> {
+  // A marketplace template has placeholder steps and isn't runnable - refuse
+  // before creating a run row (defense-in-depth; the UI hides run controls too).
+  const tmpl = templateTool(args.skill);
+  if (tmpl) throw new TemplateSkillError(tmpl);
   const base = {
     owner: args.runner,
     skillId: args.skill.id,

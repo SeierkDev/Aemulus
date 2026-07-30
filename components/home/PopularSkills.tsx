@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Card } from "@/components/ui";
 import { Stars } from "@/components/Stars";
+import { templateTool } from "@/lib/skills";
 import type { Skill, SkillReputation } from "@/lib/types";
 
 /** Marketplace teaser: real published skills with their trust signals. */
@@ -30,24 +31,38 @@ export function PopularSkills({
       <div className="mt-6 grid gap-3 md:grid-cols-3">
         {skills.map((s) => {
           const r = rep.get(s.id);
+          const tmpl = templateTool(s);
           return (
             <Link key={s.id} href={`/market/${s.id}`}>
               <Card className="flex h-full flex-col p-5 transition-colors hover:bg-surface-2">
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="text-sm font-semibold">{s.name}</h3>
-                  {r && r.ratingCount > 0 && (
-                    <span className="shrink-0 text-xs">
-                      <Stars value={r.avgStars} />
+                  {tmpl ? (
+                    <span className="shrink-0 rounded border border-border-strong bg-surface-2 px-1.5 py-0.5 text-[0.6rem] uppercase tracking-wide text-ink-3">
+                      Template
                     </span>
+                  ) : (
+                    r &&
+                    r.ratingCount > 0 && (
+                      <span className="shrink-0 text-xs">
+                        <Stars value={r.avgStars} />
+                      </span>
+                    )
                   )}
                 </div>
                 <p className="mt-1.5 flex-1 text-sm leading-relaxed text-ink-3">
                   {s.description}
                 </p>
                 <div className="mono mt-3 flex items-center gap-2 text-xs text-ink-3">
-                  <span>{s.runCount} runs</span>
-                  {r && r.runs > 0 && (
-                    <span>· {Math.round(r.successRate * 100)}%</span>
+                  {tmpl ? (
+                    <span>record your own on {tmpl}</span>
+                  ) : (
+                    <>
+                      <span>{s.runCount} runs</span>
+                      {r && r.runs > 0 && (
+                        <span>· {Math.round(r.successRate * 100)}%</span>
+                      )}
+                    </>
                   )}
                 </div>
               </Card>

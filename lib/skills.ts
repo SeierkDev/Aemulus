@@ -27,6 +27,17 @@ export async function countSkillsByOwner(owner: string): Promise<number> {
   return Number((r.rows[0] as Record<string, unknown>).c);
 }
 
+/** A marketplace "template": a starter skill with placeholder steps that a user
+ *  records their own version of (e.g. "Add invoice to QuickBooks"). It is NOT
+ *  runnable as-is - selectors are illustrative. Returns the tool name, or null
+ *  for an ordinary runnable skill. */
+export function templateTool(skill: {
+  inputSchema?: { template?: { tool?: unknown } | null } | null;
+}): string | null {
+  const t = skill.inputSchema?.template?.tool;
+  return typeof t === "string" && t.trim() ? t : null;
+}
+
 /** Parse a JSON column without throwing out of a read path. `|| "[]"` only
  *  covers NULL/empty; a corrupt (truncated/malformed) value still throws. */
 function parseJson<T>(raw: unknown, fallback: T): T {

@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui";
 import { Nav } from "@/components/Nav";
 import { MarketBrowser, type MarketItem } from "@/components/MarketBrowser";
-import { listPublishedSkills, searchPublishedSkills, categorize } from "@/lib/skills";
+import { listPublishedSkills, searchPublishedSkills, categorize, templateTool } from "@/lib/skills";
 import { getReputationBatch } from "@/lib/reputation";
 import { isVerified } from "@/lib/moderation";
 
@@ -34,6 +34,7 @@ export default async function MarketPage({
       successRate: r?.successRate ?? 0,
       runs: r?.runs ?? 0,
       verified: isVerified(s.owner),
+      template: templateTool(s),
     };
   });
 

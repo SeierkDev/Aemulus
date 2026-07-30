@@ -12,6 +12,7 @@ import {
   skillTargets,
   categorize,
   listPublishedSkillsLite,
+  templateTool,
 } from "@/lib/skills";
 import { hasRunSkill } from "@/lib/runs";
 import { getSession } from "@/lib/auth";
@@ -35,6 +36,9 @@ export default async function MarketSkillPage({
   const { id } = await params;
   const [skill, session] = await Promise.all([getSkill(id), getSession()]);
   if (!skill || !skill.published) notFound();
+  // A marketplace template (placeholder steps for a tool) isn't runnable - it's
+  // a starter you record your own version of. Show a record CTA, not a run panel.
+  const tmpl = templateTool(skill);
   // Owners running their own skill don't need the trust ack.
   const isOwner = session?.pubkey === skill.owner;
   const domains = skillTargets(skill.plan);
@@ -85,14 +89,18 @@ export default async function MarketSkillPage({
                 {category}
               </span>
               <span className="mono">by {short(skill.owner)}</span>
-              <span>·</span>
-              <span>{skill.runCount} runs</span>
+              {!tmpl && (
+                <>
+                  <span>·</span>
+                  <span>{skill.runCount} runs</span>
+                </>
+              )}
               <span>·</span>
               <span>{skill.plan.length} steps</span>
               <span>·</span>
               <span className="mono">v{skill.version}</span>
               <span>· updated {ago(skill.updatedAt)}</span>
-              {rep.ratingCount > 0 && (
+              {!tmpl && rep.ratingCount > 0 && (
                 <>
                   <span>·</span>
                   <span className="text-sm">
@@ -103,7 +111,7 @@ export default async function MarketSkillPage({
                   </span>
                 </>
               )}
-              {rep.runs > 0 && (
+              {!tmpl && rep.runs > 0 && (
                 <>
                   <span>·</span>
                   <span>{Math.round(rep.successRate * 100)}% success</span>
@@ -113,35 +121,63 @@ export default async function MarketSkillPage({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {isVerified(skill.owner) && <Badge>✓ Verified</Badge>}
-            <Badge>Published</Badge>
+            <Badge>{tmpl ? "Template" : "Published"}</Badge>
           </div>
         </div>
 
-        {/* Run it */}
-        <div className="mt-6">
-          {!isOwner && (
-            <p className="mb-2 text-xs text-ink-3">
-              Each run credits the creator {SOLANA.runFee} $AEMU. AI cost applies
-              only if a step needs the operator.
-            </p>
-          )}
-          <RunPanel
-            skillId={skill.id}
-            fields={skill.inputSchema.fields}
-            domains={domains}
-            requireTrust={!isOwner}
-          />
-        </div>
+        {tmpl ? (
+          /* Template: not runnable as-is. Point the user at recording their own. */
+          <Card className="mt-6 flex flex-col gap-4 p-6">
+            <div>
+              <h2 className="text-base font-semibold tracking-tight">
+                This is a starter template for {tmpl}
+              </h2>
+              <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-ink-2">
+                It shows the shape of the task, but the steps are illustrative -
+                real tools change their pages, so a template can&apos;t run as-is.
+                To make it yours, record the task once on your own {tmpl} (with the
+                browser extension, in your already logged-in browser). Aemulus
+                captures the real steps and turns it into a skill you can run and
+                publish.
+              </p>
+            </div>
+            <div>
+              <Link href="/record">
+                <span className="inline-flex rounded-[var(--radius-base)] bg-ink px-5 py-2.5 text-sm font-semibold text-bg transition-opacity hover:opacity-90">
+                  Record your own on {tmpl}
+                </span>
+              </Link>
+            </div>
+          </Card>
+        ) : (
+          <>
+            {/* Run it */}
+            <div className="mt-6">
+              {!isOwner && (
+                <p className="mb-2 text-xs text-ink-3">
+                  Each run credits the creator {SOLANA.runFee} $AEMU. AI cost
+                  applies only if a step needs the operator.
+                </p>
+              )}
+              <RunPanel
+                skillId={skill.id}
+                fields={skill.inputSchema.fields}
+                domains={domains}
+                requireTrust={!isOwner}
+              />
+            </div>
 
-        {/* Bulk run */}
-        {skill.inputSchema.fields.length > 0 && (
-          <div className="mt-4">
-            <BulkRunPanel
-              skillId={skill.id}
-              fields={skill.inputSchema.fields}
-              requireTrust={!isOwner}
-            />
-          </div>
+            {/* Bulk run */}
+            {skill.inputSchema.fields.length > 0 && (
+              <div className="mt-4">
+                <BulkRunPanel
+                  skillId={skill.id}
+                  fields={skill.inputSchema.fields}
+                  requireTrust={!isOwner}
+                />
+              </div>
+            )}
+          </>
         )}
 
         {/* What it does (read-only) */}

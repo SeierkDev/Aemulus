@@ -171,22 +171,27 @@ const skillOwners = SKILLS.map((_, s) => creators[s % NC]);
 
 SKILLS.forEach((sk, s) => {
   const fields = sk.fields.map((k) => ({ key: k, label: k[0].toUpperCase() + k.slice(1), example: valueFor(k, s) }));
-  // Runnable skills carry an explicit real-selector plan; tool skills derive one.
-  // The description tells users up front whether a login is needed.
-  const desc = sk.login ? `${sk.desc} · Needs a ${sk.login} login.` : `${sk.desc} · Runs anywhere, no login.`;
+  // Runnable skills carry an explicit real-selector plan and are usable by anyone.
+  // Tool skills are TEMPLATES: placeholder steps for a tool you'd record your own
+  // version of (marked in input_schema so the app shows a "record your own" CTA
+  // instead of a run button, and refuses to run them).
+  const desc = sk.login ? `${sk.desc} · Template for ${sk.login}.` : `${sk.desc} · Runs anywhere, no login.`;
   const plan = JSON.stringify(sk.plan ?? planFor(sk.host, sk.fields));
+  const schema = sk.login ? { fields, template: { tool: sk.login } } : { fields };
   push(
     `INSERT INTO skills (id,owner,name,description,plan,input_schema,source_demo_id,published,published_at,run_count,version,created_at,updated_at)
      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [SID[s], skillOwners[s], sk.name, desc, plan, JSON.stringify({ fields }), null, 1, now - (20 - s % 12) * DAY, 0, 1, now - 25 * DAY, now - (s % 10) * DAY],
+    [SID[s], skillOwners[s], sk.name, desc, plan, JSON.stringify(schema), null, 1, now - (20 - s % 12) * DAY, 0, 1, now - 25 * DAY, now - (s % 10) * DAY],
   );
 });
 
 const runCount = new Array(SKILLS.length).fill(0);
 let runTotal = 0, stepTotal = 0, aiTotal = 0;
 
+// Only RUNNABLE skills accrue runs — templates are starters, not used skills, so
+// they stay at 0 runs (honest: you can't run a template, you record your own).
 const bag = [];
-SKILLS.forEach((sk, s) => { for (let k = 0; k < sk.pop; k++) bag.push(s); });
+SKILLS.forEach((sk, s) => { if (!sk.login) for (let k = 0; k < sk.pop; k++) bag.push(s); });
 
 // Anonymous runners each run several skills over the last ~14 days.
 for (let w = 0; w < NR; w++) {
@@ -234,8 +239,10 @@ for (let w = 0; w < NR; w++) {
 SKILLS.forEach((_, s) => push(`UPDATE skills SET run_count = ? WHERE id = ?`, [runCount[s], SID[s]]));
 
 // Ratings from anonymous runners (never the creator). Unique rater per skill.
+// Templates get no ratings — you rate a skill you ran, and templates don't run.
 let ratingTotal = 0;
 SKILLS.forEach((sk, s) => {
+  if (sk.login) return;
   sk.stars.forEach((stars, i) => {
     const rater = RUNNERS[(s * 3 + i) % NR];
     push(

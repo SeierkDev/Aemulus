@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { apiKeyAuth, hasScope } from "@/lib/api-keys";
 import { logError } from "@/lib/log";
 import { getQuota, quotaReserve } from "@/lib/quota";
-import { getSkill, skillAccess } from "@/lib/skills";
+import { getSkill, skillAccess, templateTool } from "@/lib/skills";
 import { startRun, QuotaExceededError } from "@/lib/run-service";
 import { computeTier, getAemulusBalance } from "@/lib/solana";
 import { rateLimit, RUNS_PER_MIN } from "@/lib/ratelimit";
@@ -95,6 +95,13 @@ export async function POST(req: Request) {
     const skill = await getSkill(skillId);
     if (!skill || !(await skillAccess(skill, owner)).run) {
       return NextResponse.json({ error: "Skill not found" }, { status: 404 });
+    }
+    const tmpl = templateTool(skill);
+    if (tmpl) {
+      return NextResponse.json(
+        { error: `This is a template for ${tmpl}. Record your own version to run it.` },
+        { status: 422 },
+      );
     }
 
     const tier = computeTier(await getAemulusBalance(owner));

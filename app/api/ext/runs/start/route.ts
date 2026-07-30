@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiKeyAuth, hasScope } from "@/lib/api-keys";
-import { getSkill, skillAccess } from "@/lib/skills";
+import { getSkill, skillAccess, templateTool } from "@/lib/skills";
 import { getQuota, quotaReserve } from "@/lib/quota";
 import { createRun } from "@/lib/runs";
 import { computeTier, getAemulusBalance } from "@/lib/solana";
@@ -51,6 +51,13 @@ export async function POST(req: Request) {
     // execute in the user's browser (published skills are meant to be run/copied).
     if (!skill || !(await skillAccess(skill, owner)).run) {
       return NextResponse.json({ error: "Skill not found" }, { status: 404 });
+    }
+    const tmpl = templateTool(skill);
+    if (tmpl) {
+      return NextResponse.json(
+        { error: `This is a template for ${tmpl}. Record your own version to run it.` },
+        { status: 422 },
+      );
     }
 
     const tier = computeTier(await getAemulusBalance(owner));

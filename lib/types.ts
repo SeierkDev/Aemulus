@@ -120,7 +120,10 @@ export interface Skill {
   name: string;
   description: string;
   plan: SkillStep[];
-  inputSchema: { fields: SkillInputField[] };
+  /** `template` marks a marketplace starter skill (placeholder steps for a
+   *  specific tool) that a user records their own version of - not runnable
+   *  as-is. Absent on ordinary skills. */
+  inputSchema: { fields: SkillInputField[]; template?: { tool: string } };
   /** Hostnames the run may navigate to ([] = unrestricted). */
   allowedHosts: string[];
   /** Org this skill is shared with (null = personal). */
