@@ -38,7 +38,10 @@ export default async function MarketSkillPage({
   if (!skill || !skill.published) notFound();
   // A marketplace template (placeholder steps for a tool) isn't runnable - it's
   // a starter you record your own version of. Show a record CTA, not a run panel.
+  // Recording a logged-in tool must happen in the EXTENSION (own signed-in
+  // browser), not the cloud recorder - so the CTA points at the extension.
   const tmpl = templateTool(skill);
+  const extStoreUrl = process.env.AEMULUS_EXTENSION_URL;
   // Owners running their own skill don't need the trust ack.
   const isOwner = session?.pubkey === skill.owner;
   const domains = skillTargets(skill.plan);
@@ -126,27 +129,52 @@ export default async function MarketSkillPage({
         </div>
 
         {tmpl ? (
-          /* Template: not runnable as-is. Point the user at recording their own. */
-          <Card className="mt-6 flex flex-col gap-4 p-6">
+          /* Template: not runnable as-is. Recording a logged-in tool has to happen
+             in the extension (your own signed-in browser), never the cloud recorder. */
+          <Card className="mt-6 flex flex-col gap-5 p-6">
             <div>
               <h2 className="text-base font-semibold tracking-tight">
                 This is a starter template for {tmpl}
               </h2>
               <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-ink-2">
-                It shows the shape of the task, but the steps are illustrative -
-                real tools change their pages, so a template can&apos;t run as-is.
-                To make it yours, record the task once on your own {tmpl} (with the
-                browser extension, in your already logged-in browser). Aemulus
-                captures the real steps and turns it into a skill you can run and
-                publish.
+                It shows the shape of the task, but the steps are just
+                illustrative. Real tools change their pages, so a template
+                can&apos;t run as-is. To make it yours, record the task once on
+                your own {tmpl} with the Aemulus browser extension, so it records
+                right in your own signed-in browser. The cloud recorder can&apos;t
+                log into your tools; the extension already is you.
               </p>
             </div>
+            <ol className="grid gap-2 text-sm text-ink-2">
+              <li>
+                <span className="mono text-ink-3">1.</span> Install the browser
+                extension.
+              </li>
+              <li>
+                <span className="mono text-ink-3">2.</span> Open {tmpl} and sign in
+                as usual.
+              </li>
+              <li>
+                <span className="mono text-ink-3">3.</span> Click the Aemulus
+                extension, hit Record, do the task once, then Stop. It becomes a
+                skill you can run and publish.
+              </li>
+            </ol>
             <div>
-              <Link href="/record">
-                <span className="inline-flex rounded-[var(--radius-base)] bg-ink px-5 py-2.5 text-sm font-semibold text-bg transition-opacity hover:opacity-90">
-                  Record your own on {tmpl}
+              {extStoreUrl ? (
+                <a
+                  href={extStoreUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex rounded-[var(--radius-base)] bg-ink px-5 py-2.5 text-sm font-semibold text-bg transition-opacity hover:opacity-90"
+                >
+                  Get the extension
+                </a>
+              ) : (
+                <span className="inline-flex rounded-[var(--radius-base)] border border-border-strong bg-surface-2 px-5 py-2.5 text-sm text-ink-3">
+                  Extension coming to the Chrome Web Store
                 </span>
-              </Link>
+              )}
             </div>
           </Card>
         ) : (
