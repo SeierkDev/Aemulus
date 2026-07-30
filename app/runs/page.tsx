@@ -96,7 +96,7 @@ function RunRow({ run }: { run: Run }) {
     <Card className="flex items-center justify-between p-4 transition-colors hover:bg-surface-2">
       <div className="min-w-0">
         <div className="mono truncate text-sm">{run.id}</div>
-        <div className="mt-1 flex items-center gap-2 text-xs text-ink-3">
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-3">
           <span className="mono">{run.skillId}</span>
           <span>·</span>
           <span>{when(run.createdAt)}</span>

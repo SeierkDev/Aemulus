@@ -53,8 +53,8 @@ export default async function ApActivityPage() {
       </div>
 
       {/* Entry feed */}
-      <div className="mt-6 overflow-hidden rounded-lg border border-border">
-        <div className="grid grid-cols-[1.5fr_0.9fr_1fr_0.9fr_auto] items-center gap-4 border-b border-border bg-surface-2 px-4 py-2.5 text-xs text-ink-3">
+      <div className="mt-6 overflow-x-auto rounded-lg border border-border">
+        <div className="grid min-w-[560px] grid-cols-[1.5fr_0.9fr_1fr_0.9fr_auto] items-center gap-4 border-b border-border bg-surface-2 px-4 py-2.5 text-xs text-ink-3">
           <span>Vendor</span>
           <span className="text-right">Amount</span>
           <span>Bill</span>
@@ -67,7 +67,7 @@ export default async function ApActivityPage() {
           </div>
         ) : (
           bills.map((b, i) => (
-            <div key={b.billNumber} className={`grid grid-cols-[1.5fr_0.9fr_1fr_0.9fr_auto] items-center gap-4 px-4 py-3 text-sm ${i > 0 ? "border-t border-border" : ""}`}>
+            <div key={b.billNumber} className={`grid min-w-[560px] grid-cols-[1.5fr_0.9fr_1fr_0.9fr_auto] items-center gap-4 px-4 py-3 text-sm ${i > 0 ? "border-t border-border" : ""}`}>
               <span className="font-medium text-ink">{b.vendor}</span>
               <span className="text-right tabular-nums text-ink">{money(b.amount)}</span>
               <span className="mono text-xs text-ink-2">{b.billNumber}</span>

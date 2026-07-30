@@ -47,7 +47,7 @@ export default async function Home() {
           <span className="h-1.5 w-1.5 rounded-full bg-ink" />
           Show it once. It does the rest.
         </Badge>
-        <h1 className="mx-auto max-w-4xl text-balance text-5xl font-semibold leading-[1.05] tracking-tight sm:text-7xl">
+        <h1 className="mx-auto max-w-4xl text-balance text-4xl font-semibold leading-[1.05] tracking-tight sm:text-7xl">
           Automate any browser task by{" "}
           <span className="text-ink-2">demonstrating</span> it, not coding it.
         </h1>

@@ -103,9 +103,9 @@ export function ApReview({
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-6 pb-16">
       {/* Identity header */}
-      <header className="flex items-center justify-between border-b border-border py-4">
+      <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-border py-4">
         <Link href="/ap/queue" className="text-sm text-ink-3 hover:text-ink">← Back to queue</Link>
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="font-semibold tracking-tight">{fixture.vendor}</span>
           <span className="text-ink-3">·</span>
           <span className="tabular-nums text-ink">{money(fixture.amount)}</span>

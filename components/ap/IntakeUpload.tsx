@@ -127,7 +127,7 @@ export function IntakeUpload() {
             Read from <span className="text-ink-2">{fileName}</span>. Check the details, then enter it.
             {lowConfidence && <span className="text-ink"> Low confidence - double-check the fields.</span>}
           </p>
-          <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="col-span-2 text-xs text-ink-3">
               Vendor
               <input className={input} value={fields.vendor} onChange={(e) => set("vendor", e.target.value)} />

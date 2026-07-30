@@ -60,7 +60,7 @@ export default async function SkillsPage() {
                   <div className="mt-1 truncate text-sm text-ink-2">
                     {s.description}
                   </div>
-                  <div className="mt-1.5 flex items-center gap-2 text-xs text-ink-3">
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-3">
                     <span className="mono">{s.id}</span>
                     <span>·</span>
                     <span>{s.plan.length} steps</span>

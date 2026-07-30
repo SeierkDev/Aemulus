@@ -61,9 +61,9 @@ export default async function ApQueuePage() {
             <p className="mt-1 text-sm text-ink-3">Every invoice has been entered and sealed.</p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-border">
+          <div className="overflow-x-auto rounded-lg border border-border">
             {/* header row */}
-            <div className="grid grid-cols-[1.5fr_0.9fr_1.6fr_0.6fr_auto] items-center gap-4 border-b border-border bg-surface-2 px-4 py-2.5 text-xs text-ink-3">
+            <div className="grid min-w-[560px] grid-cols-[1.5fr_0.9fr_1.6fr_0.6fr_auto] items-center gap-4 border-b border-border bg-surface-2 px-4 py-2.5 text-xs text-ink-3">
               <span>Vendor</span>
               <span className="text-right">Amount</span>
               <span>Why held</span>
@@ -74,7 +74,7 @@ export default async function ApQueuePage() {
               <Link
                 key={q.invoiceId}
                 href={`/ap/invoice/${q.invoiceId}`}
-                className={`grid grid-cols-[1.5fr_0.9fr_1.6fr_0.6fr_auto] items-center gap-4 px-4 py-3.5 text-sm transition hover:bg-surface-2 ${i > 0 ? "border-t border-border" : ""}`}
+                className={`grid min-w-[560px] grid-cols-[1.5fr_0.9fr_1.6fr_0.6fr_auto] items-center gap-4 px-4 py-3.5 text-sm transition hover:bg-surface-2 ${i > 0 ? "border-t border-border" : ""}`}
               >
                 <span className="font-medium text-ink">{q.vendor}</span>
                 <span className="text-right font-medium tabular-nums text-ink">{money(q.amount)}</span>

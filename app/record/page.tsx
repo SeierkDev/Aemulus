@@ -210,7 +210,35 @@ export default function RecordPage() {
         </Badge>
       </header>
 
-      <div className="grid flex-1 gap-6 border-t border-border pt-8 md:grid-cols-[340px_1fr]">
+      {/* Mobile: the live recorder (and the browser extension) need a desktop. */}
+      <div className="border-t border-border pt-8 md:hidden">
+        <Card className="flex flex-col gap-4 p-6 text-center">
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight">
+              Record on your computer
+            </h1>
+            <p className="mt-2 text-sm leading-relaxed text-ink-2">
+              Recording a task needs a desktop browser, and for tools you log
+              into it uses the Aemulus browser extension, which phones don&apos;t
+              support. Open Aemulus on your computer to record a task.
+            </p>
+            <p className="mt-2 text-sm leading-relaxed text-ink-3">
+              Everything else works here on mobile: browse the marketplace and run
+              any skill on your own inputs.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <Link href="/market">
+              <Button variant="primary">Explore skills</Button>
+            </Link>
+            <Link href="/skills">
+              <Button variant="default">Your skills</Button>
+            </Link>
+          </div>
+        </Card>
+      </div>
+
+      <div className="hidden flex-1 gap-6 border-t border-border pt-8 md:grid md:grid-cols-[340px_1fr]">
         {/* Left: controls + trace */}
         <div className="flex flex-col gap-4">
           <div>

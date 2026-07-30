@@ -106,6 +106,15 @@ body {
   background: transparent;
 }
 
+/* Media never overflows its container (keeps the page from scrolling sideways
+   on small screens). next/image keeps its own aspect ratio via width/height. */
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
 /* Utilities */
 .mono {
   font-family: var(--font-mono);

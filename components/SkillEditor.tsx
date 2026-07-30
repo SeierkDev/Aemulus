@@ -316,7 +316,7 @@ export function SkillEditor({
             </Card>
           )}
           {fields.map((f, i) => (
-            <Card key={fieldKeys[i]} className="grid grid-cols-[1fr_1fr_1fr_auto_auto] gap-3 p-4">
+            <Card key={fieldKeys[i]} className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-[1fr_1fr_1fr_auto_auto]">
               <Field label="Key">
                 <input
                   className={input}
