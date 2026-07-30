@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Badge, Button } from "@/components/ui";
 import { Nav } from "@/components/Nav";
 import { Dashboard } from "@/components/home/Dashboard";
+import { ExtensionCallout } from "@/components/home/ExtensionCallout";
 import { PopularSkills } from "@/components/home/PopularSkills";
 import { Marketing } from "@/components/home/Marketing";
 import { Showcase } from "@/components/home/Showcase";
@@ -75,6 +76,9 @@ export default async function Home() {
             recentRuns={recentRuns}
           />
         )}
+        <Reveal>
+          <ExtensionCallout storeUrl={process.env.AEMULUS_EXTENSION_URL} />
+        </Reveal>
         <Reveal>
           <Showcase />
         </Reveal>

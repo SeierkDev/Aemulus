@@ -3,6 +3,7 @@ import { Nav } from "@/components/Nav";
 import { SiteFooter } from "@/components/SiteFooter";
 import { ApiKeysManager } from "@/components/ApiKeysManager";
 import { WebhooksManager } from "@/components/WebhooksManager";
+import { AccountBar } from "@/components/AccountBar";
 import { getSession } from "@/lib/auth";
 import { listApiKeys } from "@/lib/api-keys";
 import { listWebhooks } from "@/lib/webhooks";
@@ -186,8 +187,9 @@ console.log(v.batch?.proofValid);  // true`}
           {session ? (
             <ApiKeysManager initial={keys} />
           ) : (
-            <Card className="p-8 text-center text-sm text-ink-2">
-              Connect your wallet (top right) to create API keys.
+            <Card className="flex flex-col items-center gap-4 p-8 text-center text-sm text-ink-2">
+              <p>Connect your wallet to create an API key — keys belong to your wallet and only you can see them.</p>
+              <AccountBar />
             </Card>
           )}
         </div>
@@ -227,8 +229,9 @@ const ok = timingSafeEqual(Buffer.from(sig), Buffer.from(mac));
           {session ? (
             <WebhooksManager initial={webhooks} />
           ) : (
-            <Card className="p-8 text-center text-sm text-ink-2">
-              Connect your wallet to register webhooks.
+            <Card className="flex flex-col items-center gap-4 p-8 text-center text-sm text-ink-2">
+              <p>Connect your wallet to register webhooks.</p>
+              <AccountBar />
             </Card>
           )}
         </div>

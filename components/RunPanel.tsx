@@ -147,7 +147,7 @@ export function RunPanel({
             {busy ? "Running…" : out ? "Daily limit reached" : "▶ Run now"}
           </Button>
         )}
-        {ready && extPresent && !requireTrust && (
+        {ready && extPresent && (
           <Button variant="default" onClick={runInBrowser} disabled={!trusted}>
             Run in your browser
           </Button>

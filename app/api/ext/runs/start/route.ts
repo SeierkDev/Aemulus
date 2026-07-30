@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { apiKeyAuth, hasScope } from "@/lib/api-keys";
-import { getSkill } from "@/lib/skills";
+import { getSkill, skillAccess } from "@/lib/skills";
 import { getQuota, quotaReserve } from "@/lib/quota";
 import { createRun } from "@/lib/runs";
 import { computeTier, getAemulusBalance } from "@/lib/solana";
@@ -46,8 +46,10 @@ export async function POST(req: Request) {
     }
 
     const skill = await getSkill(skillId);
-    // Extension runs are your-own-skills-only (the plan is handed to the client).
-    if (!skill || skill.owner !== owner) {
+    // Runnable if you own it, an org-mate shared it, or it's published — same
+    // access rule as a cloud run. The plan is handed to the extension so it can
+    // execute in the user's browser (published skills are meant to be run/copied).
+    if (!skill || !(await skillAccess(skill, owner)).run) {
       return NextResponse.json({ error: "Skill not found" }, { status: 404 });
     }
 

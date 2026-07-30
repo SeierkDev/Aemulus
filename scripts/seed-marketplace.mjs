@@ -55,28 +55,51 @@ const RUNNERS = Array.from({ length: 30 }, (_, i) =>
 );
 const NR = RUNNERS.length;
 
-const SKILLS = [
-  { name: "Add invoice to QuickBooks", desc: "Enter a vendor invoice (vendor, amount, date) into the QuickBooks new-bill form.", host: "https://app.qbo.intuit.com/app/bill", fields: ["vendor", "amount", "date"], stars: [5,5,5,5,5,4,5,5], pop: 5 },
-  { name: "Add lead to HubSpot", desc: "Create a HubSpot contact from a name + email + company.", host: "https://app.hubspot.com/contacts/new", fields: ["name", "email", "company"], stars: [4,4,5,4,4,4,4], pop: 4 },
-  { name: "Post job to LinkedIn", desc: "Fill the LinkedIn 'post a job' form from a title + location.", host: "https://www.linkedin.com/job-posting/new", fields: ["title", "location"], stars: [4,3,4,4,4], pop: 2 },
-  { name: "Submit expense to Expensify", desc: "Create an Expensify expense from amount + merchant.", host: "https://www.expensify.com/expenses/new", fields: ["amount", "merchant"], stars: [5,5,4,5,5,4], pop: 3 },
-  { name: "Create Shopify product", desc: "Add a product (title, price) to a Shopify store.", host: "https://admin.shopify.com/products/new", fields: ["title", "price"], stars: [4,4,4,3,5,4], pop: 2 },
-  { name: "Log support ticket to Zendesk", desc: "Open a Zendesk ticket from subject + requester.", host: "https://northwind.zendesk.com/agent/tickets/new", fields: ["subject", "requester"], stars: [5,5,4,5,4,5,4], pop: 4 },
-  { name: "Create Stripe invoice", desc: "Draft a Stripe invoice from a customer email + amount.", host: "https://dashboard.stripe.com/invoices/create", fields: ["customer", "amount"], stars: [5,5,5,4,5,5], pop: 5 },
-  { name: "Add contact to Salesforce", desc: "Create a Salesforce contact from a name + account + email.", host: "https://login.salesforce.com/lightning/o/Contact/new", fields: ["name", "account", "email"], stars: [4,5,4,4,5,4], pop: 3 },
-  { name: "Create Trello card", desc: "Add a Trello card to a list from a title + description.", host: "https://trello.com/add-card", fields: ["title", "description"], stars: [5,5,5,5,5], pop: 3 },
-  { name: "Add row to Airtable", desc: "Append a record to an Airtable base from field values.", host: "https://airtable.com/create/record", fields: ["name", "status"], stars: [5,4,4,5,4], pop: 3 },
-  { name: "Create Notion database entry", desc: "Add a page to a Notion database from a title + status.", host: "https://www.notion.so/new", fields: ["title", "status"], stars: [4,4,4,5,4,4], pop: 3 },
-  { name: "Create Asana task", desc: "Open an Asana task from a name + assignee + due date.", host: "https://app.asana.com/0/tasks/new", fields: ["name", "assignee", "due"], stars: [4,4,3,4,4,4], pop: 2 },
-  { name: "Create Jira issue", desc: "File a Jira issue from a summary + type.", host: "https://globex.atlassian.net/jira/issue/new", fields: ["summary", "type"], stars: [5,4,5,4,5,4], pop: 4 },
-  { name: "Add candidate to Greenhouse", desc: "Create a Greenhouse candidate from a name + email + role.", host: "https://app.greenhouse.io/people/new", fields: ["name", "email", "role"], stars: [4,5,4,4,4], pop: 2 },
-  { name: "Schedule post with Buffer", desc: "Queue a social post in Buffer from text + channel.", host: "https://publish.buffer.com/compose", fields: ["text", "channel"], stars: [5,4,5,5,4,5], pop: 3 },
-  { name: "Create Calendly event type", desc: "Set up a Calendly event type from a name + duration.", host: "https://calendly.com/event_types/new", fields: ["name", "duration"], stars: [5,4,5,4,5], pop: 3 },
-  { name: "Add product to WooCommerce", desc: "Publish a WooCommerce product from a title + price.", host: "https://shop.initech.com/wp-admin/post-new.php", fields: ["title", "price"], stars: [4,4,4,4,5], pop: 2 },
-  { name: "Create GitHub issue", desc: "Open a GitHub issue from a title + label.", host: "https://github.com/soylent-labs/core/issues/new", fields: ["title", "label"], stars: [5,5,4,5,5,4], pop: 4 },
-  { name: "Add subscriber to Mailchimp", desc: "Add a Mailchimp subscriber from an email + name.", host: "https://admin.mailchimp.com/audience/contacts/new", fields: ["email", "name"], stars: [4,4,5,4,4], pop: 3 },
-  { name: "Create Monday.com item", desc: "Add a Monday.com board item from a name + status.", host: "https://umbrella.monday.com/boards/new-item", fields: ["name", "status"], stars: [4,5,4,4,4,5], pop: 3 },
+// Step builders for the runnable skills (real selectors on real pages).
+const nav = (host) => ({ idx: 0, intent: `Open ${new URL(host).hostname}`, action: "navigate", selectors: [], target: host, valueSource: "none", value: "", inputKey: "", key: "" });
+const inp = (idx, key, sel, label) => ({ idx, intent: `Enter the ${label || key}`, action: "input", selectors: [sel], target: key, valueSource: "input", value: "", inputKey: key, key: "" });
+const enter = (idx, sel) => ({ idx, intent: "Submit", action: "key", selectors: [sel], target: "", valueSource: "none", value: "", inputKey: "", key: "Enter" });
+const clickSel = (idx, sel, label) => ({ idx, intent: label || "Submit", action: "click", selectors: [sel], target: label || "Submit", valueSource: "none", value: "", inputKey: "", key: "" });
+
+// GENUINELY RUNNABLE skills — real public sites, no login, correct selectors, so
+// anyone with the extension can run them and watch them work.
+const RUNNABLE = [
+  { name: "Search the web (DuckDuckGo)", desc: "Run a DuckDuckGo search for any query.", host: "https://html.duckduckgo.com/html/", fields: ["query"], stars: [5,5,4,5,5], pop: 4, login: null,
+    plan: [nav("https://html.duckduckgo.com/html/"), inp(1, "query", 'input[name="q"]', "search query"), enter(2, 'input[name="q"]')] },
+  { name: "Search Wikipedia", desc: "Look up any topic on Wikipedia.", host: "https://en.wikipedia.org/wiki/Special:Search", fields: ["query"], stars: [5,4,5,5], pop: 3, login: null,
+    plan: [nav("https://en.wikipedia.org/wiki/Special:Search"), inp(1, "query", 'input[name="search"]', "search query"), enter(2, 'input[name="search"]')] },
+  { name: "Look up a word (Wiktionary)", desc: "Get the definition of any word from Wiktionary.", host: "https://en.wiktionary.org/wiki/Special:Search", fields: ["term"], stars: [5,5,4], pop: 2, login: null,
+    plan: [nav("https://en.wiktionary.org/wiki/Special:Search"), inp(1, "term", 'input[name="search"]', "word"), enter(2, 'input[name="search"]')] },
+  { name: "Fill a sample form", desc: "Fill + submit a public demo form (name, phone, email, notes) — a safe way to watch a skill run end to end.", host: "https://httpbin.org/forms/post", fields: ["name", "phone", "email", "notes"], stars: [5,4,5,4], pop: 3, login: null,
+    plan: [nav("https://httpbin.org/forms/post"), inp(1, "name", 'input[name="custname"]', "name"), inp(2, "phone", 'input[name="custtel"]', "phone"), inp(3, "email", 'input[name="custemail"]', "email"), inp(4, "notes", 'textarea[name="comments"]', "notes"), clickSel(5, "button", "Submit")] },
 ];
+
+// BUSINESS-TOOL skills — realistic templates. They run once you're logged into
+// the tool (labeled so no one wonders why they can't run them anonymously).
+const TOOL_SKILLS = [
+  { name: "Add invoice to QuickBooks", desc: "Enter a vendor invoice (vendor, amount, date) into the QuickBooks new-bill form.", host: "https://app.qbo.intuit.com/app/bill", fields: ["vendor", "amount", "date"], stars: [5,5,5,5,5,4,5,5], pop: 5, login: "QuickBooks" },
+  { name: "Add lead to HubSpot", desc: "Create a HubSpot contact from a name + email + company.", host: "https://app.hubspot.com/contacts/new", fields: ["name", "email", "company"], stars: [4,4,5,4,4,4,4], pop: 4, login: "HubSpot" },
+  { name: "Post job to LinkedIn", desc: "Fill the LinkedIn 'post a job' form from a title + location.", host: "https://www.linkedin.com/job-posting/new", fields: ["title", "location"], stars: [4,3,4,4,4], pop: 2, login: "LinkedIn" },
+  { name: "Submit expense to Expensify", desc: "Create an Expensify expense from amount + merchant.", host: "https://www.expensify.com/expenses/new", fields: ["amount", "merchant"], stars: [5,5,4,5,5,4], pop: 3, login: "Expensify" },
+  { name: "Create Shopify product", desc: "Add a product (title, price) to a Shopify store.", host: "https://admin.shopify.com/products/new", fields: ["title", "price"], stars: [4,4,4,3,5,4], pop: 2, login: "Shopify" },
+  { name: "Log support ticket to Zendesk", desc: "Open a Zendesk ticket from subject + requester.", host: "https://northwind.zendesk.com/agent/tickets/new", fields: ["subject", "requester"], stars: [5,5,4,5,4,5,4], pop: 4, login: "Zendesk" },
+  { name: "Create Stripe invoice", desc: "Draft a Stripe invoice from a customer email + amount.", host: "https://dashboard.stripe.com/invoices/create", fields: ["customer", "amount"], stars: [5,5,5,4,5,5], pop: 5, login: "Stripe" },
+  { name: "Add contact to Salesforce", desc: "Create a Salesforce contact from a name + account + email.", host: "https://login.salesforce.com/lightning/o/Contact/new", fields: ["name", "account", "email"], stars: [4,5,4,4,5,4], pop: 3, login: "Salesforce" },
+  { name: "Create Trello card", desc: "Add a Trello card to a list from a title + description.", host: "https://trello.com/add-card", fields: ["title", "description"], stars: [5,5,5,5,5], pop: 3, login: "Trello" },
+  { name: "Add row to Airtable", desc: "Append a record to an Airtable base from field values.", host: "https://airtable.com/create/record", fields: ["name", "status"], stars: [5,4,4,5,4], pop: 3, login: "Airtable" },
+  { name: "Create Notion database entry", desc: "Add a page to a Notion database from a title + status.", host: "https://www.notion.so/new", fields: ["title", "status"], stars: [4,4,4,5,4,4], pop: 3, login: "Notion" },
+  { name: "Create Asana task", desc: "Open an Asana task from a name + assignee + due date.", host: "https://app.asana.com/0/tasks/new", fields: ["name", "assignee", "due"], stars: [4,4,3,4,4,4], pop: 2, login: "Asana" },
+  { name: "Create Jira issue", desc: "File a Jira issue from a summary + type.", host: "https://globex.atlassian.net/jira/issue/new", fields: ["summary", "type"], stars: [5,4,5,4,5,4], pop: 4, login: "Jira" },
+  { name: "Add candidate to Greenhouse", desc: "Create a Greenhouse candidate from a name + email + role.", host: "https://app.greenhouse.io/people/new", fields: ["name", "email", "role"], stars: [4,5,4,4,4], pop: 2, login: "Greenhouse" },
+  { name: "Schedule post with Buffer", desc: "Queue a social post in Buffer from text + channel.", host: "https://publish.buffer.com/compose", fields: ["text", "channel"], stars: [5,4,5,5,4,5], pop: 3, login: "Buffer" },
+  { name: "Create Calendly event type", desc: "Set up a Calendly event type from a name + duration.", host: "https://calendly.com/event_types/new", fields: ["name", "duration"], stars: [5,4,5,4,5], pop: 3, login: "Calendly" },
+  { name: "Add product to WooCommerce", desc: "Publish a WooCommerce product from a title + price.", host: "https://shop.initech.com/wp-admin/post-new.php", fields: ["title", "price"], stars: [4,4,4,4,5], pop: 2, login: "WooCommerce" },
+  { name: "Create GitHub issue", desc: "Open a GitHub issue from a title + label.", host: "https://github.com/soylent-labs/core/issues/new", fields: ["title", "label"], stars: [5,5,4,5,5,4], pop: 4, login: "GitHub" },
+  { name: "Add subscriber to Mailchimp", desc: "Add a Mailchimp subscriber from an email + name.", host: "https://admin.mailchimp.com/audience/contacts/new", fields: ["email", "name"], stars: [4,4,5,4,4], pop: 3, login: "Mailchimp" },
+  { name: "Create Monday.com item", desc: "Add a Monday.com board item from a name + status.", host: "https://umbrella.monday.com/boards/new-item", fields: ["name", "status"], stars: [4,5,4,4,4,5], pop: 3, login: "Monday.com" },
+];
+
+const SKILLS = [...RUNNABLE, ...TOOL_SKILLS];
 const SID = SKILLS.map((_, i) => sid(i));
 
 const COMMENTS = [
@@ -105,6 +128,9 @@ function valueFor(field, i) {
   if (f.includes("label")) return pick(["bug", "enhancement", "docs"], i);
   if (f.includes("channel")) return pick(["Twitter", "LinkedIn"], i);
   if (f.includes("location")) return pick(["Remote", "New York", "London"], i);
+  if (f.includes("phone")) return pick(["555-0142", "555-0197", "555-0123"], i);
+  if (f.includes("query") || f.includes("term")) return pick(["solana", "playwright automation", "open source", "verifiable receipts"], i);
+  if (f.includes("note")) return pick(["Please deliver after 5pm", "No onions", "Leave at door"], i);
   return pick(["Q3 rollout", "Follow-up", "Weekly sync", "Draft v2"], i);
 }
 
@@ -145,10 +171,14 @@ const skillOwners = SKILLS.map((_, s) => creators[s % NC]);
 
 SKILLS.forEach((sk, s) => {
   const fields = sk.fields.map((k) => ({ key: k, label: k[0].toUpperCase() + k.slice(1), example: valueFor(k, s) }));
+  // Runnable skills carry an explicit real-selector plan; tool skills derive one.
+  // The description tells users up front whether a login is needed.
+  const desc = sk.login ? `${sk.desc} · Needs a ${sk.login} login.` : `${sk.desc} · Runs anywhere, no login.`;
+  const plan = JSON.stringify(sk.plan ?? planFor(sk.host, sk.fields));
   push(
     `INSERT INTO skills (id,owner,name,description,plan,input_schema,source_demo_id,published,published_at,run_count,version,created_at,updated_at)
      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    [SID[s], skillOwners[s], sk.name, sk.desc, JSON.stringify(planFor(sk.host, sk.fields)), JSON.stringify({ fields }), null, 1, now - (20 - s % 12) * DAY, 0, 1, now - 25 * DAY, now - (s % 10) * DAY],
+    [SID[s], skillOwners[s], sk.name, desc, plan, JSON.stringify({ fields }), null, 1, now - (20 - s % 12) * DAY, 0, 1, now - 25 * DAY, now - (s % 10) * DAY],
   );
 });
 
