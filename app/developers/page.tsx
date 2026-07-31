@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Badge, Card, Label } from "@/components/ui";
 import { Nav } from "@/components/Nav";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -26,6 +27,29 @@ function CodeBlock({ title, code }: { title: string; code: string }) {
         {code}
       </pre>
     </Card>
+  );
+}
+
+/** A numbered step in the SDK install guide. */
+function Step({
+  n,
+  title,
+  children,
+}: {
+  n: number;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex gap-4">
+      <span className="mono mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border-strong bg-surface-2 text-xs text-ink-2">
+        {n}
+      </span>
+      <div className="min-w-0 flex-1">
+        <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
+        <div className="mt-2 text-sm leading-relaxed text-ink-2">{children}</div>
+      </div>
+    </div>
   );
 }
 
@@ -116,33 +140,110 @@ export default async function DevelopersPage() {
       </section>
 
       {/* SDK */}
-      <section className="border-t border-border py-12">
+      <section id="sdk" className="scroll-mt-8 border-t border-border py-12">
         <Label>TypeScript SDK</Label>
         <h2 className="mt-3 text-2xl font-semibold tracking-tight">
-          Or skip the curl
+          Install the SDK
         </h2>
         <p className="mt-2 max-w-2xl text-sm text-ink-2">
-          A tiny, dependency-free client published as{" "}
-          <span className="mono">npm i aemulus</span>. Works anywhere{" "}
-          <span className="mono">fetch</span> does - Node, browsers, Deno, edge.
+          A tiny, dependency-free client for the Aemulus protocol. Works anywhere{" "}
+          <span className="mono">fetch</span> does - Node 18+, browsers, Deno, and
+          edge runtimes.
         </p>
-        <div className="mt-6">
-          <CodeBlock
-            title="aemulus - run, read output, verify"
-            code={`import { Aemulus } from "aemulus";
 
-const aemulus = new Aemulus({ apiKey: process.env.AEMULUS_KEY! });
+        {/* Install command, front and centre */}
+        <Card className="mt-6 flex flex-col gap-3 border-border-strong p-5 sm:flex-row sm:items-center sm:justify-between">
+          <code className="mono text-lg text-ink">npm install aemulus</code>
+          <a
+            href="https://www.npmjs.com/package/aemulus"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mono shrink-0 text-xs text-ink-3 transition-colors hover:text-ink"
+          >
+            view on npm ↗
+          </a>
+        </Card>
 
-// run across one input - or loop a CSV for the next hundred
-const run = await aemulus.runAndWait("skl_…", { vendor: "Acme", amount: "1499" });
+        {/* Step by step */}
+        <div className="mt-8 grid gap-7">
+          <Step n={1} title="Get an API key">
+            Connect your wallet on this page and create a key under{" "}
+            <a href="#keys" className="text-ink underline decoration-border-strong underline-offset-2">
+              Authentication
+            </a>
+            . The key authenticates as your wallet, so your skills, quota, and
+            earnings all apply. Keep it server-side.
+          </Step>
+
+          <Step n={2} title="Install the package">
+            <CodeBlock title="terminal" code={"npm install aemulus"} />
+          </Step>
+
+          <Step n={3} title="Create a client">
+            <CodeBlock
+              title="index.ts"
+              code={`import { Aemulus } from "aemulus";
+
+const aemulus = new Aemulus({ apiKey: process.env.AEMULUS_KEY! });`}
+            />
+          </Step>
+
+          <Step n={4} title="Run a skill and read its output">
+            Browse the{" "}
+            <Link href="/market" className="text-ink underline decoration-border-strong underline-offset-2">
+              marketplace
+            </Link>{" "}
+            for a skill id, then run it on your own inputs.{" "}
+            <span className="mono">runAndWait</span> polls until the run reaches a
+            terminal state.
+            <div className="mt-3">
+              <CodeBlock
+                title="run a skill"
+                code={`const run = await aemulus.runAndWait("skl_…", {
+  vendor: "Acme",
+  amount: "1499",
+});
+
 console.log(run.status);   // "completed"
-console.log(run.output);   // { total: "$42.00" }
+console.log(run.output);   // { total: "$42.00" }`}
+              />
+            </div>
+          </Step>
 
-// anyone can verify the receipt - no key
-const v = await aemulus.verify(run.id);
-console.log(v.batch?.proofValid);  // true`}
-          />
+          <Step n={5} title="Verify the receipt">
+            Every completed run is sealed. Anyone can check it, with no API key.
+            <div className="mt-3">
+              <CodeBlock
+                title="verify"
+                code={`const proof = await aemulus.verify(run.id);
+console.log(proof.matches);           // true
+console.log(proof.batch?.proofValid); // true`}
+              />
+            </div>
+          </Step>
         </div>
+
+        <p className="mt-8 text-sm text-ink-2">
+          Full method reference on{" "}
+          <a
+            href="https://www.npmjs.com/package/aemulus"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-ink underline decoration-border-strong underline-offset-2"
+          >
+            npm
+          </a>
+          , source in{" "}
+          <a
+            href="https://github.com/SeierkDev/Aemulus/tree/main/sdk"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-ink underline decoration-border-strong underline-offset-2"
+          >
+            the repo
+          </a>
+          .
+        </p>
       </section>
 
       {/* MCP */}
@@ -176,7 +277,7 @@ console.log(v.batch?.proofValid);  // true`}
       </section>
 
       {/* Keys */}
-      <section className="border-t border-border py-12">
+      <section id="keys" className="scroll-mt-8 border-t border-border py-12">
         <Label>Authentication</Label>
         <h2 className="mt-3 text-2xl font-semibold tracking-tight">API keys</h2>
         <p className="mt-2 max-w-2xl text-sm text-ink-2">
