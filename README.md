@@ -8,7 +8,9 @@ Record a browser task once - Aemulus learns the intent behind it and runs it aut
 
 [Website](https://aemulusai.com) · [Litepaper](https://aemulusai.com/litepaper) · [Developers](https://aemulusai.com/developers) · [SDK](#sdk) · [Roadmap](#roadmap)
 
-`$AEMU · Solana / pump.fun - pre-launch`
+`$AEMU · Solana` · [pump.fun](https://pump.fun/coin/7QQSvSuBenaLAUuXZtmSjMbqvupSUhCsTso3f2N9pump)
+
+**CA** `7QQSvSuBenaLAUuXZtmSjMbqvupSUhCsTso3f2N9pump`
 
 ---
 
