@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ES2022",
+    "moduleResolution": "node",
+    "declaration": true,
+    "declarationMap": false,
+    "sourceMap": false,
+    "outDir": "dist/esm",
+    "strict": true,
+    "skipLibCheck": true,
+    "removeComments": false,
+    "types": []
+  },
+  "include": ["index.ts"]
+}

@@ -122,14 +122,14 @@ export default async function DevelopersPage() {
           Or skip the curl
         </h2>
         <p className="mt-2 max-w-2xl text-sm text-ink-2">
-          A tiny, dependency-free client lives in the Aemulus repo (
-          <span className="mono">sdk/</span>). Works anywhere{" "}
+          A tiny, dependency-free client published as{" "}
+          <span className="mono">npm i aemulus</span>. Works anywhere{" "}
           <span className="mono">fetch</span> does - Node, browsers, Deno, edge.
         </p>
         <div className="mt-6">
           <CodeBlock
-            title="sdk/ - run, read output, verify"
-            code={`import { Aemulus } from "@/sdk";
+            title="aemulus - run, read output, verify"
+            code={`import { Aemulus } from "aemulus";
 
 const aemulus = new Aemulus({ apiKey: process.env.AEMULUS_KEY! });
 

@@ -53,3 +53,6 @@ next-env.d.ts
 
 # Local-only marketing trailer (videos + render scripts — never pushed)
 /trailer/
+
+# SDK build output (published to npm, not committed)
+/sdk/dist/

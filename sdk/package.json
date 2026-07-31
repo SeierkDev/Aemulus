@@ -1,0 +1,51 @@
+{
+  "name": "aemulus",
+  "version": "0.1.0",
+  "description": "TypeScript client for the Aemulus protocol: run browser-automation skills and verify their sealed receipts.",
+  "license": "AGPL-3.0-or-later",
+  "author": "SeierkDev",
+  "homepage": "https://aemulusai.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SeierkDev/Aemulus.git",
+    "directory": "sdk"
+  },
+  "bugs": "https://github.com/SeierkDev/Aemulus/issues",
+  "keywords": [
+    "aemulus",
+    "browser-automation",
+    "rpa",
+    "web-automation",
+    "ai-agents",
+    "solana",
+    "verifiable",
+    "sdk"
+  ],
+  "type": "module",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/esm/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json && node -e \"require('fs').writeFileSync('dist/cjs/package.json', JSON.stringify({type:'commonjs'}))\"",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "typescript": "^5"
+  }
+}

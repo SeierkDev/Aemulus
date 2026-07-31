@@ -55,7 +55,7 @@ It ships with multi-demonstration program synthesis, a self-healing sandboxed br
 ## SDK
 
 ```ts
-import { Aemulus } from "@/sdk";
+import { Aemulus } from "aemulus";
 
 const aemulus = new Aemulus({ apiKey: process.env.AEMULUS_KEY! });
 
@@ -67,7 +67,7 @@ console.log(run.output); // { total: "$42.00" }
 const proof = await aemulus.verify(run.id);
 ```
 
-The SDK source lives in [`sdk/`](./sdk); it wraps the `/v1` REST API (also documented by the OpenAPI spec at `/api/openapi.json`).
+Install with `npm i aemulus`; source in [`sdk/`](./sdk). It wraps the `/v1` REST API (also documented by the OpenAPI spec at `/api/openapi.json`).
 
 ---
 
