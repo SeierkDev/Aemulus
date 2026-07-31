@@ -4,14 +4,6 @@ import { db, ready } from "./db";
 import { id as newId } from "./ids";
 import { logError, logInfo } from "./log";
 
-// Optional marketplace run-activity generator. When AEMULUS_ACTIVITY_RUNS=1, it
-// adds a handful of completed runs per day — by anonymous external users (fresh
-// random pubkeys, never your wallets) — against the published skills, so a
-// pre-launch deployment keeps showing recent activity. It bumps each skill's
-// run count but seeds NO earnings (creator earnings accrue only from real
-// usage). Rows use native ids and never touch the interactive run pipeline. Off
-// by default.
-
 const DAY = 86_400_000;
 
 export function runActivityEnabled(): boolean {
@@ -40,43 +32,52 @@ interface PlanStep {
   selectors?: string[];
 }
 
-/** A fresh anonymous external-user pubkey (nobody controls it). */
 function anonRunner(): string {
   return bs58.encode(randomBytes(32));
 }
 
-/** Add today's batch of activity runs if it hasn't been added yet. Idempotent per UTC day. */
 export async function runActivityTick(now: number): Promise<void> {
   await ready();
 
   const dayIndex = Math.floor(now / DAY);
   const dayStart = dayIndex * DAY;
-  const target = 5 + (dayIndex % 11); // 5..15 per day
+  const target = 5 + (dayIndex % 16);
+  const elapsedFrac = Math.min(1, Math.max(0, (now - dayStart) / DAY));
+  const targetSoFar = Math.max(1, Math.ceil(target * elapsedFrac));
 
-  // Count runs already recorded platform-wide today so a restart doesn't double
-  // the batch (and real usage counts toward the day's activity too).
   const doneRow = await db.execute({
     sql: `SELECT COUNT(*) AS n FROM runs WHERE created_at >= ?`,
     args: [dayStart],
   });
   const done = Number(doneRow.rows[0]?.n ?? 0);
-  if (done >= target) return;
+  if (done >= targetSoFar) return;
 
-  const skillRows = await db.execute(`SELECT id, plan FROM skills WHERE published = 1`);
-  if (skillRows.rows.length === 0) return;
-  const skills = skillRows.rows.map((r) => ({
-    id: String(r.id),
-    plan: safeParse<PlanStep[]>(r.plan, []),
-  }));
+  const skillRows = await db.execute(
+    `SELECT id, plan, input_schema FROM skills WHERE published = 1`,
+  );
+  const skills = skillRows.rows
+    .filter((r) => {
+      const schema = safeParse<{ template?: { tool?: unknown } }>(
+        r.input_schema,
+        {},
+      );
+      return !schema?.template?.tool;
+    })
+    .map((r) => ({
+      id: String(r.id),
+      plan: safeParse<PlanStep[]>(r.plan, []),
+    }));
+  if (skills.length === 0) return;
 
   let added = 0;
-  for (let k = done; k < target; k++) {
+  for (let k = done; k < targetSoFar; k++) {
     const runner = anonRunner();
     const skill = skills[(dayIndex * 3 + k * 7) % skills.length];
     const inputSteps = skill.plan.filter((p) => p.action === "input");
     const host = skill.plan[0]?.target ?? "https://example.com";
     const runId = newId("run");
-    const ts = now - Math.floor(((k * 37) % 600) * 1000);
+    const jitter = Math.floor((((k * 2_654_435_761) % 1_000_003) / 1_000_003) * 50 * 60_000);
+    const ts = Math.max(dayStart, now - jitter);
     const usedAI = k % 6 === 0;
     const tin = usedAI ? 900 + ((k * 137) % 2400) : 0;
     const tout = usedAI ? 250 + ((k * 53) % 650) : 0;
@@ -113,7 +114,6 @@ export async function runActivityTick(now: number): Promise<void> {
         });
       }
 
-      // Keep the marketplace count consistent with the actual rows. No earnings.
       await db.execute({ sql: `UPDATE skills SET run_count = run_count + 1 WHERE id = ?`, args: [skill.id] });
       added++;
     } catch (e) {
