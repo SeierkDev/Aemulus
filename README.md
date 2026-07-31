@@ -144,10 +144,10 @@ npm run qbo:smoke
 
 | Phase | Title | Status |
 |---|---|---|
-| 1 | Launch - $AEMU live on pump.fun, on-chain payouts, live receipt anchoring | In progress |
+| 1 | Launch - $AEMU live on pump.fun, on-chain payouts, live receipt anchoring | Token live |
 | 2 | Trust at scale - micro-VM sandbox per run, Arweave receipts, marketplace search | Planned |
 | 3 | Deeper intelligence - vision-grounded synthesis, zk-SNARK proofs of execution | Planned |
-| 4 | Open ecosystem - published SDK, skill forking, portable on-chain reputation | Planned |
+| 4 | Open ecosystem - published SDK, skill forking, portable on-chain reputation | SDK shipped |
 | 5 | Frontier - multi-chain anchoring, on-chain skill registry, desktop/mobile capture | Planned |
 
 Full roadmap at [aemulusai.com/roadmap](https://aemulusai.com/roadmap).
@@ -165,6 +165,8 @@ reserved** and are *not* licensed for reuse. You may self-host and modify this
 software, but you must **rebrand any public deployment** - you may not present it
 as "Aemulus" or represent any token as the official $AEMU. See [NOTICE](./NOTICE).
 The official project lives only at [aemulusai.com](https://aemulusai.com) and
-[github.com/SeierkDev/Aemulus](https://github.com/SeierkDev/Aemulus).
+[github.com/SeierkDev/Aemulus](https://github.com/SeierkDev/Aemulus). The official
+$AEMU mint is `7QQSvSuBenaLAUuXZtmSjMbqvupSUhCsTso3f2N9pump`; any token with a different mint is not affiliated with this
+project.
 
 Built by [SeierkDev](https://github.com/SeierkDev).
