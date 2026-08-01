@@ -18,8 +18,25 @@ import { SOLANA, gatingEnabled } from "./solana";
  * on web3.js (no extra dependency); activate + verify with a funded treasury.
  */
 
-const TOKEN_PROGRAM = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+/**
+ * The two SPL token programs.
+ *
+ * This is not a formality. $AEMU is a Token-2022 mint, and the token program is
+ * part of the ATA derivation seeds — so deriving with the classic program yields
+ * an address that simply does not exist, and a transfer built against the wrong
+ * program is rejected. Measured against the live mint: the classic derivation
+ * produced SZmQvTjf…, the real account is 3iG7eWST…. Every claim would have
+ * failed. The program is therefore read from the mint at payout time rather than
+ * assumed here.
+ */
+export const TOKEN_PROGRAM = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+export const TOKEN_2022_PROGRAM = new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
 const ATA_PROGRAM = new PublicKey("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+
+/** Is this a token program we know how to build instructions for? */
+export function isKnownTokenProgram(p: PublicKey): boolean {
+  return p.equals(TOKEN_PROGRAM) || p.equals(TOKEN_2022_PROGRAM);
+}
 const MEMO_PROGRAM = new PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr");
 // `Number(x) || 6` would turn an explicit AEMULUS_DECIMALS=0 into 6 (0 is falsy);
 // accept 0 as a valid decimals value and only fall back to 6 for a missing/invalid one.
@@ -38,9 +55,21 @@ export function payoutsEnabled(): boolean {
   return gatingEnabled() && !!process.env.AEMULUS_TREASURY_SECRET;
 }
 
-export function ataFor(owner: PublicKey, mint: PublicKey): PublicKey {
+/**
+ * Derive an associated token account.
+ *
+ * `tokenProgram` is a seed, so passing the wrong one silently yields a valid-
+ * looking address for an account that does not exist. It defaults to the classic
+ * program only so existing callers keep their old behaviour; the payout path
+ * always passes the program it read off the mint.
+ */
+export function ataFor(
+  owner: PublicKey,
+  mint: PublicKey,
+  tokenProgram: PublicKey = TOKEN_PROGRAM,
+): PublicKey {
   return PublicKey.findProgramAddressSync(
-    [owner.toBuffer(), TOKEN_PROGRAM.toBuffer(), mint.toBuffer()],
+    [owner.toBuffer(), tokenProgram.toBuffer(), mint.toBuffer()],
     ATA_PROGRAM,
   )[0];
 }
@@ -59,18 +88,30 @@ export function toBaseUnits(amount: number): bigint {
 
 /**
  * Build the two instructions for a treasury → wallet $AEMU transfer:
- * createIdempotent ATA (treasury pays) + SPL Transfer (ix 3). Pure + testable
- * (no network/signing), so the money-critical account ordering and amount
- * encoding can be unit-tested without broadcasting.
+ * createIdempotent ATA (treasury pays) + TransferChecked (ix 12). Pure +
+ * testable (no network/signing), so the money-critical account ordering and
+ * amount encoding can be unit-tested without broadcasting.
+ *
+ * TransferChecked rather than the bare Transfer (ix 3) for two reasons. It is
+ * accepted by both token programs, so this one path covers classic and 2022.
+ * And it carries the mint and its decimals in the instruction itself, so the
+ * chain rejects a transfer whose scale disagrees with the mint instead of
+ * moving a thousand times the intended amount. On money, an instruction that
+ * can refuse itself is worth the extra account.
+ *
+ * `tokenProgram` and `decimals` are required, not defaulted. Both were
+ * previously assumed, and the assumption was wrong for the live mint.
  */
 export function buildPayoutInstructions(
   treasury: PublicKey,
   to: PublicKey,
   mint: PublicKey,
   base: bigint,
+  tokenProgram: PublicKey,
+  decimals: number,
 ): TransactionInstruction[] {
-  const src = ataFor(treasury, mint);
-  const dst = ataFor(to, mint);
+  const src = ataFor(treasury, mint, tokenProgram);
+  const dst = ataFor(to, mint, tokenProgram);
   return [
     // Create the recipient's token account if needed (idempotent; treasury pays).
     new TransactionInstruction({
@@ -81,19 +122,26 @@ export function buildPayoutInstructions(
         { pubkey: to, isSigner: false, isWritable: false },
         { pubkey: mint, isSigner: false, isWritable: false },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-        { pubkey: TOKEN_PROGRAM, isSigner: false, isWritable: false },
+        { pubkey: tokenProgram, isSigner: false, isWritable: false },
       ],
       data: Buffer.from([1]), // createIdempotent
     }),
-    // SPL Transfer (instruction 3): treasury ATA → recipient ATA.
+    // TransferChecked (instruction 12): src ATA → dst ATA, with the mint and its
+    // decimals verified on-chain. Note the account order differs from Transfer:
+    // the mint sits SECOND, between source and destination.
     new TransactionInstruction({
-      programId: TOKEN_PROGRAM,
+      programId: tokenProgram,
       keys: [
         { pubkey: src, isSigner: false, isWritable: true },
+        { pubkey: mint, isSigner: false, isWritable: false },
         { pubkey: dst, isSigner: false, isWritable: true },
         { pubkey: treasury, isSigner: true, isWritable: false },
       ],
-      data: Buffer.concat([Buffer.from([3]), u64le(base)]),
+      data: Buffer.concat([
+        Buffer.from([12]),
+        u64le(base),
+        Buffer.from([decimals]),
+      ]),
     }),
   ];
 }
@@ -152,8 +200,32 @@ export async function sendPayout(
       );
     }
 
+    // Which token program owns this mint? Read it rather than assume it: the
+    // same getParsedAccountInfo call above already carries it, and assuming
+    // classic SPL for a Token-2022 mint derives an account that does not exist,
+    // so every payout fails. Fail closed on anything unrecognised — a mint owned
+    // by some other program is not something to guess at with money.
+    // Named tokenProgram, not `owner`: in a payout file `owner` reads as the
+    // recipient, and this is the program that owns the MINT.
+    const tokenProgram = info.value?.owner;
+    if (!tokenProgram || !isKnownTokenProgram(tokenProgram)) {
+      throw new PayoutPrepError(
+        `The $AEMU mint is owned by ${tokenProgram?.toBase58() ?? "an unreadable program"}, which is not a known SPL token program — refusing to pay.`,
+      );
+    }
+
     tx = new Transaction();
-    for (const ix of buildPayoutInstructions(treasury.publicKey, to, mint, toBaseUnits(amount))) {
+    for (const ix of buildPayoutInstructions(
+      treasury.publicKey,
+      to,
+      mint,
+      // Amount is scaled with DECIMALS while the instruction declares `dec` from
+      // the chain — the check above already proved those are equal, so there is
+      // no path where the scale and the declared decimals disagree.
+      toBaseUnits(amount),
+      tokenProgram,
+      dec,
+    )) {
       tx.add(ix);
     }
     // Stamp the claim id as a Memo so a payout whose confirmation is lost can be
