@@ -542,7 +542,60 @@ export async function executeRun(
             await recordStep(runId, step, selectorUsed, captured, shotRel, confidence, false, `Captured ${key} = "${captured}"`);
           }
         } else {
-          await perform(page, loc.locator, step, value);
+          // If something is already sitting on top, don't spend the full step
+          // timeout discovering that. Nothing upstream catches this case: the
+          // element was found, so locate() succeeded and the operator was never
+          // consulted; the failure only shows up here, as a click that never
+          // lands.
+          const covered =
+            step.action === "click" && (await isCovered(loc.locator));
+          try {
+            await perform(
+              page,
+              loc.locator,
+              step,
+              value,
+              covered ? COVERED_CLICK_MS : undefined,
+            );
+          } catch (performErr) {
+            // The element was located fine, so this is not a "can't find it"
+            // problem — something is in the way. That is exactly the situation
+            // the agent can reason about (a consent wall, a modal, a sticky
+            // banner) and a retry loop cannot. Anything that is NOT an
+            // obstruction rethrows and fails the step as before.
+            const canAsk =
+              isBlockedError(performErr) &&
+              agentFallbackEnabled() &&
+              Date.now() <= deadline;
+            if (!canAsk) throw performErr;
+            const isSecretInput =
+              (step.action === "input" || step.action === "select") &&
+              step.valueSource === "input" &&
+              (vaultKeys.has(step.inputKey) || secretFieldKeys.has(step.inputKey));
+            const ag = await agenticStep(page, step, value, {
+              sensitive: isSecretInput,
+              vaultHost: vaultKeys.has(step.inputKey) ? vaultHost : undefined,
+              deadline,
+            });
+            tokensIn += ag.tokensIn;
+            tokensOut += ag.tokensOut;
+            // Rethrow the ORIGINAL error, not the agent's: "X intercepts
+            // pointer events" tells you what actually went wrong, where "the
+            // agent gave up" does not.
+            if (!ag.ok) throw performErr;
+            await snap();
+            await recordStep(
+              runId,
+              step,
+              ag.selectorUsed,
+              recVal,
+              recShot,
+              ag.confidence,
+              false,
+              ag.note || "Something was covering the element; the agent cleared it.",
+            );
+            continue;
+          }
           await page.waitForTimeout(150);
           await snap(); // skips the screenshot for a secret-typing step
           await recordStep(runId, step, selectorUsed, recVal, recShot, confidence, false, note);
@@ -733,15 +786,79 @@ async function captureValue(loc: Locator): Promise<string> {
   return raw.slice(0, MAX_CAPTURE_CHARS);
 }
 
+/**
+ * How long to keep trying a click we already know is covered.
+ *
+ * Playwright's default actionability wait is the full step timeout (20s). When
+ * an overlay is sitting on the element that wait is almost always wasted — the
+ * dialog is not going to dismiss itself — and the run dies having burned the
+ * time. Once isCovered() says something is on top, a couple of seconds is
+ * plenty for a transient banner to finish animating out; beyond that the agent
+ * is a better answer than more waiting.
+ */
+const COVERED_CLICK_MS = 2_500;
+
+/**
+ * Is another element sitting over this one's click point?
+ *
+ * This is the condition Playwright reports as "<el> intercepts pointer events"
+ * — the element is found, visible, and enabled, so nothing upstream treats it
+ * as a failure, and then every click silently lands on whatever is on top.
+ * Cookie-consent walls are the common case: a real one cost a run 20 seconds
+ * and then failed it outright.
+ *
+ * Deliberately conservative. Returns false on any error, and false when the top
+ * element is related to the target (a label wrapping its input, an icon inside
+ * a button), because those receive the click on the target's behalf and are not
+ * obstructions.
+ */
+export async function isCovered(loc: Locator): Promise<boolean> {
+  try {
+    return await loc.evaluate(
+      (el) => {
+        const r = (el as Element).getBoundingClientRect();
+        if (!r.width || !r.height) return false;
+        const top = document.elementFromPoint(
+          r.left + r.width / 2,
+          r.top + r.height / 2,
+        );
+        if (!top || top === el) return false;
+        return !el.contains(top) && !top.contains(el);
+      },
+      undefined,
+      // evaluate() auto-waits for the element, so without an explicit timeout a
+      // node that vanished between locate() and here would stall for the whole
+      // step timeout — reintroducing the 20-second hang this function exists to
+      // remove. A check this cheap either answers immediately or is not worth
+      // waiting for. Caught by a test.
+      { timeout: 1_000 },
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Does this failure mean "something was in the way", rather than "not found"? */
+export function isBlockedError(err: unknown): boolean {
+  const m = err instanceof Error ? err.message : String(err ?? "");
+  return (
+    m.includes("intercepts pointer events") ||
+    // Playwright reports the give-up as a plain timeout; pair it with the
+    // actionability line so an unrelated navigation timeout isn't swept in.
+    (m.includes("Timeout") && m.includes("waiting for element to be visible"))
+  );
+}
+
 async function perform(
   page: Page,
   loc: Locator,
   step: SkillStep,
   value: string,
+  clickTimeoutMs?: number,
 ): Promise<void> {
   switch (step.action) {
     case "click":
-      await loc.click();
+      await loc.click(clickTimeoutMs ? { timeout: clickTimeoutMs } : {});
       break;
     case "input":
       await loc.fill(value);
