@@ -53,6 +53,10 @@ export function receiptDigest(input: {
   outcomeReason?: string | null;
   result?: string | null;
   error?: string | null;
+  /** Canonical JSON of the isolation policy the run executed under (lib/sandbox.ts).
+   *  Folded in so "this ran sandboxed, with this egress allowlist" is part of what
+   *  the receipt attests, not a claim the database could be edited to make. */
+  sandbox?: string | null;
 }): string {
   const canonical = JSON.stringify({
     run: input.runId,
@@ -64,6 +68,10 @@ export function receiptDigest(input: {
     outcomeReason: input.outcomeReason ?? null,
     result: input.result ?? null,
     error: input.error ?? null,
+    // Conditionally spread, NOT `?? null`: adding an always-present key would
+    // change the canonical form of every receipt written before sandboxing
+    // existed and invalidate their stored hashes. Absent stays absent.
+    ...(input.sandbox ? { sandbox: input.sandbox } : {}),
     steps: [...input.steps]
       .sort((a, b) => a.idx - b.idx)
       .map((s) => ({
@@ -146,6 +154,7 @@ async function digestForRun(run: Run): Promise<string> {
     outcomeReason: run.outcomeReason,
     result: run.result,
     error: run.error,
+    sandbox: run.sandbox,
     steps,
   });
 }

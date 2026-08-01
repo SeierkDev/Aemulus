@@ -85,6 +85,7 @@ export async function createRun(input: {
     tokensIn: 0,
     tokensOut: 0,
     outcomeStatus: null,
+    sandbox: null,
     outcomeReason: null,
     commitmentRoot: null,
     registrySig: null,
@@ -396,6 +397,22 @@ export async function setRunOutcome(
   });
 }
 
+/**
+ * Record the isolation policy this run executed under. Written as the run starts
+ * (not at the end) so a run that crashes mid-flight still carries the boundary it
+ * was given, and so the value is already on the row when the receipt is sealed.
+ */
+export async function setRunSandbox(
+  runId: string,
+  policy: string,
+): Promise<void> {
+  await ready();
+  await db.execute({
+    sql: `UPDATE runs SET sandbox = ? WHERE id = ?`,
+    args: [policy, runId],
+  });
+}
+
 /** Record that this run was anchored on-chain via the aemulus-registry program. */
 export async function setRunRegistryAnchor(
   runId: string,
@@ -588,6 +605,7 @@ function rowToRun(row: Record<string, unknown>, steps: RunStepRecord[]): Run {
         ? null
         : (String(row.outcome_status) as "achieved" | "unconfirmed"),
     outcomeReason: row.outcome_reason == null ? null : String(row.outcome_reason),
+    sandbox: row.sandbox == null ? null : String(row.sandbox),
     commitmentRoot: row.commitment_root == null ? null : String(row.commitment_root),
     registrySig: row.registry_sig == null ? null : String(row.registry_sig),
     registryCluster:

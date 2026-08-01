@@ -5,6 +5,7 @@ import {
   type Page,
 } from "playwright";
 import { launchBrowser } from "./browser";
+import { runContextOptions, runLaunchOptions } from "./sandbox";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
@@ -63,6 +64,8 @@ class RecorderSession {
   private browser: Browser | null = null;
   private context: BrowserContext | null = null;
   private page: Page | null = null;
+  /** Egress check reused by the landed-URL guard on framenavigated. */
+  private guardLandedUrl: ((url: string) => Promise<boolean>) | null = null;
   private cdp: CDPSession | null = null;
   private lastFrame: string | null = null;
   private frameSeq = 0;
@@ -113,29 +116,63 @@ class RecorderSession {
 
     // Headless - the user drives it remotely via the streamed view.
     // AEMULUS_RECORD_HEADED=1 opens a real window for local debugging.
+    // Same host boundary as a run. A recording has no skill allowlist to
+    // enforce (the point is that the user browses freely), but it drives a real
+    // Chromium to whatever URL they hand it — so the OS sandbox matters here for
+    // exactly the reason it matters there: a hostile page that exploits the
+    // renderer must not land as the app user. This browser previously launched
+    // with the sandbox off, because Playwright's default is off.
     this.browser = await launchBrowser({
       headless: process.env.AEMULUS_RECORD_HEADED !== "1",
+      ...runLaunchOptions(),
     });
     this.context = await this.browser.newContext({
       viewport: VIEWPORT,
       acceptDownloads: false,
+      ...runContextOptions(),
     });
 
     // SSRF egress guard for the WHOLE session, not just the initial URL: an
     // in-page redirect/click to an internal host or a hostname that resolves
     // private would otherwise be loaded and screencast into the recording.
-    await this.context.route("**/*", async (route) => {
-      const req = route.request();
-      const url = req.url();
-      if (isUnsafeRequestUrl(url)) return route.abort();
+    const urlPasses = async (u: string) => {
+      if (isUnsafeRequestUrl(u)) return false;
       // Resolve the host and block anything pointing at a private/internal
       // address - for EVERY request, not just navigations. A subresource
       // (img/script/fetch) to a public hostname whose DNS points inside the
       // network would otherwise reach internal services / cloud metadata. The
       // check is host-cached (60s), so cost is one lookup per distinct host.
-      if (await navHostResolvesPrivate(url)) return route.abort();
+      if (await navHostResolvesPrivate(u)) return false;
+      return true;
+    };
+    await this.context.route("**/*", async (route) => {
+      const req = route.request();
+      const url = req.url();
+      if (!(await urlPasses(url))) return route.abort();
       return route.continue();
     });
+
+    // Redirects deliberately go through route.continue() here, unlike the
+    // runner, which intercepts and re-validates every hop. The reason is that
+    // intercepting costs an accurate page.url(): the final response is fulfilled
+    // against the original request, so after ANY redirect the page reports the
+    // pre-redirect address. Measured. In a run that is a documented wart. In a
+    // RECORDING it is corrupting, because every recorded action is stamped with
+    // page.url() and allowedHosts is derived from that trace — so recording
+    // through an ordinary login redirect would mint a skill whose allowlist is
+    // missing the host it actually needs, which the runner would then refuse.
+    // Recording would be generating skills the runner blocks.
+    //
+    // The threat is also weaker here. In a run, a malicious author picks the
+    // plan, allowlists their own domain, and can carry what a redirect exposed
+    // back out to themselves. A recording is driven by the user on a site they
+    // chose, and anything a hostile redirect surfaced renders in that user's own
+    // screencast, which the attacker cannot read. So the boundary here is placed
+    // after the fact: if a navigation lands somewhere the guard would have
+    // refused, blank the page so nothing internal is ever screencast, captured
+    // in a screenshot, or written into the recording.
+    // (attached below, once the page exists)
+    this.guardLandedUrl = urlPasses;
 
     // Bridge: in-page script calls window.__aemRecord(action). Exposed on the
     // context, so it's reachable from ANY frame; only accept calls from the top
@@ -152,6 +189,22 @@ class RecorderSession {
 
     this.page = await this.context.newPage();
     this.context.on("close", () => { this.markStopped(); void this.closeBrowser(); });
+
+    // The after-the-fact half of the egress guard (see the long note above the
+    // route handler). Redirects are followed natively so page.url() stays
+    // truthful for the recording, and this catches a navigation that LANDED
+    // somewhere the guard would have refused — blanking the page before any of
+    // it is screencast, screenshotted, or written into an action.
+    const guard = this.guardLandedUrl;
+    this.page.on("framenavigated", (frame) => {
+      if (frame !== this.page?.mainFrame() || !guard) return;
+      void (async () => {
+        const landed = frame.url();
+        if (!landed || landed.startsWith("about:")) return;
+        if (await guard(landed)) return;
+        await this.page?.goto("about:blank").catch(() => {});
+      })();
+    });
 
     // Stream the page to the client via CDP screencast.
     this.cdp = await this.context.newCDPSession(this.page);

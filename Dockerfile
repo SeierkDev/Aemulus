@@ -17,6 +17,15 @@ COPY . .
 ENV NODE_ENV=production
 RUN npm run build
 
+# Every run executes steps somebody else published, so Chromium's own OS sandbox
+# is the last line between a compromised renderer and this container. That
+# sandbox is silently disabled when Chromium runs as root — which is the default
+# in this image — and the usual "fix" is to paste in --no-sandbox, which throws
+# the protection away instead of earning it. So drop to the non-root user the
+# Playwright image already ships, and give it the two paths the app writes to.
+RUN mkdir -p /app/.data && chown -R pwuser:pwuser /app/.data /app/.next
+USER pwuser
+
 # Railway injects PORT; `next start` binds it on 0.0.0.0. 3000 is the fallback.
 ENV PORT=3000
 EXPOSE 3000

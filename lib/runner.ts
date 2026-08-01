@@ -1,6 +1,14 @@
 import { type Browser, type Locator, type Page } from "playwright";
 import { launchBrowser } from "./browser";
 import {
+  decideEgress,
+  followNavigation,
+  routeWebSockets,
+  runContextOptions,
+  runLaunchOptions,
+  sandboxPolicy,
+} from "./sandbox";
+import {
   attachRrwebCapture,
   saveRrwebEvents,
   type RrwebCapture,
@@ -16,6 +24,7 @@ import {
   setRunOutcome,
   setRunUsage,
   setRunCommitment,
+  setRunSandbox,
   setRunStatus,
 } from "./runs";
 import {
@@ -129,37 +138,78 @@ export async function executeRun(
   // Bound concurrent Chromium launches; excess runs queue here.
   await runSlots.acquire();
   try {
+    // Isolation boundary for this run: its own Chromium process with its own
+    // profile (destroyed on close), the OS sandbox on, and the host-reaching
+    // flags stripped. See lib/sandbox.ts.
     browser = await launchBrowser({
       headless: process.env.AEMULUS_RUN_HEADED !== "1",
+      ...runLaunchOptions(),
     });
     const context = await browser.newContext({
       viewport: { width: 1280, height: 800 },
       acceptDownloads: false, // a hostile page can't fill disk via downloads
+      ...runContextOptions(), // no service workers: they can outlive a page and
+      // issue requests the egress route below does not reliably see
     });
     // Best-effort rrweb capture for the rich replay (AEMULUS_RRWEB=1). Must be
     // wired before the first page is created; null + inert when disabled.
     capture = await attachRrwebCapture(context);
     // Egress guardrail: block requests to internal hosts / private IPs / unknown
-    // schemes so an untrusted skill can't pull from the server's network. Plus
-    // the per-skill allowlist - NAVIGATIONS must target a declared host (so a
-    // published skill can't be edited to quietly exfiltrate to a new domain);
-    // subresources still load so pages render. Empty allowlist = unrestricted.
+    // schemes so an untrusted skill can't pull from the server's network. On top
+    // of that, the per-skill allowlist is now enforced for every request that
+    // could carry data OUT (fetch/xhr/websocket/beacon), not just navigations —
+    // otherwise a published skill could scrape a page and POST the result to a
+    // host it never declared. Passive resources (images, fonts, CSS) still load
+    // from anywhere so ordinary pages render; see lib/sandbox.ts for the full
+    // policy and its stated residual. Empty allowlist = unrestricted.
     const allowedHosts = skill.allowedHosts ?? [];
-    await context.route("**/*", async (route) => {
-      const req = route.request();
-      const url = req.url();
-      if (isUnsafeRequestUrl(url)) return route.abort();
+    const unrestricted = allowedHosts.length === 0;
+    // Persist the boundary before the first step executes, so a run that dies
+    // mid-flight still records what it was confined to. Best-effort: failing to
+    // write the policy must never stop the run itself.
+    await setRunSandbox(runId, JSON.stringify(sandboxPolicy(allowedHosts))).catch(
+      (e) => logError("runner.sandbox-policy", e),
+    );
+    // Every check a URL must pass, in one place, so a redirect hop is held to
+    // exactly the same standard as the request that started the navigation.
+    const urlPasses = async (u: string, isNav: boolean, type: string) => {
+      if (isUnsafeRequestUrl(u)) return false;
       // Block a hostname that RESOLVES private (the sync filter above only
       // catches literal private IPs) for EVERY request, not just navigations -
       // a subresource to a public host whose DNS points inside the network would
       // otherwise reach internal services. Host-cached (60s) so it's one lookup
       // per distinct host.
-      if (await navHostResolvesPrivate(url)) return route.abort();
-      if (req.isNavigationRequest()) {
-        if (!hostInAllowlist(url, allowedHosts)) return route.abort();
+      if (await navHostResolvesPrivate(u)) return false;
+      return (
+        decideEgress({
+          resourceType: type,
+          isNavigation: isNav,
+          hostAllowed: hostInAllowlist(u, allowedHosts),
+          unrestricted,
+        }) === "allow"
+      );
+    };
+    await context.route("**/*", async (route) => {
+      const req = route.request();
+      const url = req.url();
+      const isNav = req.isNavigationRequest();
+      const type = req.resourceType();
+      if (!(await urlPasses(url, isNav, type))) return route.abort();
+      // A navigation that gets a 3xx would otherwise be followed by the network
+      // stack WITHOUT coming back through this handler, which walks straight past
+      // both the allowlist and the SSRF guard. Follow it hop by hop instead,
+      // re-checking each Location. Subresource redirects stay on the fast path:
+      // their responses aren't readable cross-origin, so the same abuse doesn't
+      // land, and routing every image through fetch/fulfill would be costly.
+      if (isNav) {
+        return followNavigation(route, url, (next) => urlPasses(next, true, type));
       }
       return route.continue();
     });
+    // WebSockets bypass context.route() entirely, so the rule above is blind to
+    // them. Without this a skill confined to one host could still open a socket
+    // anywhere and stream out everything it read.
+    await routeWebSockets(context, allowedHosts, hostInAllowlist);
     const page = await context.newPage();
     // Close any popup/extra tab the run didn't open (the runner only drives the
     // original page) so a window.open() storm can't leak Page objects.
@@ -529,6 +579,8 @@ export async function executeRun(
     // below still runs (closes the browser + releases the slot) before it does.
     throw err instanceof Error ? err : new Error("Run failed to start.");
   } finally {
+    // Closing the browser also destroys the run's profile directory, which
+    // Playwright created for this launch alone.
     await browser?.close().catch(() => {});
     // Persist the rrweb events (best-effort) for the replay - even for failed
     // runs, where the replay is most useful for debugging.

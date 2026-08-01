@@ -19,4 +19,15 @@ jobs:
       # differently and rejects the lockfile as out of sync.
       - run: npm install -g npm@11
       - run: npm ci
+      # The sandbox wiring test drives a REAL Chromium — that is the entire
+      # point of it, since every isolation bug found so far was a gap between
+      # what the code said and what a browser actually did. Without this step
+      # the browser is missing and the test can only fail.
+      - run: npx playwright install --with-deps chromium
+      # Ubuntu 23.10+ (the runner image is noble) blocks unprivileged user
+      # namespaces via AppArmor, and that is exactly what Chromium's sandbox
+      # needs. Without this, chromiumSandbox:true cannot start and the test
+      # would only pass by testing a WEAKER configuration than production runs.
+      # Re-enable it so CI exercises the real thing.
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: npm run ci # tsc --noEmit && eslint . && vitest run

@@ -269,6 +269,9 @@ export interface Run {
   /** Vision success-verification: null = unchecked, else achieved | unconfirmed. */
   outcomeStatus: "achieved" | "unconfirmed" | null;
   outcomeReason: string | null;
+  /** Canonical JSON of the isolation policy this run executed under (lib/sandbox.ts).
+   *  null for runs that predate isolated execution. */
+  sandbox: string | null;
   /** Private verifiable receipt: hiding-commitment root over the run's fields. */
   commitmentRoot: string | null;
   /** On-chain registry anchor (aemulus-registry program), if recorded. */

@@ -10,54 +10,88 @@ export const metadata = {
   description: "Where Aemulus is going next.",
 };
 
-const ROADMAP = [
+/** A roadmap line. `done` marks something that has actually shipped. */
+type Item = { t: string; done?: boolean };
+
+const ROADMAP: { phase: string; title: string; body: Item[] }[] = [
   {
     phase: "Phase 1",
     title: "Launch",
     body: [
-      "$AEMU goes live on pump.fun; usage gating activates automatically.",
-      "On-chain creator payouts - escrow + claim - replace the off-chain earnings ledger.",
-      "Receipt roots anchored live on Solana mainnet, with funded signing.",
+      {
+        t: "$AEMU goes live on pump.fun; usage gating activates automatically.",
+        done: true,
+      },
+      {
+        t: "On-chain creator payouts - escrow + claim - replace the off-chain earnings ledger.",
+      },
+      { t: "Receipt roots anchored live on Solana mainnet, with funded signing." },
     ],
   },
   {
     phase: "Phase 2",
     title: "Trust at scale",
     body: [
-      "Network-isolated micro-VM sandbox per run, so untrusted marketplace skills can't reach anything they shouldn't.",
-      "Permanent receipt + screenshot storage on Arweave - proofs that outlive the app.",
-      "More run notifications: email and Telegram (signed webhooks are already live today).",
-      "A creator analytics dashboard - runs, success rate, unique users, and cost over time, per skill (per-skill run count, success rate, and ratings already ship today).",
-      "Curated collections and editorial spotlights - full-text search and auto-categories already ship today.",
+      // Split deliberately. What shipped is process-level isolation, not a
+      // micro-VM, and the two are not the same boundary — claiming the stronger
+      // one because the weaker one landed would be exactly the kind of thing
+      // this feature exists to make checkable.
+      {
+        t: "Isolated execution: every run gets its own browser process and profile, plus a network boundary that only lets it reach the hosts its skill declared. The policy each run executed under is recorded in its receipt.",
+        done: true,
+      },
+      {
+        t: "Micro-VM isolation per run, adding a kernel-level boundary on top of the process-level one that ships today.",
+      },
+      {
+        t: "Permanent receipt + screenshot storage on Arweave - proofs that outlive the app.",
+      },
+      {
+        t: "More run notifications: email and Telegram (signed webhooks are already live today).",
+      },
+      {
+        t: "A creator analytics dashboard - runs, success rate, unique users, and cost over time, per skill (per-skill run count, success rate, and ratings already ship today).",
+      },
+      {
+        t: "Curated collections and editorial spotlights - full-text search and auto-categories already ship today.",
+      },
     ],
   },
   {
     phase: "Phase 3",
     title: "Deeper intelligence",
     body: [
-      "Vision-grounded synthesis - the model sees the page, not just the trace.",
-      "Full zk-SNARK proofs of execution - today runs already carry private, selective-disclosure receipts (prove any field without revealing the rest); next, prove a whole run followed its skill with zero knowledge.",
-      "Longer, branching multi-step pipelines with waits and conditionals - single-level skill chaining that passes one skill's outputs into another's inputs already ships today.",
+      { t: "Vision-grounded synthesis - the model sees the page, not just the trace." },
+      {
+        t: "Full zk-SNARK proofs of execution - today runs already carry private, selective-disclosure receipts (prove any field without revealing the rest); next, prove a whole run followed its skill with zero knowledge.",
+      },
+      {
+        t: "Longer, branching multi-step pipelines with waits and conditionals - single-level skill chaining that passes one skill's outputs into another's inputs already ships today.",
+      },
     ],
   },
   {
     phase: "Phase 4",
     title: "Open ecosystem",
     body: [
-      "A published, versioned SDK package and additional language clients (the REST API, OpenAPI spec, in-repo TypeScript SDK, and MCP server are live today).",
-      "Skill forking and remixing across creators (versioning with full history already ships).",
-      "Reputation as a portable, on-chain credential.",
-      "Richer team roles + shared run history (basic teams with shared skills already ship).",
+      {
+        t: "A published, versioned SDK package and additional language clients (the REST API, OpenAPI spec, in-repo TypeScript SDK, and MCP server are live today).",
+      },
+      { t: "Skill forking and remixing across creators (versioning with full history already ships)." },
+      { t: "Reputation as a portable, on-chain credential." },
+      { t: "Richer team roles + shared run history (basic teams with shared skills already ship)." },
     ],
   },
   {
     phase: "Phase 5",
     title: "Frontier",
     body: [
-      "Multi-chain receipt anchoring.",
-      "An on-chain skill registry anyone can build on.",
-      "Agents that discover and compose marketplace skills autonomously.",
-      "Capture beyond the browser - desktop and mobile (the browser extension, which runs skills in your own logged-in browser, already ships today).",
+      { t: "Multi-chain receipt anchoring." },
+      { t: "An on-chain skill registry anyone can build on." },
+      { t: "Agents that discover and compose marketplace skills autonomously." },
+      {
+        t: "Capture beyond the browser - desktop and mobile (the browser extension, which runs skills in your own logged-in browser, already ships today).",
+      },
     ],
   },
 ];
@@ -77,7 +111,7 @@ export default function RoadmapPage() {
         </h1>
         <p className="mx-auto mt-4 max-w-xl text-lg leading-relaxed text-ink-2">
           Forward-looking. Each phase builds on what&apos;s already live in the
-          product today.
+          product today. Anything marked shipped is running right now.
         </p>
       </section>
 
@@ -125,14 +159,34 @@ export default function RoadmapPage() {
                       <ul className="mt-3 grid gap-2">
                         {r.body.map((b) => (
                           <li
-                            key={b}
+                            key={b.t}
                             className={
-                              "flex gap-2.5 text-sm text-ink-2 " +
+                              "flex gap-2.5 text-sm " +
+                              (b.done ? "text-ink " : "text-ink-2 ") +
                               (left ? "md:flex-row-reverse md:text-right" : "")
                             }
                           >
-                            <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-ink-3" />
-                            <span className="leading-relaxed">{b}</span>
+                            {b.done ? (
+                              <span
+                                aria-hidden
+                                className="mt-[3px] flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-border-strong text-[9px] leading-none text-ink"
+                              >
+                                ✓
+                              </span>
+                            ) : (
+                              <span
+                                aria-hidden
+                                className="mt-2 h-1 w-1 shrink-0 rounded-full bg-ink-3"
+                              />
+                            )}
+                            <span className="leading-relaxed">
+                              {b.t}
+                              {b.done ? (
+                                <span className="ml-2 align-middle text-[10px] uppercase tracking-[0.14em] text-ink-3">
+                                  Shipped
+                                </span>
+                              ) : null}
+                            </span>
                           </li>
                         ))}
                       </ul>

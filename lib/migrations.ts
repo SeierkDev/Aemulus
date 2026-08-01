@@ -501,4 +501,14 @@ export const MIGRATIONS: Migration[] = [
     name: "runs_batched_at",
     addColumns: [{ table: "runs", column: "batched_at", def: "INTEGER" }],
   },
+
+  // 35 - isolated execution: the sandbox policy a run actually executed under,
+  // stored as canonical JSON and folded into the receipt hash. NULL for every
+  // run predating sandboxing, which is why the receipt digest omits the field
+  // entirely rather than hashing a null (see lib/receipt.ts).
+  {
+    id: 35,
+    name: "run_sandbox_policy",
+    addColumns: [{ table: "runs", column: "sandbox", def: "TEXT" }],
+  },
 ];
