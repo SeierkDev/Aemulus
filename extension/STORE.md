@@ -32,8 +32,10 @@ Record and replay browser automations for the user's own Aemulus account.
 
 - **storage** — remember the Aemulus URL/API key and buffer a recording in
   progress.
-- **tabs** — know the active tab to record/run in and read its URL to start.
-- **scripting** — perform the recorded steps in the page during a run.
+- **tabs** — identify the active tab to record or run in, read its URL to start a
+  task, navigate between pages mid-task, send each step to the content script,
+  and capture the visible tab for the step screenshots the user sees in their
+  own run history.
 - **host access (`<all_urls>`)** — a task can span any site the user chooses and
   can navigate between pages mid-task, so the recorder/replayer must work on all
   URLs. The extension only acts while the user has started a recording or a run.
