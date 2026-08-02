@@ -18,9 +18,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function PrivacyPage() {
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-6">
+    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6">
       <Nav />
-      <main className="py-10">
+      <main className="mx-auto w-full max-w-3xl py-10">
         <h1 className="text-3xl font-semibold tracking-tight">Privacy Policy</h1>
         <p className="mt-2 text-xs text-ink-3">Last updated: July 30, 2026</p>
 

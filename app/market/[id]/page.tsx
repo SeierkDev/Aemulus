@@ -73,9 +73,9 @@ export default async function MarketSkillPage({
     .slice(0, 4);
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col px-6">
+    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6">
       <Nav />
-      <div className="border-t border-border pt-8">
+      <div className="mx-auto w-full max-w-4xl border-t border-border pt-8">
         <Link href="/market" className="text-sm text-ink-3 hover:text-ink">
           ← marketplace
         </Link>

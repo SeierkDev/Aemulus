@@ -15,9 +15,9 @@ export default async function OrgPage() {
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-6">
+    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6">
       <Nav />
-      <div className="border-t border-border pt-8">
+      <div className="mx-auto w-full max-w-3xl border-t border-border pt-8">
         <h1 className="text-2xl font-semibold tracking-tight">Teams</h1>
         <p className="mt-1.5 max-w-2xl text-sm text-ink-2">
           Share skills with other wallets. Members can view and run a shared
