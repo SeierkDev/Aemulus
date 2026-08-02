@@ -3,11 +3,14 @@ import {
   claimSchedule,
   deactivate,
   dueSchedules,
+  getWatch,
   recordRun,
+  setWatchState,
 } from "./schedules";
 import { getSkill } from "./skills";
 import { getQuota } from "./quota";
 import { startRun } from "./run-service";
+import { activeSink } from "./watch-sink-telegram";
 import { computeTier, gatingEnabled, readAemulusBalance } from "./solana";
 import { logError, logInfo } from "./log";
 import type { Session } from "./siws";
@@ -72,6 +75,10 @@ async function runDue(): Promise<void> {
         if (!t.allowed) {
           await deactivate(s.id); // CONFIRMED no longer holds enough - stop it
           logInfo("scheduler.skip", "no longer eligible", { schedule: s.id });
+          // Switching someone's watch off without telling them is the worst of
+          // the silent paths: it never comes back on its own, and to the owner
+          // it just looks like the page stopped changing.
+          await tellOwner(s, "tier", true);
           continue;
         }
       }
@@ -84,9 +91,15 @@ async function runDue(): Promise<void> {
       const quota = await getQuota(session);
       if (!quota.ok) {
         logInfo("scheduler.skip", "quota exhausted", { schedule: s.id });
+        await tellOwner(s, "quota", false);
         continue; // already advanced by the claim
       }
-      const run = await startRun({ skill, input: s.input, runner: s.owner });
+      const run = await startRun({
+        skill,
+        input: s.input,
+        runner: s.owner,
+        scheduleId: s.id, // so a watch on this schedule can be evaluated on completion
+      });
       await recordRun(s.id, run.id);
       logInfo("scheduler.ran", "ok", {
         schedule: s.id,
@@ -108,4 +121,44 @@ export function startScheduler(): void {
   const tickMs = Math.max(1000, Number(process.env.AEMULUS_SCHEDULER_MS) || 60_000);
   globalThis.__aemScheduler = setInterval(() => void runDue(), tickMs);
   logInfo("scheduler", `started (${tickMs}ms tick)`);
+}
+
+/**
+ * Tell the owner their watch could not run.
+ *
+ * A watch that goes quiet is indistinguishable from a page that stopped
+ * changing, so every path where the scheduler skips one has to say so. Only for
+ * schedules that ARE watches: a plain schedule has nobody waiting on a message.
+ *
+ * Suppressed to one notice a day per schedule, because quota exhaustion lasts
+ * until midnight and would otherwise fire on every tick, and a watch that nags
+ * gets muted along with the alerts that matter.
+ */
+const STALL_NOTICE_EVERY_MS = 20 * 60 * 60 * 1000;
+
+async function tellOwner(
+  s: { id: string; skillId: string },
+  reason: "quota" | "tier",
+  stopped: boolean,
+): Promise<void> {
+  try {
+    const w = await getWatch(s.id);
+    if (!w) return; // an ordinary schedule; nobody is waiting on it
+    const last = w.state.stalledNoticeAt ?? 0;
+    if (Date.now() - last < STALL_NOTICE_EVERY_MS) return;
+
+    const skill = await getSkill(s.skillId);
+    await activeSink().stalled({
+      scheduleId: s.id,
+      owner: w.owner,
+      skillName: skill?.name ?? "your watch",
+      reason,
+      stopped,
+      notify: w.notify,
+    });
+    await setWatchState(s.id, { ...w.state, stalledNoticeAt: Date.now() });
+  } catch (e) {
+    // Never let a notification failure stop the scheduler doing its job.
+    logError("scheduler.stalled", e, { schedule: s.id });
+  }
 }

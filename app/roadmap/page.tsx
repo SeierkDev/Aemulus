@@ -56,8 +56,16 @@ const ROADMAP: { phase: string; title: string; body: Item[] }[] = [
         t: "Permanent screenshot storage on Arweave, so the evidence a receipt points at outlives the app too, not just the hashes that prove it. Opt-in per run: permanent storage is public and has no delete, and a run's screenshots are yours until you decide otherwise.",
         done: true,
       },
+      // Split, and email dropped. Sign-in is a wallet, so there is no address
+      // to send to; adding one would mean collecting and verifying personal
+      // data this product deliberately does not hold. Telegram covers the same
+      // need without any of it.
       {
-        t: "More run notifications: email and Telegram (signed webhooks are already live today).",
+        t: "Telegram watches: turn any page into an alert, including pages behind your login, because a watch replays a skill you recorded while signed in. Set one up in three taps and it stays quiet until the value changes.",
+        done: true,
+      },
+      {
+        t: "Alerts for ordinary runs too, not only watches, so a finished or failed run can reach you the same way (signed webhooks are already live today).",
       },
       {
         t: "A creator analytics dashboard - runs, success rate, unique users, and cost over time, per skill (per-skill run count, success rate, and ratings already ship today).",

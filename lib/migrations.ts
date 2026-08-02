@@ -512,10 +512,55 @@ export const MIGRATIONS: Migration[] = [
     addColumns: [{ table: "runs", column: "sandbox", def: "TEXT" }],
   },
 
-  // 36 and 37 are deliberately absent here: they belong to work that has not
-  // shipped publicly yet. Ids are tracked individually, not as a high-water
-  // mark, so a gap is applied later without disturbing anything already run —
-  // and NEVER renumber these, since 38-40 are already applied elsewhere.
+  // 36 - watches. A watch IS a schedule with a rule attached, deliberately: the
+  // scheduler tick, cadence maths, next_run_at, the active toggle and the
+  // per-owner quota reservation all already exist and are tested. A parallel
+  // watches table would have duplicated every one of them. A row with
+  // watch_rule NULL behaves exactly as a plain schedule always did.
+  //
+  // runs.schedule_id exists because startRun returns BEFORE the run executes,
+  // so the scheduler tick never sees the output. Evaluation has to hang off run
+  // completion, and a finished run needs to know which watch it belongs to.
+  {
+    id: 36,
+    name: "watches",
+    addColumns: [
+      { table: "schedules", column: "watch_rule", def: "TEXT" },
+      { table: "schedules", column: "watch_state", def: "TEXT" },
+      { table: "schedules", column: "notify", def: "TEXT" },
+      { table: "runs", column: "schedule_id", def: "TEXT" },
+    ],
+    statements: [
+      `CREATE INDEX IF NOT EXISTS idx_runs_schedule ON runs(schedule_id);`,
+    ],
+  },
+
+  // 37 - Telegram. Two tables, because they have different lifetimes: a link is
+  // durable, a code is ephemeral and single-use.
+  //
+  // The binding is chat -> wallet, and it can ONLY be created by redeeming a
+  // code on the site with a wallet signature. Telegram never gets to assert who
+  // someone is: if a pasted address were accepted as identity, anyone could
+  // subscribe themselves to anyone else's watches.
+  {
+    id: 37,
+    name: "telegram",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS telegram_links (
+         chat_id TEXT PRIMARY KEY,
+         owner TEXT NOT NULL,
+         created_at INTEGER NOT NULL
+       );`,
+      `CREATE INDEX IF NOT EXISTS idx_tg_links_owner ON telegram_links(owner);`,
+      `CREATE TABLE IF NOT EXISTS telegram_codes (
+         code TEXT PRIMARY KEY,
+         chat_id TEXT NOT NULL,
+         expires_at INTEGER NOT NULL,
+         used_at INTEGER
+       );`,
+      `CREATE INDEX IF NOT EXISTS idx_tg_codes_chat ON telegram_codes(chat_id);`,
+    ],
+  },
 
   // 38 - permanent proof storage. The Arweave transaction holding this batch's
   // bundle. NULL means it was never stored: storage off, bundle over the free

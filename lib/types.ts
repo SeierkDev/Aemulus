@@ -229,6 +229,20 @@ export type Cadence =
   | "weekdays"
   | "weekly";
 
+/**
+ * Where a watch's alerts go. Only Telegram for now, but the shape is a tagged
+ * union so adding email later does not mean rewriting every caller.
+ *
+ * `redact` sends the fact that something changed WITHOUT the value. Values from
+ * a logged-in page leave this system and enter a third party's, and for a bank
+ * balance or a revenue figure that is a decision the user should get to make.
+ */
+export type WatchNotify = {
+  channel: "telegram";
+  chatId: string;
+  redact?: boolean;
+};
+
 export interface Schedule {
   id: string;
   owner: string;
@@ -274,6 +288,10 @@ export interface Run {
   /** Canonical JSON of the isolation policy this run executed under (lib/sandbox.ts).
    *  null for runs that predate isolated execution. */
   sandbox: string | null;
+  /** The schedule that fired this run, if any. A watch needs it because
+   *  startRun returns before the run executes, so evaluation happens on
+   *  completion and the finished run has to say which watch it belongs to. */
+  scheduleId: string | null;
   /** Private verifiable receipt: hiding-commitment root over the run's fields. */
   commitmentRoot: string | null;
   /** On-chain registry anchor (aemulus-registry program), if recorded. */

@@ -42,6 +42,8 @@ export async function createRun(input: {
   overrides?: RunOverrides;
   bulkId?: string;
   rowIndex?: number;
+  /** Set when this run was fired by a schedule, so a watch can find it later. */
+  scheduleId?: string;
   reserve?: undefined;
 }): Promise<Run>;
 export async function createRun(input: {
@@ -51,6 +53,7 @@ export async function createRun(input: {
   overrides?: RunOverrides;
   bulkId?: string;
   rowIndex?: number;
+  scheduleId?: string;
   reserve: QuotaReserve;
 }): Promise<Run | null>;
 export async function createRun(input: {
@@ -60,6 +63,7 @@ export async function createRun(input: {
   overrides?: RunOverrides;
   bulkId?: string;
   rowIndex?: number;
+  scheduleId?: string;
   reserve?: QuotaReserve;
 }): Promise<Run | null> {
   await ready();
@@ -87,6 +91,7 @@ export async function createRun(input: {
     tokensOut: 0,
     outcomeStatus: null,
     sandbox: null,
+    scheduleId: input.scheduleId ?? null,
     outcomeReason: null,
     commitmentRoot: null,
     registrySig: null,
@@ -98,7 +103,7 @@ export async function createRun(input: {
     createdAt: now,
     updatedAt: now,
   };
-  const cols = `id, owner, skill_id, status, input, overrides, result, error, bulk_id, row_index, created_at, updated_at`;
+  const cols = `id, owner, skill_id, status, input, overrides, result, error, bulk_id, row_index, schedule_id, created_at, updated_at`;
   const vals = [
     run.id,
     run.owner,
@@ -110,6 +115,7 @@ export async function createRun(input: {
     null,
     run.bulkId,
     run.rowIndex,
+    input.scheduleId ?? null,
     now,
     now,
   ];
@@ -122,7 +128,7 @@ export async function createRun(input: {
     const sinceMs = now - input.reserve.windowMs;
     const res = await db.execute({
       sql: `INSERT INTO runs (${cols})
-            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             WHERE (SELECT COUNT(*) FROM runs WHERE owner = ? AND created_at >= ?) < ?`,
       args: [...vals, run.owner, sinceMs, input.reserve.limit],
     });
@@ -131,7 +137,7 @@ export async function createRun(input: {
   }
 
   await db.execute({
-    sql: `INSERT INTO runs (${cols}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO runs (${cols}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: vals,
   });
   return run;
@@ -609,6 +615,7 @@ function rowToRun(row: Record<string, unknown>, steps: RunStepRecord[]): Run {
         : (String(row.outcome_status) as "achieved" | "unconfirmed"),
     outcomeReason: row.outcome_reason == null ? null : String(row.outcome_reason),
     sandbox: row.sandbox == null ? null : String(row.sandbox),
+    scheduleId: row.schedule_id == null ? null : String(row.schedule_id),
     commitmentRoot: row.commitment_root == null ? null : String(row.commitment_root),
     registrySig: row.registry_sig == null ? null : String(row.registry_sig),
     registryCluster:

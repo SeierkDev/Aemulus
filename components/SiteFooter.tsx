@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SOLANA } from "@/lib/solana";
+import { TELEGRAM_CHANNEL_URL, TELEGRAM_COMMUNITY_URL } from "@/lib/telegram-links";
 
 /** Shared site footer for the landing surfaces. */
 export function SiteFooter() {
@@ -40,6 +41,22 @@ export function SiteFooter() {
               X
             </a>
           )}
+          <a
+            href={TELEGRAM_CHANNEL_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-ink"
+          >
+            Telegram
+          </a>
+          <a
+            href={TELEGRAM_COMMUNITY_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-ink"
+          >
+            Community
+          </a>
           {SOLANA.githubUrl && (
             <a href={SOLANA.githubUrl} target="_blank" rel="noopener noreferrer" className="hover:text-ink">
               GitHub

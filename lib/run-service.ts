@@ -11,6 +11,8 @@ import {
 import { incrementRunCount, templateTool } from "./skills";
 import { invalidateReputation } from "./reputation";
 import { creditEarningOnce } from "./earnings";
+import { evaluateWatchForRun } from "./watch-runner";
+import { activeSink } from "./watch-sink-telegram";
 import { dispatchRunEvent, eventForStatus } from "./webhooks";
 import { recordRunOnChain, registryEnabled } from "./registry";
 import { recordRunCompressed, zkReceiptsEnabled } from "./zk-receipts";
@@ -28,6 +30,9 @@ interface RunArgs {
   runner: string;
   bulkId?: string;
   rowIndex?: number;
+  /** The schedule that fired this run. Set by the scheduler so that when the
+   *  run settles, a watch attached to that schedule can be found. */
+  scheduleId?: string;
   /**
    * Optional atomic daily-quota reservation. When set, the run is created only
    * if the caller is still under the limit (race-free); over quota throws
@@ -72,6 +77,7 @@ export async function startRun(args: RunArgs): Promise<Run> {
     overrides: args.overrides ?? {},
     bulkId: args.bulkId,
     rowIndex: args.rowIndex,
+    scheduleId: args.scheduleId,
   };
   // Branch so each call resolves a concrete createRun overload (metered → may
   // return null; unmetered → always a Run).
@@ -193,6 +199,10 @@ export async function finalizeRunAccounting(
     receiptHash: final.receiptHash,
     at: final.updatedAt,
   }).catch(() => {});
+  // A watch on this run's schedule, if it has one. Fire-and-forget for the same
+  // reason as the webhooks above: the run has already settled and its receipt is
+  // attached, so a watch must never be able to break settlement.
+  void evaluateWatchForRun(final, activeSink()).catch(() => {});
   if (final.output && Object.keys(final.output).length > 0) {
     void dispatchRunEvent(runner, "run.output", {
       runId,

@@ -1,7 +1,8 @@
 import { db, ready } from "./db";
 import { id } from "./ids";
 import { decryptJSON, encryptJSON } from "./encrypt";
-import type { Cadence, Schedule } from "./types";
+import { emptyState, type WatchRule, type WatchState } from "./watches";
+import type { Cadence, Schedule, WatchNotify } from "./types";
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
@@ -228,6 +229,91 @@ export async function bumpNextRun(
     sql: `UPDATE schedules SET next_run_at = ? WHERE id = ?`,
     args: [nextRunAt, scheduleId],
   });
+}
+
+/**
+ * The watch attached to a schedule, if it has one.
+ *
+ * Returns null for an ordinary schedule — that is the check the run-completion
+ * hook uses to decide whether a finished run means anything to anybody.
+ */
+export async function getWatch(scheduleId: string): Promise<{
+  owner: string;
+  rule: WatchRule;
+  state: WatchState;
+  notify: WatchNotify | null;
+} | null> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT owner, watch_rule, watch_state, notify FROM schedules WHERE id = ?`,
+    args: [scheduleId],
+  });
+  const row = r.rows[0];
+  if (!row || row.watch_rule == null) return null;
+  const rule = safeJson<WatchRule | null>(String(row.watch_rule), null);
+  if (!rule || typeof rule.key !== "string" || typeof rule.op !== "string") return null;
+  return {
+    owner: String(row.owner),
+    rule,
+    state:
+      row.watch_state == null
+        ? emptyState()
+        : safeJson<WatchState>(String(row.watch_state), emptyState()),
+    notify:
+      row.notify == null ? null : safeJson<WatchNotify | null>(String(row.notify), null),
+  };
+}
+
+/**
+ * Persist the state a check produced.
+ *
+ * Written on EVERY check, not only on the ones that alert — the confirm counter
+ * and failure streak are exactly the things that have to survive between checks,
+ * and a watch that forgets them would alert on the first sighting of a value
+ * that was supposed to be confirmed twice.
+ */
+export async function setWatchState(
+  scheduleId: string,
+  state: WatchState,
+): Promise<void> {
+  await ready();
+  await db.execute({
+    sql: `UPDATE schedules SET watch_state = ? WHERE id = ?`,
+    args: [JSON.stringify(state), scheduleId],
+  });
+}
+
+/** Attach or replace the watch rule on a schedule. */
+export async function setWatch(
+  scheduleId: string,
+  owner: string,
+  rule: WatchRule,
+  notify: WatchNotify | null,
+): Promise<boolean> {
+  await ready();
+  const r = await db.execute({
+    sql: `UPDATE schedules SET watch_rule = ?, notify = ?, watch_state = ?
+          WHERE id = ? AND owner = ?`,
+    args: [
+      JSON.stringify(rule),
+      notify ? JSON.stringify(notify) : null,
+      // A new rule starts from a clean slate: the old baseline was measured
+      // against a different question and carrying it over would alert on the
+      // first check.
+      JSON.stringify(emptyState()),
+      scheduleId,
+      owner,
+    ],
+  });
+  return r.rowsAffected > 0;
+}
+
+function safeJson<T>(raw: string, fallback: T): T {
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
 }
 
 export async function deactivate(scheduleId: string): Promise<void> {
