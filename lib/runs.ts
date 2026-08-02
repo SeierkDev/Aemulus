@@ -78,6 +78,7 @@ export async function createRun(input: {
     receiptCluster: null,
     batchId: null,
     leafIndex: null,
+    shotsPublic: false,
     merkleProof: null,
     bulkId: input.bulkId ?? null,
     rowIndex: input.rowIndex ?? null,
@@ -282,6 +283,7 @@ export async function getBatch(batchId: string): Promise<ReceiptBatch | null> {
     sig: row.sig == null ? null : String(row.sig),
     cluster: row.cluster == null ? null : String(row.cluster),
     createdAt: Number(row.created_at),
+    arweaveId: row.arweave_id == null ? null : String(row.arweave_id),
   };
 }
 
@@ -590,6 +592,7 @@ function rowToRun(row: Record<string, unknown>, steps: RunStepRecord[]): Run {
     receiptCluster:
       row.receipt_cluster == null ? null : String(row.receipt_cluster),
     batchId: row.batch_id == null ? null : String(row.batch_id),
+    shotsPublic: Number(row.shots_public ?? 0) === 1,
     leafIndex: row.leaf_index == null ? null : Number(row.leaf_index),
     merkleProof: safeParse(row.merkle_proof, null),
     bulkId: row.bulk_id == null ? null : String(row.bulk_id),

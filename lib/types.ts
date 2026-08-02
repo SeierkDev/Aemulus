@@ -258,6 +258,8 @@ export interface Run {
   // Merkle batching: this run's leaf, its position, and proof to the batch root.
   batchId: string | null;
   leafIndex: number | null;
+  /** Owner published this run's screenshots to permanent public storage. */
+  shotsPublic: boolean;
   merkleProof: { siblings: { hash: string; left: boolean }[] } | null;
   // Bulk runs + extracted output.
   bulkId: string | null;
@@ -301,4 +303,6 @@ export interface ReceiptBatch {
   sig: string | null;
   cluster: string | null;
   createdAt: number;
+  /** Arweave transaction holding this batch's bundle permanently, if stored. */
+  arweaveId: string | null;
 }

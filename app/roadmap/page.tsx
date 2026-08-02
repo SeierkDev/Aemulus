@@ -43,8 +43,18 @@ const ROADMAP: { phase: string; title: string; body: Item[] }[] = [
       {
         t: "Micro-VM isolation per run, adding a kernel-level boundary on top of the process-level one that ships today.",
       },
+      // Split for the same reason as the isolation entry above. What ships is
+      // the batch bundle - the Merkle root, every leaf hash and every proof -
+      // which is what makes a receipt verifiable offline. The screenshots
+      // themselves are still ours: the bundle proves what a screenshot hashed
+      // to, not what it looked like.
       {
-        t: "Permanent receipt + screenshot storage on Arweave - proofs that outlive the app.",
+        t: "Permanent receipt storage on Arweave: each batch's proof bundle is written to permanent storage, readable by anyone at a public gateway with no account and no help from us - so a receipt stays checkable even if this app is gone.",
+        done: true,
+      },
+      {
+        t: "Permanent screenshot storage on Arweave, so the evidence a receipt points at outlives the app too, not just the hashes that prove it. Opt-in per run: permanent storage is public and has no delete, and a run's screenshots are yours until you decide otherwise.",
+        done: true,
       },
       {
         t: "More run notifications: email and Telegram (signed webhooks are already live today).",

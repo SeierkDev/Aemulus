@@ -511,4 +511,63 @@ export const MIGRATIONS: Migration[] = [
     name: "run_sandbox_policy",
     addColumns: [{ table: "runs", column: "sandbox", def: "TEXT" }],
   },
+
+  // 36 and 37 are deliberately absent here: they belong to work that has not
+  // shipped publicly yet. Ids are tracked individually, not as a high-water
+  // mark, so a gap is applied later without disturbing anything already run —
+  // and NEVER renumber these, since 38-40 are already applied elsewhere.
+
+  // 38 - permanent proof storage. The Arweave transaction holding this batch's
+  // bundle. NULL means it was never stored: storage off, bundle over the free
+  // limit, or the upload failed — none of which affect the batch's validity,
+  // since the bundle verifies offline either way.
+  {
+    id: 38,
+    name: "batch_arweave",
+    addColumns: [{ table: "receipt_batches", column: "arweave_id", def: "TEXT" }],
+  },
+
+  // 39 - permanent screenshot storage.
+  //
+  // Keyed by CONTENT HASH, not by step: the receipt already commits to each
+  // screenshot's sha256, so the hash is the join a verifier can make with no
+  // database at all, and identical screenshots upload once instead of once per
+  // run (proof runs repeat the same pages constantly).
+  //
+  // shots_public is opt-in and defaults to 0 on purpose. Arweave is permanent
+  // and public; a run's screenshots routinely hold invoices, vendor names and
+  // whatever else was on a logged-in page. Public verification has always
+  // excluded screenshots — this must not quietly reverse that, and there is no
+  // taking an upload back.
+  {
+    id: 39,
+    name: "shot_arweave",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS arweave_shots (
+         hash TEXT PRIMARY KEY,
+         tx_id TEXT NOT NULL,
+         bytes INTEGER NOT NULL,
+         created_at INTEGER NOT NULL
+       );`,
+    ],
+    addColumns: [
+      { table: "runs", column: "shots_public", def: "INTEGER NOT NULL DEFAULT 0" },
+    ],
+  },
+
+  // 40 - let the screenshot sweep finish and move on.
+  //
+  // Without a record of which runs are done, a newest-first sweep re-reads the
+  // same few published runs on every tick forever and never reaches an older
+  // one behind them. shots_archived_at marks a run fully stored; shots_attempts
+  // bounds the retries, so a transient failure heals itself while a screenshot
+  // that can never be stored stops blocking the queue.
+  {
+    id: 40,
+    name: "shot_archive_progress",
+    addColumns: [
+      { table: "runs", column: "shots_archived_at", def: "INTEGER" },
+      { table: "runs", column: "shots_attempts", def: "INTEGER NOT NULL DEFAULT 0" },
+    ],
+  },
 ];

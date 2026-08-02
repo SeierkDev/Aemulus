@@ -12,6 +12,9 @@ import {
 } from "@solana/web3.js";
 import bs58 from "bs58";
 import { getBatch, getRun, listBatchLeaves, updateReceipt } from "./runs";
+import { arweaveUrl } from "./arweave";
+import { DATA_ROOT } from "./paths";
+import { shotTxs, shotUrl } from "./shot-archive";
 import { verifyProof } from "./merkle";
 import { logError } from "./log";
 import type { Run } from "./types";
@@ -27,7 +30,7 @@ import type { Run } from "./types";
 const MEMO_PROGRAM = new PublicKey(
   "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
 );
-const DATA_ROOT = path.join(process.cwd(), ".data");
+
 
 export interface ReceiptStep {
   idx: number;
@@ -85,7 +88,8 @@ export function receiptDigest(input: {
   return createHash("sha256").update(canonical).digest("hex");
 }
 
-async function hashScreenshot(rel: string): Promise<string> {
+/** sha256 of a stored screenshot — the hash the receipt commits to. */
+export async function hashScreenshot(rel: string): Promise<string> {
   if (!rel) return "";
   try {
     const buf = await readFile(path.join(DATA_ROOT, rel));
@@ -191,6 +195,44 @@ export interface BatchBundle {
 }
 
 /**
+ * The form written to permanent storage: everything except the Merkle proofs.
+ *
+ * Not a lossy shortcut — this is exactly the canonical form bundleHash is
+ * already computed over. Every proof is derivable from the ordered leaf hashes,
+ * so carrying them is O(n log n) of redundancy on top of O(n) of information.
+ * At the batcher's 1000-leaf cap that redundancy is the difference between
+ * roughly 1 MB and 79 KB, which is the difference between a batch that can be
+ * stored permanently and one that silently never is.
+ *
+ * Run ids are dropped with the proofs. A verifier holding a receipt recomputes
+ * its hash and finds it among the leaves; nobody else learns which runs are in
+ * here, which is the right trade for a copy that is public forever.
+ */
+export interface ArchiveBundle {
+  batchId: string;
+  root: string;
+  sig: string | null;
+  cluster: string | null;
+  leafCount: number;
+  createdAt: number;
+  bundleHash: string;
+  leaves: { i: number; h: string }[];
+}
+
+export function toArchiveBundle(b: BatchBundle): ArchiveBundle {
+  return {
+    batchId: b.batchId,
+    root: b.root,
+    sig: b.sig,
+    cluster: b.cluster,
+    leafCount: b.leafCount,
+    createdAt: b.createdAt,
+    bundleHash: b.bundleHash,
+    leaves: b.leaves.map((l) => ({ i: l.leafIndex, h: l.leafHash })),
+  };
+}
+
+/**
  * A self-contained, content-addressed proof bundle for a batch: the root, the
  * (optional) on-chain signature, and every leaf's hash + Merkle proof. It's
  * verifiable offline (recompute the root from each leaf+proof) and app-
@@ -233,10 +275,25 @@ export interface ReceiptVerification {
   hash?: string | null;
   /** Recomputed digest equals the recorded receipt (tamper-evident). */
   matches?: boolean;
+  /**
+   * Steps whose screenshot the receipt commits to but that is no longer on
+   * disk. A mismatch caused by this is evidence that went missing, NOT evidence
+   * that was edited, and telling a user their run "changed since it ran" when a
+   * file simply isn't there accuses them of tampering over an infrastructure
+   * problem.
+   */
+  missingShots?: number;
   /** Private-receipt commitment root (selective disclosure; reveals nothing). */
   commitmentRoot?: string | null;
   /** On-chain registry record (aemulus-registry program), if anchored. */
   registry?: { sig: string; cluster: string; url: string };
+  /**
+   * Permanently stored screenshots, present only when the owner explicitly
+   * published them. Public verification has never returned screenshots and
+   * still doesn't — this returns a link to a copy the owner chose to make
+   * public, and nothing at all for every other run.
+   */
+  shots?: { hash: string; url: string }[];
   /** ZK-compressed receipt (aemulus-zk-receipts Light program), if anchored. */
   zk?: { sig: string; address: string; cluster: string; url: string };
   /** Merkle batch this run was anchored in, if batched. */
@@ -245,6 +302,13 @@ export interface ReceiptVerification {
     root: string;
     index: number;
     leafCount: number;
+    /**
+     * Where this batch's proof bundle is stored permanently, readable by
+     * anyone with no account and no help from us. Written but never shown is
+     * the same as not stored at all — if the id only ever lived in our
+     * database, the proof would stop being findable the moment we did.
+     */
+    arweave?: { id: string; url: string };
     /** Recomputed leaf proves into the batch root (membership). */
     proofValid: boolean;
     anchor?: {
@@ -337,6 +401,12 @@ export async function verifyReceipt(
         leafCount: batch.leafCount,
         proofValid,
       };
+      if (batch.arweaveId) {
+        verification.batch.arweave = {
+          id: batch.arweaveId,
+          url: arweaveUrl(batch.arweaveId),
+        };
+      }
       if (batch.sig && batch.cluster) {
         verification.batch.anchor = {
           sig: batch.sig,
@@ -350,6 +420,30 @@ export async function verifyReceipt(
         };
       }
     }
+  }
+
+  // Only for a run whose owner explicitly published it. Everything else returns
+  // no screenshot information at all, exactly as before.
+  // Only worth computing when something already failed — this is the difference
+  // between "we cannot check this" and "this was altered".
+  if (verification.matches === false) {
+    let missing = 0;
+    for (const st of run.steps) {
+      if (!st.screenshot) continue; // no screenshot recorded (e.g. a sensitive step)
+      if (!(await hashScreenshot(st.screenshot))) missing++;
+    }
+    if (missing) verification.missingShots = missing;
+  }
+
+  if (run.shotsPublic) {
+    const hashes = await Promise.all(run.steps.map((s) => hashScreenshot(s.screenshot)));
+    // One query for the whole run: this is an open endpoint, and a query per
+    // screenshot would make every public verification fan out with step count.
+    const txs = await shotTxs(hashes);
+    const shots = hashes
+      .filter((h) => h && txs.has(h))
+      .map((h) => ({ hash: h, url: shotUrl(txs.get(h)!) }));
+    if (shots.length) verification.shots = shots;
   }
   return verification;
 }

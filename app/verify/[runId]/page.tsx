@@ -37,16 +37,31 @@ export default async function VerifyPage({
           <Card className="p-6">
             <div className="flex items-center justify-between">
               <h1 className="text-xl font-semibold tracking-tight">
-                {v.matches ? "Receipt verified" : "Receipt mismatch"}
+                {v.matches
+                  ? "Receipt verified"
+                  : v.missingShots
+                    ? "Cannot verify - evidence missing"
+                    : "Receipt mismatch"}
               </h1>
               <Badge className="text-ink">
-                {v.matches ? "✓ intact" : "✗ altered"}
+                {v.matches
+                  ? "✓ intact"
+                  : v.missingShots
+                    ? "? unavailable"
+                    : "✗ altered"}
               </Badge>
             </div>
+            {/* A receipt commits to a hash of every proof screenshot, so a
+                missing file fails the check exactly like an edited one. They are
+                not the same thing, and saying "altered" about a file that is
+                simply gone accuses someone of tampering over what is almost
+                always lost storage. */}
             <p className="mt-2 text-sm text-ink-2">
               {v.matches
                 ? "The run's stored data and proof screenshots still hash to the recorded receipt - nothing has been altered since it ran."
-                : "The recomputed hash does NOT match the recorded receipt. This run's data or screenshots have changed since it ran."}
+                : v.missingShots
+                  ? `${v.missingShots} of this run's proof ${v.missingShots === 1 ? "screenshot is" : "screenshots are"} no longer in storage, so the receipt can't be rechecked. This is missing evidence, not evidence of tampering - a receipt can only be verified while the screenshots it commits to still exist.`
+                  : "The recomputed hash does NOT match the recorded receipt. This run's data or screenshots have changed since it ran."}
             </p>
             <div className="mt-4 grid gap-1.5 text-sm">
               <Row k="run" v={v.runId} mono />
@@ -76,7 +91,9 @@ export default async function VerifyPage({
                 <p>
                   {v.batch.proofValid
                     ? `This run is leaf #${v.batch.index} of a batch of ${v.batch.leafCount}. Its Merkle proof resolves to the batch root - independently confirmed.`
-                    : "The Merkle proof does NOT resolve to the batch root for this run's data."}
+                    : v.missingShots
+                      ? "This can't be rechecked either: the Merkle leaf is built from the same hash, so a missing screenshot breaks it for the same reason."
+                      : "The Merkle proof does NOT resolve to the batch root for this run's data."}
                 </p>
                 <div
                   className="mono mt-3 break-all text-xs text-ink-3"
@@ -114,6 +131,44 @@ export default async function VerifyPage({
                     Root recorded; on-chain anchoring activates at launch.
                   </p>
                 )}
+                {v.shots?.length ? (
+                  <p className="mt-2">
+                    The owner published this run&apos;s{" "}
+                    {v.shots.length === 1 ? "screenshot" : `${v.shots.length} screenshots`}{" "}
+                    permanently — the images themselves, not just their hashes.{" "}
+                    {v.shots.map((sh, i) => (
+                      <a
+                        key={sh.hash}
+                        href={sh.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-ink hover:underline"
+                      >
+                        {i === 0 ? "" : " · "}
+                        {`#${i + 1}`}
+                      </a>
+                    ))}
+                  </p>
+                ) : null}
+                {v.batch.arweave ? (
+                  <p className="mt-2">
+                    This batch is stored permanently — the root and every leaf,
+                    enough to rebuild any proof — so it stays checkable without
+                    us.{" "}
+                    <a
+                      href={v.batch.arweave.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-ink hover:underline"
+                    >
+                      Read it on Arweave →
+                    </a>{" "}
+                    <span className="text-ink-3">
+                      A proof stored in the last few minutes may not be readable
+                      at the gateway yet.
+                    </span>
+                  </p>
+                ) : null}
               </div>
             ) : (
               <p className="mt-2 text-sm text-ink-3">

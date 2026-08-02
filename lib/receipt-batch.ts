@@ -2,7 +2,9 @@ import { db, ready } from "./db";
 import { id } from "./ids";
 import { setRunBatch } from "./runs";
 import { buildMerkle, proofForIndex } from "./merkle";
-import { anchorOnChain } from "./receipt";
+import { anchorOnChain, buildBatchBundle, toArchiveBundle } from "./receipt";
+import { arweaveEnabled, storeBundle } from "./arweave";
+import { sweepShots } from "./shot-archive";
 import { logError, logInfo } from "./log";
 
 export { getBatch } from "./runs";
@@ -133,9 +135,24 @@ export async function batchPendingReceipts(
       throw e;
     }
 
+    // Store the bundle permanently, AFTER the batch is safely persisted. The
+    // batch is already valid and verifiable without this — permanence is an
+    // addition to the proof, not a precondition for it — so nothing about
+    // Arweave may hold up batching or lose a proof. storeBatch owns the whole
+    // path including building the bundle, and cannot throw.
+    const arweaveId = await storeBatch(batchId);
+    // Pick up anything an earlier tick failed to store, so one bad upload does
+    // not mean that batch is silently never permanent.
+    void storeMissingBatches().catch(() => {});
+    // Screenshots of runs their owners published. Separate switch, separate
+    // budget: this one spends money and publishes pixels, so it never rides
+    // along on the bundle setting.
+    void sweepShots().catch(() => {});
+
     logInfo("receipt.batch", batchId, {
       leaves: pending.length,
       anchored: !!anchored,
+      arweave: arweaveId ?? false,
     });
     return {
       batchId,
@@ -145,6 +162,81 @@ export async function batchPendingReceipts(
     };
   } finally {
     batching = false;
+  }
+}
+
+/**
+ * How far back the retry sweep looks.
+ *
+ * Bounded on purpose, in both directions. Without an upper bound on age the
+ * sweep walks the entire back-catalogue and silently uploads every batch that
+ * predates the key ever being set — work nobody asked for. And a batch that can
+ * never be stored (an oversized bundle fails identically every time) would sit
+ * at the head of an unbounded newest-first sweep forever, blocking every batch
+ * behind it. Ageing out is the better failure of the two: the work stays
+ * bounded, and the gap is visible, because a batch with no Arweave link simply
+ * doesn't show one on its receipt.
+ */
+const SWEEP_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/** Guards against overlapping sweeps, which would upload the same batch twice. */
+let sweeping = false;
+
+/**
+ * Build, store and record a batch's bundle. Nothing here can throw: a batch is
+ * already valid and verifiable offline without Arweave, so permanence is an
+ * addition to the proof rather than a precondition for it, and no third party
+ * may hold up batching.
+ */
+export async function storeBatch(batchId: string): Promise<string | null> {
+  if (!arweaveEnabled()) return null;
+  try {
+    await ready();
+    // Built inside the boundary: doing it at the call site put a database read
+    // outside the try, where a blip threw straight out of batching.
+    const full = await buildBatchBundle(batchId);
+    // Stored WITHOUT the proofs. A full bundle for a large batch runs to about
+    // a megabyte, far past the free tier, so storing that form meant every busy
+    // batch was silently skipped — permanence quietly switching itself off
+    // exactly when there were the most receipts to keep.
+    const arweaveId = await storeBundle(batchId, full ? toArchiveBundle(full) : null);
+    if (!arweaveId) return null;
+    await db.execute({
+      sql: `UPDATE receipt_batches SET arweave_id = ? WHERE id = ?`,
+      args: [arweaveId, batchId],
+    });
+    return arweaveId;
+  } catch (e) {
+    logError("arweave.storeBatch", e, { batch: batchId });
+    return null;
+  }
+}
+
+/**
+ * Re-attempt recent batches that were never stored, so a single failed upload
+ * doesn't mean that batch is silently never permanent.
+ */
+export async function storeMissingBatches(limit = 5): Promise<number> {
+  if (!arweaveEnabled() || sweeping) return 0;
+  sweeping = true;
+  try {
+    await ready();
+    const r = await db.execute({
+      sql: `SELECT id FROM receipt_batches
+            WHERE arweave_id IS NULL AND created_at >= ?
+            ORDER BY created_at DESC LIMIT ?`,
+      args: [Date.now() - SWEEP_WINDOW_MS, Math.max(1, Math.min(50, limit))],
+    });
+    let stored = 0;
+    for (const row of r.rows) {
+      if (await storeBatch(String(row.id))) stored++;
+    }
+    return stored;
+  } catch (e) {
+    logError("arweave.sweep", e);
+    return 0;
+  } finally {
+    sweeping = false;
   }
 }
 

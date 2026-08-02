@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
+    "@ardrive/turbo-sdk": "^1.42.0",
     "@coral-xyz/anchor": "^0.32.1",
     "@libsql/client": "^0.17.4",
     "@lightprotocol/stateless.js": "^0.23.3",
