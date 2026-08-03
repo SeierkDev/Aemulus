@@ -14,6 +14,8 @@ import bs58 from "bs58";
 import { getBatch, getRun, listBatchLeaves, updateReceipt } from "./runs";
 import { arweaveUrl } from "./arweave";
 import { DATA_ROOT } from "./paths";
+import { OUTPUT_ARITY } from "./agenc";
+import { encryptJSON } from "./encrypt";
 import { shotTxs, shotUrl } from "./shot-archive";
 import { verifyProof } from "./merkle";
 import { logError } from "./log";
@@ -60,6 +62,11 @@ export function receiptDigest(input: {
    *  Folded in so "this ran sandboxed, with this egress allowlist" is part of what
    *  the receipt attests, not a claim the database could be edited to make. */
   sandbox?: string | null;
+  /** AgenC canonical constraint hash. Folded in so the interop number is part of
+   *  what the receipt attests rather than a column the database could be edited
+   *  to change. Conditional, so every receipt written before it existed keeps
+   *  its canonical form. */
+  agencHash?: string | null;
 }): string {
   const canonical = JSON.stringify({
     run: input.runId,
@@ -75,6 +82,7 @@ export function receiptDigest(input: {
     // change the canonical form of every receipt written before sandboxing
     // existed and invalidate their stored hashes. Absent stays absent.
     ...(input.sandbox ? { sandbox: input.sandbox } : {}),
+    ...(input.agencHash ? { agencHash: input.agencHash } : {}),
     steps: [...input.steps]
       .sort((a, b) => a.idx - b.idx)
       .map((s) => ({
@@ -159,11 +167,59 @@ async function digestForRun(run: Run): Promise<string> {
     result: run.result,
     error: run.error,
     sandbox: run.sandbox,
+    agencHash: run.agencHash,
     steps,
   });
 }
 
 /** Compute, optionally anchor, and persist a run's receipt. */
+/**
+ * Compute and store this run's AgenC constraint hash, before the receipt is
+ * hashed so the number is inside it.
+ *
+ * Best effort by design: a missing constraint hash costs an interop field, an
+ * exception here would cost the receipt itself.
+ */
+export async function attachAgenc(runId: string): Promise<void> {
+  try {
+    const run = await getRun(runId);
+    if (!run || run.agencHash) return; // already done, or nothing to do
+    // Never after the receipt is written. The digest folds the constraint hash
+    // in, so adding one to a run that already has a receipt would make the
+    // recomputed digest disagree with the stored one — and the verify page would
+    // report "Receipt mismatch" on a run nobody touched. Every run that predates
+    // this feature is in exactly that state, so a well-meaning backfill would
+    // break all of them at once.
+    if (run.receiptHash) return;
+    const { commitRun } = await import("./agenc");
+    const c = await commitRun({
+      id: run.id,
+      owner: run.owner,
+      skillId: run.skillId,
+      skillVersion: run.skillVersion,
+      status: run.status,
+      outcomeStatus: run.outcomeStatus,
+      outputs: run.output,
+    });
+    if (!c) return;
+    const { db, ready } = await import("./db");
+    await ready();
+    await db.execute({
+      sql: `UPDATE runs SET agenc_hash = ?, agenc_commitment = ?, agenc_salt = ? WHERE id = ?`,
+      args: [
+        c.constraintHash,
+        c.outputCommitment,
+        // NULL rather than an encrypted blob wrapping null, so "has a salt" is
+        // answerable in SQL without decrypting every row to find out it doesn't.
+        c.salt ? encryptJSON({ salt: c.salt }) : null,
+        runId,
+      ],
+    });
+  } catch (e) {
+    logError("agenc.attach", e, { run: runId });
+  }
+}
+
 export async function attachReceipt(runId: string): Promise<void> {
   const run = await getRun(runId);
   if (!run) return;
@@ -287,6 +343,17 @@ export interface ReceiptVerification {
   commitmentRoot?: string | null;
   /** On-chain registry record (aemulus-registry program), if anchored. */
   registry?: { sig: string; cluster: string; url: string };
+  /**
+   * AgenC interop: a public commitment to a private result.
+   *
+   * The hash is canonical, so whoever HOLDS the run data can rebuild the vector
+   * and recompute it with AgenC's own SDK. A stranger cannot, because one of the
+   * four elements is a digest of the outputs and those are not public — and must
+   * not be, since a digest of a low-entropy value like a price is guessable by
+   * brute force. So this proves a result was fixed at run time to anyone the
+   * owner chooses to show it to, and tells everyone else nothing.
+   */
+  agenc?: { constraintHash: string; commitment: string | null; arity: number };
   /**
    * Permanently stored screenshots, present only when the owner explicitly
    * published them. Public verification has never returned screenshots and
@@ -420,6 +487,14 @@ export async function verifyReceipt(
         };
       }
     }
+  }
+
+  if (run.agencHash) {
+    verification.agenc = {
+      constraintHash: run.agencHash,
+      commitment: run.agencCommitment,
+      arity: OUTPUT_ARITY,
+    };
   }
 
   // Only for a run whose owner explicitly published it. Everything else returns

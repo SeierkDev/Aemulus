@@ -43,7 +43,7 @@ import {
   navHostResolvesPrivate,
 } from "./safe-url";
 import { runSlots } from "./semaphore";
-import { attachReceipt } from "./receipt";
+import { attachAgenc, attachReceipt } from "./receipt";
 import { learnSelectors } from "./skills";
 import { startChainedRun } from "./chain";
 import { agenticStep, agentFallbackEnabled } from "./agent";
@@ -690,6 +690,8 @@ export async function executeRun(
       }
     }
 
+    // Before the receipt is hashed, so the constraint hash is inside it.
+    await attachAgenc(runId);
     await attachReceipt(runId); // verifiable receipt (+ anchor if configured)
 
     // Self-healing: only on a fully-completed run, and only when the owner runs

@@ -9,7 +9,7 @@ import {
   setRunCommitment,
   getRun,
 } from "./runs";
-import { attachReceipt } from "./receipt";
+import { attachAgenc, attachReceipt } from "./receipt";
 import { buildCommitment, commitmentFields } from "./commitment";
 import { finalizeRunAccounting } from "./run-service";
 import { logError } from "./log";
@@ -133,6 +133,8 @@ export async function finalizeExtensionRun(args: {
       const c = buildCommitment(commitmentFields(r));
       await setRunCommitment(runId, c.root, c.salts);
     }
+    // Before the receipt is hashed, so the constraint hash is inside it.
+    await attachAgenc(runId);
     await attachReceipt(runId);
   } catch (e) {
     logError("ext.finalize", e);

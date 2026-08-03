@@ -247,6 +247,63 @@ console.log(proof.batch?.proofValid); // true`}
       </section>
 
       {/* MCP */}
+      {/* Public and anchor-linkable on purpose: an interop claim is worth nothing
+          if the other protocol's authors cannot check the method for themselves. */}
+      <section id="agenc" className="scroll-mt-8 border-t border-border py-12">
+        <Label>AgenC interop</Label>
+        <h2 className="mt-3 text-2xl font-semibold tracking-tight">
+          Every run carries an AgenC constraint hash
+        </h2>
+        <p className="mt-2 max-w-2xl text-sm text-ink-2">
+          Computed with{" "}
+          <a
+            href="https://github.com/tetsuo-ai/AgenC"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-ink underline underline-offset-4"
+          >
+            AgenC&apos;s own SDK
+          </a>{" "}
+          (<span className="mono">@tetsuo-ai/sdk</span>, pinned to 1.4.0), folded
+          into the run&apos;s receipt so it is sealed rather than stored in a column
+          that could be edited, and shown on the public verify page for any run
+          that has one.
+        </p>
+
+        <p className="mt-4 max-w-2xl text-sm text-ink-2">
+          Their circuit takes exactly four field elements, so the layout is fixed
+          and ordered. Each is a domain-separated sha256 reduced into the BN254
+          scalar field:
+        </p>
+
+        <CodeBlock
+          title="The four elements"
+          code={`0  run       sha256("aemulus:run:"     + runId)
+1  skill     sha256("aemulus:skill:"   + skillId + "@" + version)
+2  outputs   sha256("aemulus:outputs:" + canonicalJson(outputs))
+3  outcome   sha256("aemulus:outcome:" + status + "/" + outcomeVerdict)
+
+// canonicalJson sorts keys, so two encoders agree.
+// Each element is taken modulo the BN254 scalar field.`}
+        />
+
+        <CodeBlock
+          title="Recompute it yourself"
+          code={`import { computeConstraintHash } from "@tetsuo-ai/sdk";
+
+const hash = computeConstraintHash(vector).toString(16);
+// matches the constraint hash shown on /verify/<runId>`}
+        />
+
+        <p className="mt-6 max-w-2xl text-sm text-ink-2">
+          Element 2 digests the run&apos;s outputs, and those are private. So the
+          hash commits to a result without publishing it: whoever holds the run
+          can recompute this number and see it match, and everyone else learns
+          nothing from it. RISC Zero proofs verified on-chain by AgenC&apos;s router
+          are the next step, and land when their prover is live.
+        </p>
+      </section>
+
       <section className="border-t border-border py-12">
         <Label>MCP server</Label>
         <h2 className="mt-3 text-2xl font-semibold tracking-tight">

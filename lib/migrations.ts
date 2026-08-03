@@ -645,4 +645,21 @@ export const MIGRATIONS: Migration[] = [
     name: "drop_unused_run_version_index",
     statements: [`DROP INDEX IF EXISTS idx_runs_skill_version;`],
   },
+
+  // 43 - AgenC interop.
+  //
+  // A run's constraint hash in AgenC's canonical BN254 form, plus the hiding
+  // commitment over its outputs. The hash is public and recomputable by anyone
+  // holding the receipt; the salt is not, because with it the commitment stops
+  // hiding. NULL throughout means the run predates this or the SDK was
+  // unavailable, never that the values were zero.
+  {
+    id: 43,
+    name: "agenc_interop",
+    addColumns: [
+      { table: "runs", column: "agenc_hash", def: "TEXT" },
+      { table: "runs", column: "agenc_commitment", def: "TEXT" },
+      { table: "runs", column: "agenc_salt", def: "TEXT" },
+    ],
+  },
 ];

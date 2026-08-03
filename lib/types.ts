@@ -274,6 +274,14 @@ export interface Run {
   leafIndex: number | null;
   /** Owner published this run's screenshots to permanent public storage. */
   shotsPublic: boolean;
+  /** The skill version this run actually executed. Null for runs made before
+   *  versions were stamped — unknown, never "version 1". */
+  skillVersion: number | null;
+  /** AgenC canonical constraint hash over this run's four-element output
+   *  vector. Public: anyone with the receipt can recompute it with their SDK. */
+  agencHash: string | null;
+  /** Hiding commitment over the outputs. Public and reveals nothing. */
+  agencCommitment: string | null;
   merkleProof: { siblings: { hash: string; left: boolean }[] } | null;
   // Bulk runs + extracted output.
   bulkId: string | null;

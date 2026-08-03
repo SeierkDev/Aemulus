@@ -25,6 +25,7 @@
     "@solana/wallet-adapter-react": "^0.15.39",
     "@solana/wallet-adapter-react-ui": "^0.9.39",
     "@solana/web3.js": "^1.98.4",
+    "@tetsuo-ai/sdk": "1.4.0",
     "bs58": "^6.0.0",
     "jose": "^6.2.3",
     "next": "16.2.9",

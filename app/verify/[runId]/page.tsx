@@ -86,6 +86,22 @@ export default async function VerifyPage({
                 </Badge>
               )}
             </div>
+            {v.agenc ? (
+              <div className="mt-4 border-t border-border pt-4 text-sm text-ink-2">
+                <Label>AgenC constraint hash</Label>
+                <p className="mt-2">
+                  This run&apos;s outputs, hashed in AgenC&apos;s canonical form over
+                  four field elements and sealed into the receipt above. It commits
+                  to a result without publishing it: whoever holds the run can
+                  recompute this number with AgenC&apos;s SDK and see it match, and
+                  everyone else learns nothing from it.
+                </p>
+                <div className="mono mt-3 break-all text-xs text-ink-3">
+                  {v.agenc.constraintHash}
+                </div>
+              </div>
+            ) : null}
+
             {v.batch ? (
               <div className="mt-2 text-sm text-ink-2">
                 <p>
