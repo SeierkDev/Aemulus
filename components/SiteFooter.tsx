@@ -36,11 +36,6 @@ export function SiteFooter() {
           <Link href="/privacy" className="hover:text-ink">
             Privacy
           </Link>
-          {SOLANA.xUrl && (
-            <a href={SOLANA.xUrl} target="_blank" rel="noopener noreferrer" className="hover:text-ink">
-              X
-            </a>
-          )}
           <a
             href={TELEGRAM_CHANNEL_URL}
             target="_blank"
@@ -57,11 +52,6 @@ export function SiteFooter() {
           >
             Community
           </a>
-          {SOLANA.githubUrl && (
-            <a href={SOLANA.githubUrl} target="_blank" rel="noopener noreferrer" className="hover:text-ink">
-              GitHub
-            </a>
-          )}
         </div>
       </div>
       <div className="mt-4 border-t border-border pt-4">

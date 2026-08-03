@@ -44,6 +44,9 @@ export async function createRun(input: {
   rowIndex?: number;
   /** Set when this run was fired by a schedule, so a watch can find it later. */
   scheduleId?: string;
+  /** The skill version this run is executing, stamped so analytics can tie a
+   *  change in success rate to the edit that caused it. */
+  skillVersion?: number;
   reserve?: undefined;
 }): Promise<Run>;
 export async function createRun(input: {
@@ -54,6 +57,7 @@ export async function createRun(input: {
   bulkId?: string;
   rowIndex?: number;
   scheduleId?: string;
+  skillVersion?: number;
   reserve: QuotaReserve;
 }): Promise<Run | null>;
 export async function createRun(input: {
@@ -64,6 +68,7 @@ export async function createRun(input: {
   bulkId?: string;
   rowIndex?: number;
   scheduleId?: string;
+  skillVersion?: number;
   reserve?: QuotaReserve;
 }): Promise<Run | null> {
   await ready();
@@ -103,11 +108,15 @@ export async function createRun(input: {
     createdAt: now,
     updatedAt: now,
   };
-  const cols = `id, owner, skill_id, status, input, overrides, result, error, bulk_id, row_index, schedule_id, created_at, updated_at`;
+  const cols = `id, owner, skill_id, skill_version, status, input, overrides, result, error, bulk_id, row_index, schedule_id, created_at, updated_at`;
   const vals = [
     run.id,
     run.owner,
     run.skillId,
+    // Stamped at creation, not read back from the skill later: by the time this
+    // run is analysed the skill may have been edited or healed several times,
+    // and the whole point is knowing which plan actually ran.
+    input.skillVersion ?? null,
     run.status,
     encryptJSON(run.input),
     JSON.stringify(run.overrides),
@@ -128,7 +137,7 @@ export async function createRun(input: {
     const sinceMs = now - input.reserve.windowMs;
     const res = await db.execute({
       sql: `INSERT INTO runs (${cols})
-            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
             WHERE (SELECT COUNT(*) FROM runs WHERE owner = ? AND created_at >= ?) < ?`,
       args: [...vals, run.owner, sinceMs, input.reserve.limit],
     });
@@ -137,7 +146,7 @@ export async function createRun(input: {
   }
 
   await db.execute({
-    sql: `INSERT INTO runs (${cols}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO runs (${cols}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: vals,
   });
   return run;

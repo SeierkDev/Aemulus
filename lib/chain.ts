@@ -71,6 +71,7 @@ export async function startChainedRun(args: {
     skillId: sub.id,
     input,
     overrides: {},
+    skillVersion: sub.version,
     reserve: await quotaReserveForOwner(args.owner),
   });
   if (!run) return { skipped: "daily run limit reached" };

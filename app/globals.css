@@ -25,6 +25,12 @@
   /* Signal (still monochrome - pure white as the only "accent") */
   --signal: #ffffff;
 
+  /* Semantic, and deliberately NOT the accent. White stays the only accent;
+     these two carry meaning instead of emphasis, so a direction on a number can
+     be read without lighting it up like a call to action. */
+  --ok: #8ee6a8;
+  --warn: #e8c27a;
+
   --radius: 10px;
 }
 
@@ -39,6 +45,8 @@
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
   --color-signal: var(--signal);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
 
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;

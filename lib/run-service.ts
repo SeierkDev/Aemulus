@@ -78,6 +78,10 @@ export async function startRun(args: RunArgs): Promise<Run> {
     bulkId: args.bulkId,
     rowIndex: args.rowIndex,
     scheduleId: args.scheduleId,
+    // Stamped now, from the skill as it stands at this moment. Read later it
+    // would be whatever the skill has since been edited or healed into, which
+    // is exactly the question analytics is trying to answer.
+    skillVersion: args.skill.version,
   };
   // Branch so each call resolves a concrete createRun overload (metered → may
   // return null; unmetered → always a Run).

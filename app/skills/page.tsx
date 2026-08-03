@@ -53,26 +53,40 @@ export default async function SkillsPage() {
             </Card>
           )}
           {skills.map((s) => (
-            <Link key={s.id} href={`/skills/${s.id}`}>
-              <Card className="flex items-center justify-between p-4 transition-colors hover:bg-surface-2">
-                <div className="min-w-0">
-                  <div className="truncate font-medium">{s.name}</div>
-                  <div className="mt-1 truncate text-sm text-ink-2">
-                    {s.description}
-                  </div>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-3">
-                    <span className="mono">{s.id}</span>
-                    <span>·</span>
-                    <span>{s.plan.length} steps</span>
-                    <span>·</span>
-                    <span>{s.inputSchema.fields.length} inputs</span>
-                    <span>·</span>
-                    <span>{when(s.updatedAt)}</span>
-                  </div>
+            // The card is no longer one big link: analytics needs its own
+            // destination, and an anchor inside an anchor is invalid markup that
+            // browsers silently rewrite.
+            <Card
+              key={s.id}
+              className="flex items-center justify-between gap-4 p-4 transition-colors hover:bg-surface-2"
+            >
+              <Link href={`/skills/${s.id}`} className="min-w-0 flex-1">
+                <div className="truncate font-medium">{s.name}</div>
+                <div className="mt-1 truncate text-sm text-ink-2">
+                  {s.description}
                 </div>
-                <Label>Review →</Label>
-              </Card>
-            </Link>
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-3">
+                  <span className="mono">{s.id}</span>
+                  <span>·</span>
+                  <span>{s.plan.length} steps</span>
+                  <span>·</span>
+                  <span>{s.inputSchema.fields.length} inputs</span>
+                  <span>·</span>
+                  <span>{when(s.updatedAt)}</span>
+                </div>
+              </Link>
+              <div className="flex shrink-0 items-center gap-4">
+                <Link
+                  href={`/skills/${s.id}/analytics`}
+                  className="text-sm text-ink-3 underline underline-offset-4 hover:text-ink"
+                >
+                  Analytics
+                </Link>
+                <Link href={`/skills/${s.id}`}>
+                  <Label>Review →</Label>
+                </Link>
+              </div>
+            </Card>
           ))}
         </div>
       </div>

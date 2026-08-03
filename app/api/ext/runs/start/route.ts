@@ -83,6 +83,7 @@ export async function POST(req: Request) {
       skillId: skill.id,
       input,
       overrides: {},
+      skillVersion: skill.version,
       reserve: quotaReserve(session),
     });
     if (!run) {

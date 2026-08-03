@@ -166,6 +166,15 @@ export function SkillEditor({
           ← skills
         </Link>
         <div className="flex items-center gap-3">
+          {/* The one place someone editing a skill can ask whether it is still
+              working for the people running it. */}
+          <Link
+            href={`/skills/${initial.id}/analytics`}
+            prefetch
+            className="text-sm text-ink-3 underline underline-offset-4 hover:text-ink"
+          >
+            Analytics
+          </Link>
           {saved && <span className="text-xs text-ink-3">Saved</span>}
           {saveError && (
             <span className="text-xs text-ink" role="alert">

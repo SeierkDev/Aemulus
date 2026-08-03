@@ -615,4 +615,34 @@ export const MIGRATIONS: Migration[] = [
       { table: "runs", column: "shots_attempts", def: "INTEGER NOT NULL DEFAULT 0" },
     ],
   },
+
+  // 41 - which version of a skill a run actually executed.
+  //
+  // Skills are versioned and they self-heal, so "the rate dropped" is only
+  // useful next to "and it dropped at v4". Nothing recorded this before, and it
+  // cannot be reconstructed: a run's plan is not stored, so NULL genuinely means
+  // unknown rather than version 1. Analytics reports those separately instead of
+  // guessing.
+  {
+    id: 41,
+    name: "run_skill_version",
+    addColumns: [{ table: "runs", column: "skill_version", def: "INTEGER" }],
+    statements: [
+      `CREATE INDEX IF NOT EXISTS idx_runs_skill_version ON runs(skill_id, skill_version);`,
+    ],
+  },
+
+  // 42 - drop the index 41 just created.
+  //
+  // Measured with EXPLAIN QUERY PLAN rather than assumed: every analytics query
+  // filters skill_id together with created_at, so the planner picks
+  // idx_runs_skill_created every time and this one is never chosen. An unused
+  // index is not free — it is another B-tree written on every single run insert,
+  // which is one of the hottest paths there is. Left in 41 rather than edited
+  // out of it, because 41 has already been applied.
+  {
+    id: 42,
+    name: "drop_unused_run_version_index",
+    statements: [`DROP INDEX IF EXISTS idx_runs_skill_version;`],
+  },
 ];
