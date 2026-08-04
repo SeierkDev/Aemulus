@@ -14,14 +14,24 @@ import type { SkillStep } from "./types";
  * locator + the run's egress guard; iterations are hard-capped. If it succeeds
  * the runner skips its own action (the agent already performed it).
  *
- * Default OFF: executing model-chosen actions is the most autonomous (and
- * riskiest) path, so an operator opts in. Without it, a stuck step just pauses
- * for a human (needs_review), exactly as before.
+ * Default ON. It shipped opt-in because executing model-chosen actions is the
+ * most autonomous path here, and that caution was right while it was unproven.
+ * What the caution actually bought was skills that fail instead of skills that
+ * recover: a stuck step paused for a human who, on a marketplace skill run by a
+ * stranger, is never coming. A published skill whose page moved one button is
+ * indistinguishable from a skill that does not work.
+ *
+ * The bounds are what make it safe rather than the flag: every action goes
+ * through the same locator and egress guard as a recorded step, iterations are
+ * hard-capped, secrets are withheld from the model, and it only ever runs on a
+ * step that was ALREADY going to fail. The worst case is the old behaviour.
+ *
+ * AEMULUS_AGENT_FALLBACK=0 turns it off.
  */
 const MAX_STEPS = Math.max(1, Number(process.env.AEMULUS_AGENT_MAX_STEPS) || 5);
 
 export function agentFallbackEnabled(): boolean {
-  return process.env.AEMULUS_AGENT_FALLBACK === "1";
+  return process.env.AEMULUS_AGENT_FALLBACK !== "0";
 }
 
 /** True when `url`'s host is `host` or a subdomain of it. Local copy (runner's is

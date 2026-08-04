@@ -219,6 +219,7 @@ export default async function RunPage({
                     screenshot: s.screenshot,
                     flagged: s.flagged,
                     note: s.note,
+                    repaired: s.repaired,
                     confidence: s.confidence,
                   }))}
               />
@@ -266,6 +267,15 @@ export default async function RunPage({
                 <span className="mono text-xs text-ink-3">
                   {Math.round(s.confidence * 100)}%
                 </span>
+                {/* A repair is the interesting thing on the page, not a
+                    footnote: this step was going to fail, and the run survived
+                    it. Saying so is also the only way somebody trusts a
+                    marketplace skill that quietly changed under them. */}
+                {s.repaired && (
+                  <span className="rounded-full border border-border-strong bg-surface-2 px-2 py-0.5 text-[0.65rem] uppercase tracking-wide text-ink">
+                    Repaired
+                  </span>
+                )}
                 {s.flagged && (
                   <span className="rounded-full border border-border-strong bg-surface-2 px-2 py-0.5 text-[0.65rem] uppercase tracking-wide text-ink">
                     Flagged

@@ -259,6 +259,25 @@ export async function executeRun(
       logError("runner.vault", e);
     }
 
+    /**
+     * Is this run driving a page somebody is signed in to?
+     *
+     * It decides whether the agentic fallback may run at all, because the
+     * fallback's first act is to screenshot the page and send it to a model.
+     * The step record already withholds a secret VALUE from the prompt — but a
+     * screenshot is not a value. On a run that filled a vault credential the
+     * browser is logged into the runner's own account, and the image is
+     * whatever that account can see: invoices, balances, customers, a whole
+     * inbox.
+     *
+     * Sending that was a decision an operator used to make explicitly by
+     * turning the fallback on. Now that it is on by default, nobody made it, so
+     * the credentialed case keeps the old behaviour and pauses for a human
+     * instead. Public pages — which is what a marketplace skill runs on — keep
+     * the repair.
+     */
+    const credentialed = vaultKeys.size > 0 || secretFieldKeys.size > 0;
+
     for (const step of skill.plan) {
       if (Date.now() > deadline) {
         finalStatus = "failed";
@@ -482,7 +501,27 @@ export async function executeRun(
           // Agentic fallback (opt-in): before pausing for a human, let the agent
           // try to accomplish the step itself. Only for action steps (extract is
           // a read, not something the agent performs).
-          if (agentFallbackEnabled() && step.action !== "extract" && Date.now() <= deadline) {
+          // Not on a watch check. The separate, cheaper watch meter was
+          // justified on a check making NO model calls — that is the whole
+          // argument for 48 checks a day costing what they cost, and quietly
+          // adding an agent back into that path makes the price dishonest.
+          //
+          // The cost shape is also worse here than anywhere else: a watch whose
+          // selector broke fails on EVERY check, so it would invoke the agent
+          // 48 times a day, for as long as the watch exists, on a path designed
+          // to fail silently. The user is told once, at the broken threshold,
+          // and never again.
+          //
+          // Nothing is lost that the user cannot get: a broken watch reports
+          // itself, and the skill behind it repairs on the next ordinary run,
+          // where somebody asked for it and their own quota bounds it.
+          if (
+            agentFallbackEnabled() &&
+            !isWatch &&
+            !credentialed &&
+            step.action !== "extract" &&
+            Date.now() <= deadline
+          ) {
             // Hide the value from the model for BOTH a vault credential and an
             // author-marked secret input (mirrors the step-record masking at line
             // 195) — otherwise a non-owner's secret would be echoed into the operator
@@ -502,9 +541,14 @@ export async function executeRun(
             tokensOut += ag.tokensOut;
             if (ag.ok) {
               await snap();
-              await recordStep(runId, step, ag.selectorUsed, recVal, recShot, ag.confidence, false, ag.note);
+              incr("agent.repaired");
+              await recordStep(runId, step, ag.selectorUsed, recVal, recShot, ag.confidence, false, ag.note, true);
               continue; // the agent performed the step
             }
+            // It tried and could not. Counted separately from never having
+            // tried, because "the fallback does not help here" and "the
+            // fallback was switched off" are different things to learn.
+            incr("agent.gaveUp");
             note = ag.note || note;
           }
           await snap();
@@ -568,6 +612,8 @@ export async function executeRun(
             const canAsk =
               isBlockedError(performErr) &&
               agentFallbackEnabled() &&
+              !isWatch && // same reason as above: a check makes no model calls
+              !credentialed && // and the page is not one somebody is logged into
               Date.now() <= deadline;
             if (!canAsk) throw performErr;
             const isSecretInput =
@@ -584,8 +630,12 @@ export async function executeRun(
             // Rethrow the ORIGINAL error, not the agent's: "X intercepts
             // pointer events" tells you what actually went wrong, where "the
             // agent gave up" does not.
-            if (!ag.ok) throw performErr;
+            if (!ag.ok) {
+              incr("agent.gaveUp");
+              throw performErr;
+            }
             await snap();
+            incr("agent.repaired");
             await recordStep(
               runId,
               step,
@@ -595,6 +645,7 @@ export async function executeRun(
               ag.confidence,
               false,
               ag.note || "Something was covering the element; the agent cleared it.",
+              true,
             );
             continue;
           }
@@ -918,6 +969,7 @@ async function recordStep(
   confidence: number,
   flagged: boolean,
   note: string,
+  repaired = false,
 ): Promise<void> {
   await addRunStep({
     id: id("rst"),
@@ -931,6 +983,7 @@ async function recordStep(
     confidence,
     flagged,
     note,
+    repaired,
     createdAt: Date.now(),
   });
 }

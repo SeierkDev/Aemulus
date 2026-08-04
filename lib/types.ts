@@ -174,6 +174,8 @@ export interface RunStepRecord {
   screenshot: string; // relative path under .data/recordings
   confidence: number; // 0..1
   flagged: boolean;
+  /** The agent rescued this step after the recorded selector failed. */
+  repaired?: boolean;
   note: string;
   createdAt: number;
 }

@@ -104,7 +104,18 @@ CREATE TABLE IF NOT EXISTS runs (
   zk_address  TEXT,
   zk_cluster  TEXT,
   created_at  INTEGER NOT NULL,
-  updated_at  INTEGER NOT NULL
+  updated_at  INTEGER NOT NULL,
+  batched_at  INTEGER,
+  sandbox     TEXT,
+  schedule_id TEXT,
+  shots_public INTEGER NOT NULL DEFAULT 0,
+  shots_archived_at INTEGER,
+  shots_attempts INTEGER NOT NULL DEFAULT 0,
+  skill_version INTEGER,
+  agenc_hash  TEXT,
+  agenc_commitment TEXT,
+  agenc_salt  TEXT,
+  is_watch    INTEGER NOT NULL DEFAULT 0
 );
 
 -- Per-step record: the proof + the place where calibration happens.
@@ -118,7 +129,8 @@ CREATE TABLE IF NOT EXISTS run_steps (
   confidence  REAL,           -- 0..1 - drives flagging
   flagged     INTEGER NOT NULL DEFAULT 0,
   note        TEXT,
-  created_at  INTEGER NOT NULL
+  created_at  INTEGER NOT NULL,
+  repaired    INTEGER NOT NULL DEFAULT 0
 );
 
 -- Creator earnings ledger: a credit each time someone runs your published skill.
@@ -158,7 +170,11 @@ CREATE TABLE IF NOT EXISTS schedules (
   last_run_id  TEXT,
   last_run_at  INTEGER,
   next_run_at  INTEGER NOT NULL,
-  created_at   INTEGER NOT NULL
+  created_at   INTEGER NOT NULL,
+  watch_rule  TEXT,
+  watch_state TEXT,
+  notify      TEXT,
+  muted_until INTEGER
 );
 
 -- Teams/orgs: a group of wallets that share skills, with roles (admin|member).
@@ -248,7 +264,8 @@ CREATE TABLE IF NOT EXISTS receipt_batches (
   leaf_count   INTEGER NOT NULL,
   sig          TEXT,            -- Solana tx signature anchoring the root (if any)
   cluster      TEXT,
-  created_at   INTEGER NOT NULL
+  created_at   INTEGER NOT NULL,
+  arweave_id  TEXT
 );
 
 -- API keys: programmatic access to the public /api/v1 protocol surface.

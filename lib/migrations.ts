@@ -716,4 +716,13 @@ export const MIGRATIONS: Migration[] = [
     name: "telegram_chat_type",
     addColumns: [{ table: "telegram_links", column: "chat_type", def: "TEXT" }],
   },
+  {
+    id: 48,
+    name: "step_repaired",
+    // Which steps the agent rescued, kept per step rather than derived from the
+    // note text. The note is prose meant for a person; a run page that wants to
+    // say "this one was repaired" should not be pattern-matching English.
+    addColumns: [{ table: "run_steps", column: "repaired", def: "INTEGER NOT NULL DEFAULT 0" }],
+  },
+
 ];

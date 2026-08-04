@@ -178,8 +178,8 @@ export async function createRun(input: {
 export async function addRunStep(step: RunStepRecord): Promise<void> {
   await ready();
   await db.execute({
-    sql: `INSERT INTO run_steps (id, run_id, idx, intent, action, screenshot, confidence, flagged, note, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO run_steps (id, run_id, idx, intent, action, screenshot, confidence, flagged, note, repaired, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [
       step.id,
       step.runId,
@@ -194,6 +194,7 @@ export async function addRunStep(step: RunStepRecord): Promise<void> {
       step.confidence,
       step.flagged ? 1 : 0,
       step.note,
+      step.repaired ? 1 : 0,
       step.createdAt,
     ],
   });
@@ -707,6 +708,7 @@ function rowToStep(row: Record<string, unknown>): RunStepRecord {
     screenshot: row.screenshot == null ? "" : String(row.screenshot),
     confidence: row.confidence == null ? 0 : Number(row.confidence),
     flagged: Number(row.flagged) === 1,
+    repaired: Number(row.repaired) === 1,
     note: row.note == null ? "" : String(row.note),
     createdAt: Number(row.created_at),
   };

@@ -63,6 +63,17 @@ export default async function VerifyPage({
                   ? `${v.missingShots} of this run's proof ${v.missingShots === 1 ? "screenshot is" : "screenshots are"} no longer in storage, so the receipt can't be rechecked. This is missing evidence, not evidence of tampering - a receipt can only be verified while the screenshots it commits to still exist.`
                   : "The recomputed hash does NOT match the recorded receipt. This run's data or screenshots have changed since it ran."}
             </p>
+            {/* Intact means nothing changed after the run. It has never meant
+                the run followed the published plan, and once the agentic
+                fallback is on by default that gap is worth stating rather than
+                leaving somebody to infer it from a matching hash. */}
+            {v.repairedSteps ? (
+              <p className="mt-2 text-sm text-ink-2">
+                {v.repairedSteps === 1
+                  ? "One step of this run did not go as recorded: the saved selector failed and the agent performed that step instead. It is inside the receipt, so it cannot be added or removed after the fact."
+                  : `${v.repairedSteps} steps of this run did not go as recorded: the saved selectors failed and the agent performed those steps instead. They are inside the receipt, so they cannot be added or removed after the fact.`}
+              </p>
+            ) : null}
             <div className="mt-4 grid gap-1.5 text-sm">
               <Row k="run" v={v.runId} mono />
               <Row k="status" v={String(v.status)} />

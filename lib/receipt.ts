@@ -40,6 +40,17 @@ export interface ReceiptStep {
   confidence: number;
   flagged: boolean;
   shotHash: string;
+  /**
+   * The agent performed this step after the recorded selector failed.
+   *
+   * Part of what the receipt attests, because it changes what the receipt
+   * MEANS. Every other field says the published plan ran; this one says a model
+   * chose the actions for this step instead. A verifier who cannot tell those
+   * apart is being told less than they think, and while the fallback was
+   * opt-in almost nobody was affected — with it on by default, a real share of
+   * runs are improvised somewhere and the receipt has to say which.
+   */
+  repaired?: boolean;
 }
 
 /** Pure, deterministic digest of a run's verifiable content. */
@@ -91,6 +102,12 @@ export function receiptDigest(input: {
         c: s.confidence,
         f: s.flagged,
         h: s.shotHash,
+        // Conditional for the same reason as sandbox/agencHash above: a key
+        // present on every step would change the canonical form of every
+        // receipt ever written and invalidate its stored hash. A step that was
+        // not repaired keeps exactly the shape it had, which is every step in
+        // every receipt written before repairs were recorded.
+        ...(s.repaired ? { r: true } : {}),
       })),
   });
   return createHash("sha256").update(canonical).digest("hex");
@@ -153,6 +170,7 @@ async function digestForRun(run: Run): Promise<string> {
       action: s.action,
       confidence: s.confidence,
       flagged: s.flagged,
+      repaired: s.repaired,
       shotHash: await hashScreenshot(s.screenshot),
     })),
   );
@@ -339,6 +357,17 @@ export interface ReceiptVerification {
    * problem.
    */
   missingShots?: number;
+  /**
+   * Steps the agent performed after the recorded selector failed.
+   *
+   * Surfaced next to the verdict rather than buried in the hash, because it
+   * changes what "verified" means. Intact says nothing was altered after the
+   * run; it never said the run followed the published plan. When a step was
+   * repaired, a model chose the actions for it, and somebody deciding whether
+   * to trust this run should be told that by the page rather than have to
+   * recompute the digest to notice.
+   */
+  repairedSteps?: number;
   /** Private-receipt commitment root (selective disclosure; reveals nothing). */
   commitmentRoot?: string | null;
   /** On-chain registry record (aemulus-registry program), if anchored. */
@@ -509,6 +538,9 @@ export async function verifyReceipt(
     }
     if (missing) verification.missingShots = missing;
   }
+
+  const repaired = run.steps.filter((st) => st.repaired).length;
+  if (repaired) verification.repairedSteps = repaired;
 
   if (run.shotsPublic) {
     const hashes = await Promise.all(run.steps.map((s) => hashScreenshot(s.screenshot)));
