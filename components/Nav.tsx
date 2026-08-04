@@ -7,6 +7,7 @@ import { SOLANA } from "@/lib/solana";
 
 const NAV_LINKS: { href: string; label: string }[] = [
   { href: "/market", label: "Explore" },
+  { href: "/alerts", label: "Alerts" },
   { href: "/skills", label: "Skills" },
   { href: "/runs", label: "Runs" },
   { href: "/earnings", label: "Earnings" },

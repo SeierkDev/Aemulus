@@ -6,7 +6,11 @@ import type { Cadence, Schedule, WatchNotify } from "./types";
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
+const MIN = 60 * 1000;
 const INTERVAL: Record<string, number> = {
+  every10m: 10 * MIN,
+  every15m: 15 * MIN,
+  every30m: 30 * MIN,
   hourly: HOUR,
   every6h: 6 * HOUR,
   every12h: 12 * HOUR,
@@ -19,6 +23,9 @@ export function cadenceMs(c: Cadence): number {
 }
 
 const CADENCE_LABEL: Record<Cadence, string> = {
+  every10m: "Every 10 minutes",
+  every15m: "Every 15 minutes",
+  every30m: "Every 30 minutes",
   hourly: "Every hour",
   every6h: "Every 6 hours",
   every12h: "Every 12 hours",
@@ -28,6 +35,32 @@ const CADENCE_LABEL: Record<Cadence, string> = {
 };
 export function cadenceLabel(c: Cadence): string {
   return CADENCE_LABEL[c] ?? c;
+}
+
+/** Checks a cadence makes in a day. Drives what a tier can afford. */
+export const CHECKS_PER_DAY: Record<Cadence, number> = {
+  every10m: 144,
+  every15m: 96,
+  every30m: 48,
+  hourly: 24,
+  every6h: 4,
+  every12h: 2,
+  daily: 1,
+  weekdays: 1,
+  weekly: 1,
+};
+
+/**
+ * Cadences this allowance can actually sustain, cheapest question first.
+ *
+ * Offered before the choice rather than enforced after it: the scheduler used to
+ * accept any cadence and then silently skip every firing the quota could not
+ * cover, which looks identical to a broken watch.
+ */
+export function affordableCadences(dailyLimit: number): Cadence[] {
+  const all = Object.keys(CHECKS_PER_DAY) as Cadence[];
+  if (dailyLimit < 0) return all; // unlimited
+  return all.filter((c) => CHECKS_PER_DAY[c] <= dailyLimit);
 }
 
 /** Next run timestamp after `from` - handles "weekdays" by skipping weekends. */
@@ -242,10 +275,12 @@ export async function getWatch(scheduleId: string): Promise<{
   rule: WatchRule;
   state: WatchState;
   notify: WatchNotify | null;
+  /** Quiet until this timestamp. Checks still run. */
+  mutedUntil: number | null;
 } | null> {
   await ready();
   const r = await db.execute({
-    sql: `SELECT owner, watch_rule, watch_state, notify FROM schedules WHERE id = ?`,
+    sql: `SELECT owner, watch_rule, watch_state, notify, muted_until FROM schedules WHERE id = ?`,
     args: [scheduleId],
   });
   const row = r.rows[0];
@@ -261,6 +296,7 @@ export async function getWatch(scheduleId: string): Promise<{
         : safeJson<WatchState>(String(row.watch_state), emptyState()),
     notify:
       row.notify == null ? null : safeJson<WatchNotify | null>(String(row.notify), null),
+    mutedUntil: row.muted_until == null ? null : Number(row.muted_until),
   };
 }
 
@@ -281,6 +317,27 @@ export async function setWatchState(
     sql: `UPDATE schedules SET watch_state = ? WHERE id = ?`,
     args: [JSON.stringify(state), scheduleId],
   });
+}
+
+/**
+ * Stay quiet until a timestamp, without stopping the checks.
+ *
+ * Deliberately not the same as pausing. A paused watch stops looking, so when
+ * it comes back its baseline is whatever the page said days ago and the first
+ * alert is about accumulated drift rather than a change. A muted watch keeps
+ * looking and keeps its baseline honest.
+ */
+export async function muteUntil(
+  scheduleId: string,
+  owner: string,
+  until: number | null,
+): Promise<boolean> {
+  await ready();
+  const r = await db.execute({
+    sql: `UPDATE schedules SET muted_until = ? WHERE id = ? AND owner = ?`,
+    args: [until, scheduleId, owner],
+  });
+  return r.rowsAffected > 0;
 }
 
 /** Attach or replace the watch rule on a schedule. */

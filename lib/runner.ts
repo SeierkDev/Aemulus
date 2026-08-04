@@ -44,6 +44,7 @@ import {
 } from "./safe-url";
 import { runSlots } from "./semaphore";
 import { attachAgenc, attachReceipt } from "./receipt";
+import { runIsWatch } from "./runs";
 import { learnSelectors } from "./skills";
 import { startChainedRun } from "./chain";
 import { agenticStep, agentFallbackEnabled } from "./agent";
@@ -124,6 +125,7 @@ export async function executeRun(
   overrides: RunOverrides = {},
 ): Promise<Run> {
   await mkdir(path.join(RUNS_DIR, owner, runId), { recursive: true });
+  const isWatch = await runIsWatch(runId);
 
   let browser: Browser | null = null;
   let capture: RrwebCapture | null = null; // rrweb session events (if enabled)
@@ -678,7 +680,12 @@ export async function executeRun(
     // run's cost below. Run this BEFORE attachReceipt so the outcome verdict is
     // folded into the receipt hash (and thus the on-chain anchor) — otherwise the
     // hash would omit the very "achieved" signal it's meant to make tamper-evident.
-    if (finalStatus === "completed" && finalShot) {
+    // Skipped entirely for a watch check. The verifier asks a vision model
+    // whether the goal was met, which for an hourly watch is 24 model calls a
+    // day answering a question the watch never asked: it cares whether one
+    // extracted value changed, and the comparison already decides that. This is
+    // the dominant marginal cost of a check and it buys a watch nothing.
+    if (finalStatus === "completed" && finalShot && !isWatch) {
       const goal = `${skill.name}. ${skill.description}`.trim();
       const v = await verifyOutcome(goal, finalShot);
       if (v) {

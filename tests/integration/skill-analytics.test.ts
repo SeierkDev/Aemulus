@@ -207,3 +207,18 @@ describe("getSkillAnalytics", () => {
     }
   });
 });
+
+describe("skillTotals", () => {
+  // The digest asks for this once per published skill, per chat, on a scheduler
+  // tick. It must agree with the full analytics it stands in for, or the two
+  // surfaces report different numbers for the same skill.
+  it("matches the headline numbers getSkillAnalytics computes", async () => {
+    const { skillTotals } = await import("../../lib/analytics");
+    const full = await getSkillAnalytics(skill.id, 7);
+    const quick = await skillTotals(skill.id, 7);
+    expect(quick.runs).toBe(full.runs);
+    expect(quick.succeeded).toBe(full.succeeded);
+    if (full.successRate === null) expect(quick.rate).toBeNull();
+    else expect(quick.rate).toBeCloseTo(full.successRate, 10);
+  });
+});

@@ -45,6 +45,13 @@ export const SOLANA = {
   quotaHolder: num("AEMULUS_QUOTA_HOLDER", 5),
   quotaPro: num("AEMULUS_QUOTA_PRO", 50),
   quotaWhale: num("AEMULUS_QUOTA_WHALE", -1),
+  // Watch checks get their own allowance. Sized so the entry tier can actually
+  // run two hourly watches (48/day) rather than none: a watch check costs a
+  // fraction of a real run once the vision verifier is skipped, so metering it
+  // against the same 5/day made the whole feature unreachable.
+  watchHolder: num("AEMULUS_WATCH_HOLDER", 48),
+  watchPro: num("AEMULUS_WATCH_PRO", 250),
+  watchWhale: num("AEMULUS_WATCH_WHALE", -1),
   /** $AEMU credited to a creator each time someone else runs their skill. */
   runFee: intNum("AEMULUS_RUN_FEE", 10),
 };
@@ -55,6 +62,14 @@ export function limitForLevel(level: number): number {
   if (level === 2) return SOLANA.quotaPro;
   if (level === 1) return SOLANA.quotaHolder;
   return 0; // locked - no runs (locked wallets never reach a run anyway)
+}
+
+/** Daily watch-check allowance for an access level. -1 is unlimited. */
+export function watchLimitForLevel(level: number): number {
+  if (level >= 3) return SOLANA.watchWhale;
+  if (level === 2) return SOLANA.watchPro;
+  if (level === 1) return SOLANA.watchHolder;
+  return 0;
 }
 
 export function gatingEnabled(): boolean {

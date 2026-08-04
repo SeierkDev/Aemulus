@@ -222,6 +222,13 @@ export interface SkillReview {
 }
 
 export type Cadence =
+  // Sub-hourly cadences exist for alerts, where being early IS the value: an
+  // exchange listing checked every six hours is worth nothing. Gated by tier in
+  // affordableCadences, because 10-minute checks are 144 a day.
+  | "every10m"
+  | "every15m"
+  | "every30m"
+
   | "hourly"
   | "every6h"
   | "every12h"

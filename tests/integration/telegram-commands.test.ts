@@ -205,4 +205,15 @@ describe("the caps the website enforces apply here too", () => {
     // And it really did not create one past the cap.
     expect(await countActiveSchedules(ALICE)).toBe(MAX_ACTIVE_SCHEDULES);
   });
+
+  // Every preset in /alerts is a published skill recorded by somebody else.
+  // Requiring the tapper to own it made the whole preset flow impossible, while
+  // a private skill must still be off limits.
+  it("lets a published skill be watched by someone who doesn't own it", async () => {
+    const { setPublished } = await import("../../lib/skills");
+    await setPublished(bobSkill.id, BOB, true);
+    const r = await handleCallback(ALICE_CHAT, `w|s|${bobSkill.id}`);
+    expect(r?.text).not.toContain("no longer exists");
+    expect(r?.keyboard?.length).toBeGreaterThan(0);
+  });
 });

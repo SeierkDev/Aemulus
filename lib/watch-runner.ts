@@ -1,4 +1,5 @@
 import { getWatch, setWatchState } from "./schedules";
+import type { WatchState } from "./watches";
 import { evaluate, evaluateFailure, type WatchDecision } from "./watches";
 import { logError, logInfo } from "./log";
 import type { Run, WatchNotify } from "./types";
@@ -113,12 +114,54 @@ export async function evaluateWatchForRun(
           )
         : evaluate(watch.rule, watch.state, raw, now);
 
+    const muted = watch.mutedUntil != null && watch.mutedUntil > now;
+
+    // Muting is not pausing: the check still runs and lastValue still moves, so
+    // /watches keeps telling the truth about what the page says right now.
+    //
+    // But silence must not swallow the event. A one-time flip — socials
+    // vanishing from a coin page, the earliest rug tell the pack ships — moves
+    // the baseline with it, and by the time anyone is listening again nothing
+    // differs. The alert the watch existed for is never sent and nothing says
+    // so. So the value at the start of the quiet is kept aside, and the first
+    // check after the mute compares against THAT: one message for the net
+    // change, however many times it moved in between.
+    const persist: WatchState = muted
+      ? { ...decision.state, mutedFrom: watch.state.mutedFrom ?? watch.state.lastValue ?? null }
+      : { ...decision.state, mutedFrom: undefined };
+
     // Persist on EVERY check, not only when alerting: the confirm counter and
     // the failure streak are exactly the things that have to survive between
     // checks.
-    await setWatchState(run.scheduleId, decision.state);
+    await setWatchState(run.scheduleId, persist);
 
-    if (decision.notify) {
+    // The mute just lifted. decision only knows about the last hop, so it can
+    // report nothing while the value is still somewhere new — compare across
+    // the whole quiet instead.
+    const lifted = !muted && watch.state.mutedFrom !== undefined;
+    if (lifted && !decision.broken) {
+      const from = watch.state.mutedFrom ?? null;
+      const to = decision.state.lastValue ?? "";
+      if (from !== to) {
+        await sink.changed({
+          scheduleId: run.scheduleId,
+          owner: watch.owner,
+          runId: run.id,
+          skillId: run.skillId,
+          key: watch.rule.key,
+          notify: watch.notify,
+          at: now,
+          from,
+          to,
+        });
+        return decision;
+      }
+      // Nothing net changed across the quiet, so there is no event to report —
+      // and decision, which only saw the last hop, must not invent one.
+      return decision;
+    }
+
+    if (decision.notify && !muted) {
       const base = {
         scheduleId: run.scheduleId,
         owner: watch.owner,

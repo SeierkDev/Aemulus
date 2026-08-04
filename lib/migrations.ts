@@ -662,4 +662,58 @@ export const MIGRATIONS: Migration[] = [
       { table: "runs", column: "agenc_salt", def: "TEXT" },
     ],
   },
+
+  // 44 - watch checks are their own kind of run.
+  //
+  // A watch check replays two or three steps and reads one value. A run is a
+  // person asking for work. Metering them from the same daily allowance meant a
+  // background watch quietly ate the quota somebody wanted for actual work, and
+  // at 5 runs/day a Holder could not afford a single hourly watch at all.
+  //
+  // Flagged at creation rather than derived by joining schedules later, because
+  // the quota count runs on every scheduler tick and must stay a single indexed
+  // scan.
+  {
+    id: 44,
+    name: "watch_runs",
+    addColumns: [
+      { table: "runs", column: "is_watch", def: "INTEGER NOT NULL DEFAULT 0" },
+    ],
+    statements: [
+      `CREATE INDEX IF NOT EXISTS idx_runs_owner_watch ON runs(owner, is_watch, created_at);`,
+    ],
+  },
+
+  // 45 - snooze. Distinct from pausing: the watch keeps checking and keeps its
+  // baseline current, it just stays quiet until the timestamp passes. Pausing
+  // stops the checks, which means the first alert after resuming compares
+  // against whatever the value was days ago.
+  {
+    id: 45,
+    name: "watch_mute",
+    addColumns: [{ table: "schedules", column: "muted_until", def: "INTEGER" }],
+  },
+
+  // 46 - creator digest. When a chat last got a summary of its own wallet, so a
+  // sweep that runs every scheduler tick sends one a day rather than one a tick.
+  {
+    id: 46,
+    name: "telegram_digest",
+    addColumns: [
+      { table: "telegram_links", column: "last_digest_at", def: "INTEGER" },
+    ],
+  },
+
+  // 47 - what kind of chat this is.
+  //
+  // Alerts are fine in a group; that is the point of /here. A wallet summary is
+  // not: it carries earnings and a claimable balance, and a group linked for
+  // alerts would have received it in front of everybody. NULL means unknown, and
+  // unknown is treated as "not private" so the leak cannot happen to a link that
+  // predates this. It backfills from the next message that chat sends.
+  {
+    id: 47,
+    name: "telegram_chat_type",
+    addColumns: [{ table: "telegram_links", column: "chat_type", def: "TEXT" }],
+  },
 ];

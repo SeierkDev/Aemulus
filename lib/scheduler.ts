@@ -11,6 +11,7 @@ import { getSkill } from "./skills";
 import { getQuota } from "./quota";
 import { startRun } from "./run-service";
 import { activeSink } from "./watch-sink-telegram";
+import { sweepDigests } from "./wallet-digest";
 import { computeTier, gatingEnabled, readAemulusBalance } from "./solana";
 import { logError, logInfo } from "./log";
 import type { Session } from "./siws";
@@ -88,7 +89,9 @@ async function runDue(): Promise<void> {
         level,
         balance: 0,
       };
-      const quota = await getQuota(session);
+      // A schedule carrying a watch rule is metered as a watch check.
+      const watch = await getWatch(s.id);
+      const quota = await getQuota(session, watch ? "watch" : "runs");
       if (!quota.ok) {
         logInfo("scheduler.skip", "quota exhausted", { schedule: s.id });
         await tellOwner(s, "quota", false);
@@ -99,6 +102,7 @@ async function runDue(): Promise<void> {
         input: s.input,
         runner: s.owner,
         scheduleId: s.id, // so a watch on this schedule can be evaluated on completion
+        isWatch: !!watch,
       });
       await recordRun(s.id, run.id);
       logInfo("scheduler.ran", "ok", {
@@ -119,7 +123,12 @@ declare global {
 export function startScheduler(): void {
   if (globalThis.__aemScheduler) return;
   const tickMs = Math.max(1000, Number(process.env.AEMULUS_SCHEDULER_MS) || 60_000);
-  globalThis.__aemScheduler = setInterval(() => void runDue(), tickMs);
+  globalThis.__aemScheduler = setInterval(() => {
+    void runDue();
+    // Rides the same tick rather than owning a timer: it is rate-limited by a
+    // per-chat timestamp, so a frequent tick costs one indexed query.
+    void sweepDigests();
+  }, tickMs);
   logInfo("scheduler", `started (${tickMs}ms tick)`);
 }
 

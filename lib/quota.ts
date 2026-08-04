@@ -1,4 +1,4 @@
-import { limitForLevel, computeTier, getAemulusBalance } from "./solana";
+import { limitForLevel, watchLimitForLevel, computeTier, getAemulusBalance } from "./solana";
 import { countRecentRuns } from "./runs";
 import type { QuotaReserve } from "./runs";
 import type { Session } from "./auth";
@@ -19,12 +19,17 @@ export interface QuotaStatus {
   ok: boolean; // is there at least one run left?
 }
 
-export async function getQuota(session: Session): Promise<QuotaStatus> {
-  const limit = limitForLevel(session.level);
+export async function getQuota(
+  session: Session,
+  kind: "runs" | "watch" = "runs",
+): Promise<QuotaStatus> {
+  const limit =
+    kind === "watch" ? watchLimitForLevel(session.level) : limitForLevel(session.level);
   const unlimited = limit < 0;
   const used = await countRecentRuns(
     session.pubkey,
     Date.now() - QUOTA_WINDOW_MS,
+    kind,
   );
   return {
     tier: session.tier,
@@ -56,4 +61,9 @@ export function quotaReserve(session: Session): QuotaReserve {
 export async function quotaReserveForOwner(owner: string): Promise<QuotaReserve> {
   const level = computeTier(await getAemulusBalance(owner)).level;
   return { limit: limitForLevel(level), windowMs: QUOTA_WINDOW_MS };
+}
+
+/** The same reservation for a watch check, against the watch allowance. */
+export function quotaReserveForWatch(level: number): QuotaReserve {
+  return { limit: watchLimitForLevel(level), windowMs: QUOTA_WINDOW_MS };
 }

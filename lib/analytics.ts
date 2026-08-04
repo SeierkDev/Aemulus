@@ -359,3 +359,30 @@ export async function getSkillAnalytics(
     },
   };
 }
+
+/**
+ * Just the counts, for the daily digest.
+ *
+ * getSkillAnalytics reads every run in the window into memory to build a daily
+ * series and a stops breakdown. The digest needs three numbers, and it asks for
+ * them once per published skill, per chat, on a scheduler tick — so it gets an
+ * aggregate the database can answer without handing back rows.
+ */
+export async function skillTotals(
+  skillId: string,
+  days: number,
+): Promise<{ runs: number; succeeded: number; rate: number | null }> {
+  await ready();
+  const since = Date.now() - days * 24 * 60 * 60 * 1000;
+  const r = await db.execute({
+    sql: `SELECT COUNT(*) AS all_runs,
+                 SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) AS ok,
+                 SUM(CASE WHEN status IN (?, ?) THEN 1 ELSE 0 END) AS inflight
+          FROM runs WHERE skill_id = ? AND created_at >= ?`,
+    args: [OK, INFLIGHT[0], INFLIGHT[1], skillId, since],
+  });
+  const row = r.rows[0];
+  const runs = Number(row?.all_runs ?? 0) - Number(row?.inflight ?? 0);
+  const succeeded = Number(row?.ok ?? 0);
+  return { runs, succeeded, rate: runs > 0 ? succeeded / runs : null };
+}

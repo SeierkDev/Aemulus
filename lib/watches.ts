@@ -53,6 +53,16 @@ export type WatchState = {
   /** Consecutive failed checks. Reset by any successful check. */
   failStreak: number;
   /**
+   * The value at the moment the quiet started, kept only while a mute is on.
+   *
+   * lastValue keeps moving during a mute so /watches stays truthful about what
+   * the page says right now. That alone would lose a one-time flip: socials
+   * vanish while muted, the baseline follows them, and at mute-lift nothing
+   * differs any more. This is the point the lift compares against, so the net
+   * change across the quiet is reported exactly once.
+   */
+  mutedFrom?: string | null;
+  /**
    * When the owner was last told this watch could not run at all (quota gone,
    * tier no longer eligible). Kept so a condition that lasts all day produces
    * one message, not one per tick.

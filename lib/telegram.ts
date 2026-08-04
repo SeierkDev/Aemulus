@@ -82,8 +82,10 @@ export async function sendMessage(
     markdown?: boolean;
     /** Link buttons (open a URL). */
     buttons?: { text: string; url: string }[];
-    /** Callback buttons (send data back to the webhook), one array per row. */
-    inlineKeyboard?: { text: string; data: string }[][];
+    /** Inline keyboard rows. A button carries either callback data or a url;
+     *  Telegram allows both kinds side by side in one row, which an alert needs
+     *  so "Pause" and "See what I saw" can sit together. */
+    inlineKeyboard?: { text: string; data?: string; url?: string }[][];
   } = {},
 ): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -98,7 +100,9 @@ export async function sendMessage(
     if (opts.inlineKeyboard?.length) {
       body.reply_markup = {
         inline_keyboard: opts.inlineKeyboard.map((row) =>
-          row.map((b) => ({ text: b.text, callback_data: b.data })),
+          row.map((b) =>
+            b.url ? { text: b.text, url: b.url } : { text: b.text, callback_data: b.data },
+          ),
         ),
       };
     } else if (opts.buttons?.length) {
@@ -228,6 +232,52 @@ export async function ownerForChat(chatId: string): Promise<string | null> {
 }
 
 /** Every chat a wallet has linked. A person may run Telegram on more than one account. */
+/**
+ * Chats due a wallet summary.
+ *
+ * Everything else in the alerts work serves people watching pages. This is the
+ * one path that serves the people publishing skills, and it needs no page, no
+ * skill and no quota — the numbers already exist.
+ */
+export async function chatsDueDigest(everyMs: number): Promise<
+  { chatId: string; owner: string }[]
+> {
+  await ready();
+  const cutoff = Date.now() - everyMs;
+  const r = await db.execute({
+    sql: `SELECT chat_id, owner FROM telegram_links
+          WHERE (last_digest_at IS NULL OR last_digest_at < ?)
+            AND chat_type = 'private'
+          LIMIT 50`,
+    args: [cutoff],
+  });
+  return r.rows.map((row) => ({ chatId: String(row.chat_id), owner: String(row.owner) }));
+}
+
+export async function markDigestSent(chatId: string): Promise<void> {
+  await ready();
+  await db.execute({
+    sql: `UPDATE telegram_links SET last_digest_at = ? WHERE chat_id = ?`,
+    args: [Date.now(), chatId],
+  });
+}
+
+/**
+ * Remember what kind of chat this is, from any message it sends.
+ *
+ * Recorded opportunistically rather than only at link time, so chats linked
+ * before the column existed classify themselves the next time somebody uses
+ * them, instead of being permanently unknown.
+ */
+export async function noteChatType(chatId: string, type: string | undefined): Promise<void> {
+  if (!type) return;
+  await ready();
+  await db.execute({
+    sql: `UPDATE telegram_links SET chat_type = ? WHERE chat_id = ? AND (chat_type IS NULL OR chat_type != ?)`,
+    args: [type, chatId, type],
+  });
+}
+
 export async function chatsForOwner(owner: string): Promise<string[]> {
   await ready();
   const r = await db.execute({

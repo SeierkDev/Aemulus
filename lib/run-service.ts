@@ -30,6 +30,9 @@ interface RunArgs {
   runner: string;
   bulkId?: string;
   rowIndex?: number;
+  /** A scheduled watch check. Metered against the watch allowance and executed
+   *  without the vision verifier, which a watch has no use for. */
+  isWatch?: boolean;
   /** The schedule that fired this run. Set by the scheduler so that when the
    *  run settles, a watch attached to that schedule can be found. */
   scheduleId?: string;
@@ -82,6 +85,7 @@ export async function startRun(args: RunArgs): Promise<Run> {
     // would be whatever the skill has since been edited or healed into, which
     // is exactly the question analytics is trying to answer.
     skillVersion: args.skill.version,
+    isWatch: args.isWatch,
   };
   // Branch so each call resolves a concrete createRun overload (metered → may
   // return null; unmetered → always a Run).

@@ -47,6 +47,9 @@ export async function createRun(input: {
   /** The skill version this run is executing, stamped so analytics can tie a
    *  change in success rate to the edit that caused it. */
   skillVersion?: number;
+  /** A scheduled watch check rather than work somebody asked for. Metered
+   *  separately and executed without the vision verifier. */
+  isWatch?: boolean;
   reserve?: undefined;
 }): Promise<Run>;
 export async function createRun(input: {
@@ -58,6 +61,9 @@ export async function createRun(input: {
   rowIndex?: number;
   scheduleId?: string;
   skillVersion?: number;
+  /** A scheduled watch check rather than work somebody asked for. Metered
+   *  separately and executed without the vision verifier. */
+  isWatch?: boolean;
   reserve: QuotaReserve;
 }): Promise<Run | null>;
 export async function createRun(input: {
@@ -69,6 +75,9 @@ export async function createRun(input: {
   rowIndex?: number;
   scheduleId?: string;
   skillVersion?: number;
+  /** A scheduled watch check rather than work somebody asked for. Metered
+   *  separately and executed without the vision verifier. */
+  isWatch?: boolean;
   reserve?: QuotaReserve;
 }): Promise<Run | null> {
   await ready();
@@ -111,7 +120,7 @@ export async function createRun(input: {
     createdAt: now,
     updatedAt: now,
   };
-  const cols = `id, owner, skill_id, skill_version, status, input, overrides, result, error, bulk_id, row_index, schedule_id, created_at, updated_at`;
+  const cols = `id, owner, skill_id, skill_version, status, input, overrides, result, error, bulk_id, row_index, schedule_id, is_watch, created_at, updated_at`;
   const vals = [
     run.id,
     run.owner,
@@ -128,6 +137,7 @@ export async function createRun(input: {
     run.bulkId,
     run.rowIndex,
     input.scheduleId ?? null,
+    input.isWatch ? 1 : 0,
     now,
     now,
   ];
@@ -140,16 +150,26 @@ export async function createRun(input: {
     const sinceMs = now - input.reserve.windowMs;
     const res = await db.execute({
       sql: `INSERT INTO runs (${cols})
-            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
-            WHERE (SELECT COUNT(*) FROM runs WHERE owner = ? AND created_at >= ?) < ?`,
-      args: [...vals, run.owner, sinceMs, input.reserve.limit],
+            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            WHERE (SELECT COUNT(*) FROM runs
+                   WHERE owner = ? AND created_at >= ? AND is_watch = ?) < ?`,
+      args: [
+        ...vals,
+        run.owner,
+        sinceMs,
+        // Meter against the bucket this row belongs to. Counting every run
+        // regardless of kind would let a day of background checks block the
+        // work somebody actually asked for, and vice versa.
+        input.isWatch ? 1 : 0,
+        input.reserve.limit,
+      ],
     });
     if (res.rowsAffected === 0) return null; // over quota - nothing inserted
     return run;
   }
 
   await db.execute({
-    sql: `INSERT INTO runs (${cols}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    sql: `INSERT INTO runs (${cols}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: vals,
   });
   return run;
@@ -497,16 +517,42 @@ export async function getRun(runId: string): Promise<Run | null> {
 }
 
 /** How many runs this wallet has started since `sinceMs` (for quotas). */
+/**
+ * Runs in the window, by kind.
+ *
+ * Watch checks are counted separately from work somebody asked for: they are
+ * background, predictable and cheap, and letting them share one allowance meant
+ * a watch silently consumed the runs a person wanted for actual work.
+ */
 export async function countRecentRuns(
   owner: string,
   sinceMs: number,
+  kind: "runs" | "watch" = "runs",
 ): Promise<number> {
   await ready();
   const r = await db.execute({
-    sql: `SELECT COUNT(*) AS n FROM runs WHERE owner = ? AND created_at >= ?`,
-    args: [owner, sinceMs],
+    sql: `SELECT COUNT(*) AS n FROM runs
+          WHERE owner = ? AND created_at >= ? AND is_watch = ?`,
+    args: [owner, sinceMs, kind === "watch" ? 1 : 0],
   });
   return Number(r.rows[0]?.n ?? 0);
+}
+
+/**
+ * Is this run a scheduled watch check?
+ *
+ * Read from the row rather than threaded through executeRun's arguments: a run
+ * can reach the executor directly or be requeued by the worker, and the job
+ * record carries no such flag. One primary-key read at the top of a function
+ * that is about to launch a browser costs nothing.
+ */
+export async function runIsWatch(runId: string): Promise<boolean> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT is_watch FROM runs WHERE id = ?`,
+    args: [runId],
+  });
+  return Number(r.rows[0]?.is_watch ?? 0) === 1;
 }
 
 export async function listRuns(owner: string): Promise<Run[]> {

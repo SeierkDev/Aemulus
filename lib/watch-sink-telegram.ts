@@ -75,7 +75,16 @@ export const telegramSink: WatchSink = {
     for (const chat of chats) {
       await sendMessage(chat, text, {
         markdown: true,
-        buttons: [{ text: "See what I saw", url: runUrl(a.runId) }],
+        // Actionable where the attention already is. Muting a noisy watch used
+        // to mean leaving the message, running /watches, reading a number and
+        // typing /pause 3 — at whatever hour the alert arrived.
+        inlineKeyboard: [
+          [
+            { text: "Pause", data: `a|p|${a.scheduleId}` },
+            { text: "Check again", data: `a|c|${a.scheduleId}` },
+          ],
+          [{ text: "See what I saw", url: runUrl(a.runId) }],
+        ],
       });
     }
   },

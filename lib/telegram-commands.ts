@@ -10,12 +10,15 @@ import {
   setScheduleActive,
   setWatch,
   getWatch,
+  muteUntil,
   cadenceLabel,
+  affordableCadences,
 } from "./schedules";
 import { verifyReceipt } from "./receipt";
-import { getQuota } from "./quota";
-import { computeTier, getAemulusBalance } from "./solana";
+import { getQuota, quotaReserveForWatch } from "./quota";
+import { computeTier, getAemulusBalance, watchLimitForLevel } from "./solana";
 import { publicBaseUrl } from "./public-url";
+import { ALERT_PRESETS } from "./alert-pack";
 import { mdEscape, ownerForChat } from "./telegram";
 import type { Cadence, Skill } from "./types";
 
@@ -39,6 +42,9 @@ const SITE = () => publicBaseUrl();
 
 /** Cadences offered in the wizard, in the order a person thinks about them. */
 const CADENCES: { c: Cadence; label: string; perDay: number }[] = [
+  { c: "every10m", label: "Every 10 minutes", perDay: 144 },
+  { c: "every15m", label: "Every 15 minutes", perDay: 96 },
+  { c: "every30m", label: "Every 30 minutes", perDay: 48 },
   { c: "hourly", label: "Every hour", perDay: 24 },
   { c: "every6h", label: "Every 6 hours", perDay: 4 },
   { c: "every12h", label: "Every 12 hours", perDay: 2 },
@@ -154,10 +160,18 @@ export async function cmdWatches(owner: string): Promise<Reply> {
       w.state.lastValue === null
         ? "I haven't checked it yet."
         : `Right now it says: ${mdEscape(clip(w.state.lastValue))}`;
+    // When it last looked, not just what it saw. Without this, "nothing has
+    // changed" and "this hasn't run since Tuesday" read identically.
+    const seen = s.lastRunAt ? `Last checked ${ago(s.lastRunAt)}.` : "Not checked yet.";
+    const muted =
+      w.mutedUntil && w.mutedUntil > Date.now()
+        ? `   (muted for ${Math.max(1, Math.round((w.mutedUntil - Date.now()) / 3600000))}h)`
+        : "";
     return [
-      `*${i + 1}.  ${mdEscape(s.skillName)}*${s.active ? "" : "   (paused)"}`,
+      `*${i + 1}.  ${mdEscape(s.skillName)}*${s.active ? "" : "   (paused)"}${muted}`,
       `Watching *${mdEscape(w.rule.key)}*, checked ${cadenceLabel(s.cadence).toLowerCase()}.`,
       value,
+      seen,
     ].join("\n");
   });
   return {
@@ -167,6 +181,7 @@ export async function cmdWatches(owner: string): Promise<Reply> {
       lines.join("\n\n"),
       "",
       "Use the number in front of each one to manage it:",
+      "`/check 1` to look now, `/mute 1 24h` to go quiet for a while,",
       "`/pause 1` to stop checking, `/resume 1` to start again, `/delete 1` to remove it.",
     ].join("\n"),
     markdown: true,
@@ -222,6 +237,134 @@ export async function cmdDelete(owner: string, arg: string): Promise<Reply> {
   return { text: `Deleted "${w.name}". I won't check that page again.` };
 }
 
+export async function cmdCheck(owner: string, arg: string): Promise<Reply> {
+  const n = Number(arg.trim());
+  if (!Number.isInteger(n) || n < 1) {
+    return {
+      text: "Tell me which one. Send /watches to see them numbered, then `/check 1` for the first.",
+      markdown: true,
+    };
+  }
+  const w = await watchAt(owner, n);
+  if (!w) {
+    return { text: "You don't have a watch with that number. Send /watches to see the list again." };
+  }
+  return checkNow(owner, w.id, w.name);
+}
+
+/**
+ * Snooze rather than pause.
+ *
+ * Pause reads as permanent and people never come back to undo it, so a watch
+ * that was annoying for an afternoon stays off forever. A snooze says when it
+ * returns, and it returns by itself.
+ */
+export async function cmdMute(owner: string, arg: string): Promise<Reply> {
+  const [numRaw, durRaw] = arg.trim().split(/\s+/);
+  const n = Number(numRaw);
+  if (!Number.isInteger(n) || n < 1) {
+    return {
+      text: "Tell me which one and for how long. Like `/mute 1 24h`, or just `/mute 1` for a day.",
+      markdown: true,
+    };
+  }
+  const hours = parseHours(durRaw);
+  if (hours === null) {
+    return { text: "I didn't understand that length. Try `2h`, `24h` or `3d`.", markdown: true };
+  }
+  const w = await watchAt(owner, n);
+  if (!w) {
+    return { text: "You don't have a watch with that number. Send /watches to see the list again." };
+  }
+  await muteUntil(w.id, owner, Date.now() + hours * 60 * 60 * 1000);
+  return {
+    text: `Muted "${w.name}" for ${hours === 24 ? "a day" : `${hours}h`}. It starts again by itself, and it keeps checking in the meantime so you won't miss what changed while it was quiet.`,
+  };
+}
+
+/** "2h", "24h", "3d", or nothing at all meaning a day. Bounded to a week. */
+function parseHours(raw: string | undefined): number | null {
+  if (!raw) return 24;
+  const m = /^(\d+)\s*([hd])$/i.exec(raw.trim());
+  if (!m) return null;
+  const n = Number(m[1]);
+  const hours = m[2].toLowerCase() === "d" ? n * 24 : n;
+  if (hours < 1 || hours > 24 * 7) return null;
+  return hours;
+}
+
+/**
+ * The curated list, in the bot.
+ *
+ * Someone who finds the bot before the site should never have to leave it to
+ * get value. Presets with no recorded skill behind them say so rather than
+ * offering a button that quietly does nothing.
+ */
+export async function cmdAlerts(owner: string): Promise<Reply> {
+  const tier = computeTier(await getAemulusBalance(owner));
+  const allowance = watchLimitForLevel(tier.level);
+  const affordable = new Set(affordableCadences(allowance));
+
+  const ready = ALERT_PRESETS.filter((p) => p.skillId && affordable.has(p.suggested));
+  const lines = [
+    "*Alerts*",
+    "",
+    "Pick something to be told about. I check the page and message you here when it changes.",
+    "",
+  ];
+  for (const p of ALERT_PRESETS) {
+    const mark = !p.skillId ? "soon" : affordable.has(p.suggested) ? "ready" : "higher tier";
+    lines.push(`*${mdEscape(p.title)}* — ${mdEscape(p.detail)}  (${mark})`);
+  }
+  lines.push("");
+  lines.push(
+    ready.length > 0
+      ? "Tap one below to turn it on."
+      : "None of these have a recorded skill behind them yet. Send /watch to build one from a skill you already have.",
+  );
+
+  return {
+    text: lines.join("\n"),
+    markdown: true,
+    keyboard: ready.slice(0, 10).map((p) => [{ text: p.title, data: `w|s|${p.skillId}` }]),
+  };
+}
+
+/**
+ * Send a watch's alerts to THIS chat.
+ *
+ * The plumbing for group delivery already existed — a watch targets one chat id
+ * and an owner can link several — but there was no way to move an existing
+ * watch, so an alert set up in a DM could never reach a team.
+ */
+export async function cmdHere(owner: string, arg: string, chatId: string): Promise<Reply> {
+  const n = Number(arg.trim());
+  if (!Number.isInteger(n) || n < 1) {
+    return {
+      text: "Tell me which one. Send /watches to see them numbered, then `/here 1` in the chat you want the alerts in.",
+      markdown: true,
+    };
+  }
+  const w = await watchAt(owner, n);
+  if (!w) {
+    return { text: "You don't have a watch with that number. Send /watches to see the list again." };
+  }
+  const watch = await getWatch(w.id);
+  if (!watch) return { text: "That watch is gone." };
+  // Carry the existing options over. Rebuilding notify from scratch dropped
+  // `redact`, so a watch deliberately set to hide its value would start
+  // publishing it — at the exact moment it moves into a group, where more
+  // people are watching.
+  await setWatch(w.id, owner, watch.rule, {
+    ...(watch.notify ?? {}),
+    channel: "telegram",
+    chatId,
+  });
+  return {
+    text: `"${w.name}" will send its alerts here from now on. Anyone in this chat will see them.`,
+  };
+}
+
 /* ── the /watch wizard ───────────────────────────────────────────────────── */
 
 /**
@@ -259,21 +402,127 @@ export async function cmdWatch(owner: string): Promise<Reply> {
   };
 }
 
+/**
+ * A tap on an alert's own buttons.
+ *
+ * Ownership is re-checked here, not trusted from the message: callback data
+ * comes back from the client, and an old alert forwarded into another chat must
+ * not become a way to pause somebody else's watch.
+ */
+export async function handleAlertAction(
+  chatId: string,
+  data: string,
+  actingOwner?: string,
+): Promise<Reply | null> {
+  if (!data.startsWith("a|")) return null;
+  // Supplied by the webhook, which resolves it from whoever tapped rather than
+  // from the room the message is sitting in.
+  const owner = actingOwner ?? (await ownerForChat(chatId));
+  if (!owner) return NOT_LINKED;
+  const [, action, scheduleId] = data.split("|");
+  if (!scheduleId) return null;
+
+  const w = await getWatch(scheduleId);
+  if (!w || w.owner !== owner) {
+    return { text: "That watch is gone, or it isn't yours." };
+  }
+  const all = await listSchedules(owner);
+  const sched = all.find((x) => x.id === scheduleId);
+  const name = sched?.skillName ?? "that watch";
+
+  if (action === "p") {
+    await setScheduleActive(scheduleId, owner, false);
+    return {
+      text: `Paused "${name}". It keeps everything it has learned. Send /watches and resume it whenever.`,
+    };
+  }
+  if (action === "c") {
+    const r = await checkNow(owner, scheduleId, name);
+    return r;
+  }
+  return null;
+}
+
+/**
+ * Run a watch's check right now.
+ *
+ * "Has it changed yet?" is the commonest thing anyone wants from an alert, and
+ * until now the only answer was to wait for the next cadence.
+ */
+async function checkNow(owner: string, scheduleId: string, name: string): Promise<Reply> {
+  const w = await getWatch(scheduleId);
+  if (!w || w.owner !== owner) return { text: "That watch is gone, or it isn't yours." };
+
+  const all = await listSchedules(owner);
+  const sched = all.find((x) => x.id === scheduleId);
+  if (!sched) return { text: "That watch is gone." };
+
+  const tier = computeTier(await getAemulusBalance(owner));
+  const session = { pubkey: owner, level: tier.level, tier: tier.name } as never;
+  const q = await getQuota(session, "watch");
+  if (!q.ok) {
+    return {
+      text: [
+        "You've used all your checks for today, so I can't look right now.",
+        "",
+        "It resets on a rolling 24 hours, and your scheduled checks pick up again by themselves.",
+      ].join("\n"),
+    };
+  }
+
+  const skill = await getSkill(sched.skillId);
+  if (!skill) return { text: "That skill no longer exists." };
+
+  const { startRun } = await import("./run-service");
+  try {
+    await startRun({
+      skill,
+      input: sched.input,
+      runner: owner,
+      scheduleId,
+      isWatch: true,
+      quota: quotaReserveForWatch(tier.level),
+    });
+  } catch {
+    // The soft check above passed but the atomic reserve refused: a scheduled
+    // check landed in the same instant. Nothing was started, and saying so is
+    // better than an error the person cannot act on.
+    return {
+      text: "A scheduled check just took the last slot for today. Nothing lost — that check covers you.",
+    };
+  }
+  // A muted watch checks but stays silent, so a manual check would have
+  // promised a message it was never going to send. Asking explicitly is the
+  // opposite of not wanting to be disturbed, so the mute lifts here rather than
+  // the answer being swallowed.
+  const wasMuted = w.mutedUntil != null && w.mutedUntil > Date.now();
+  if (wasMuted) await muteUntil(scheduleId, owner, null);
+
+  return {
+    text: wasMuted
+      ? `Checking "${name}" now. It was muted, so I've unmuted it — you asked, so you'll hear the answer.`
+      : `Checking "${name}" now. I'll message you only if it's different from last time.`,
+  };
+}
+
 /** A button press. Returns null when the data isn't ours. */
 export async function handleCallback(
   chatId: string,
   data: string,
+  actingOwner?: string,
 ): Promise<Reply | null> {
   if (!data.startsWith("w|")) return null;
-  const owner = await ownerForChat(chatId);
+  const owner = actingOwner ?? (await ownerForChat(chatId));
   if (!owner) return NOT_LINKED;
   const [, kind, skillId, key, cadence] = data.split("|");
 
   const skill = skillId ? await getSkill(skillId) : null;
-  // The skill has to still exist AND still belong to the person tapping —
-  // callback data is client-supplied and a stale button must not become a way
-  // to watch somebody else's skill.
-  if (!skill || skill.owner !== owner) {
+  // Callback data is client-supplied, so a stale button must not become a way to
+  // watch somebody else's PRIVATE skill. A published one is different: anyone
+  // can run it, that is what the marketplace is, and every preset in /alerts is
+  // a published skill owned by whoever recorded it rather than by the person
+  // tapping. Requiring ownership here made the whole preset flow impossible.
+  if (!skill || (skill.owner !== owner && !skill.published)) {
     return { text: "That skill no longer exists. Send /watch to start again." };
   }
 
@@ -302,12 +551,28 @@ export async function handleCallback(
   }
 
   if (kind === "f") {
-    const rows = CADENCES.map((c) => ({
-      text: c.label,
-      data: `w|c|${skill.id}|${key}|${c.c}`,
-    }))
+    // Only cadences this wallet can actually sustain. Offering "Every hour" to
+    // someone who cannot pay for 24 checks a day meant the scheduler accepted
+    // the watch and then skipped every firing, which looks exactly like a watch
+    // that quietly broke.
+    const tier = computeTier(await getAemulusBalance(owner));
+    const affordable = new Set(affordableCadences(watchLimitForLevel(tier.level)));
+    const rows = CADENCES.filter((c) => affordable.has(c.c))
+      .map((c) => ({
+        text: c.label,
+        data: `w|c|${skill.id}|${key}|${c.c}`,
+      }))
       .filter((b) => b.data.length <= MAX_CB)
       .map((b) => [b]);
+    if (rows.length === 0) {
+      return {
+        text: [
+          "Your wallet's tier doesn't cover any checking schedule right now.",
+          "",
+          "Send /quota to see where you are.",
+        ].join("\n"),
+      };
+    }
     return {
       text: [
         "*Step 3 of 3*",
@@ -383,4 +648,14 @@ export async function handleCallback(
 function clip(s: string, max = 40): string {
   const t = s.trim();
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
+}
+
+/** Rough, human, and never precise enough to be wrong in an interesting way. */
+function ago(ts: number): string {
+  const m = Math.max(0, Math.round((Date.now() - ts) / 60000));
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.round(h / 24)}d ago`;
 }
