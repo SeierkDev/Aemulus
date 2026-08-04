@@ -23,8 +23,15 @@ RUN npm run build
 # in this image — and the usual "fix" is to paste in --no-sandbox, which throws
 # the protection away instead of earning it. So drop to the non-root user the
 # Playwright image already ships, and give it the two paths the app writes to.
+#
+# .next is fixed here because it is baked into the image. .data is NOT, because
+# a mounted volume replaces this directory at runtime with one owned by root,
+# and no build-time chown can reach it. The entrypoint repairs that on every
+# boot and drops to pwuser itself — which is why there is no `USER pwuser` here.
 RUN mkdir -p /app/.data && chown -R pwuser:pwuser /app/.data /app/.next
-USER pwuser
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
 # Railway injects PORT; `next start` binds it on 0.0.0.0. 3000 is the fallback.
 ENV PORT=3000

@@ -5,6 +5,7 @@ import { getRecorder } from "@/lib/recorder";
 import { logError } from "@/lib/log";
 import { enforceRateLimit } from "@/lib/ratelimit";
 import { readJson, RecordStartBody } from "@/lib/validate";
+import { storageWritable } from "@/lib/storage-health";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,6 +47,22 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
+    // Checked before launching a browser, because this is the failure that
+    // actually happens and the one the user can do nothing about from here.
+    // Without it the mkdir below throws EACCES and every cause — a bad URL, a
+    // dead browser, an unwritable disk — arrives as the same sentence.
+    const storage = await storageWritable();
+    if (!storage.writable) {
+      logError("api/record/start", new Error(`storage unwritable: ${storage.reason}`));
+      return NextResponse.json(
+        {
+          error:
+            "Recording storage isn't writable on the server, so there's nowhere to save this. This is a server problem, not something you did.",
+        },
+        { status: 503 },
+      );
+    }
+
     const state = await getRecorder(session.pubkey).start(
       body.title ?? "",
       url,
@@ -53,10 +70,18 @@ export async function POST(req: Request) {
     );
     return NextResponse.json(state);
   } catch (e) {
+    // 409 said "conflict" for every possible cause — an unwritable volume, a
+    // browser that would not launch, a page that never loaded — so the status
+    // code actively pointed away from the real problem. A failure here is the
+    // server's, and it says which one it was.
     logError("api/record/start", e);
+    const detail = e instanceof Error ? e.message : "";
     return NextResponse.json(
-      { error: "Couldn’t start the recording." },
-      { status: 409 },
+      {
+        error: "Couldn’t start the recording.",
+        ...(detail ? { detail: detail.slice(0, 300) } : {}),
+      },
+      { status: 500 },
     );
   }
 }

@@ -4,6 +4,7 @@ import { bootAt, metricsSnapshot } from "@/lib/metrics";
 import { jobCounts } from "@/lib/jobs";
 import { gatingEnabled } from "@/lib/solana";
 import { launchStatus } from "@/lib/launch-status";
+import { storageWritable } from "@/lib/storage-health";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,11 +24,20 @@ export async function GET(req: Request) {
   } catch {
     dbOk = false;
   }
+  // Reported, but deliberately NOT folded into `ok`. An instance that cannot
+  // write is degraded, not dead — the site, the marketplace and every read path
+  // still work — and failing liveness would have the platform restart-loop a
+  // container whose disk permissions a restart cannot change. It is here so the
+  // condition is visible at all, which is the part that was missing.
+  const storage = await storageWritable();
+
   const body: Record<string, unknown> = {
     ok: dbOk,
     db: dbOk ? "ok" : "unreachable",
+    storage: storage.writable ? "ok" : "unwritable",
     uptimeMs: Date.now() - bootAt,
   };
+  if (!storage.writable && storage.reason) body.storageReason = storage.reason;
 
   const opsToken = process.env.AEMULUS_METRICS_TOKEN;
   if (opsToken && req.headers.get("x-metrics-token") === opsToken) {
