@@ -75,7 +75,7 @@ export async function POST(req: Request) {
     // code actively pointed away from the real problem. A failure here is the
     // server's, and it says which one it was.
     logError("api/record/start", e);
-    const detail = e instanceof Error ? e.message : "";
+    const detail = explain(e instanceof Error ? e.message : "");
     return NextResponse.json(
       {
         error: "Couldn’t start the recording.",
@@ -84,4 +84,21 @@ export async function POST(req: Request) {
       { status: 500 },
     );
   }
+}
+
+/**
+ * Turn a Chromium launch failure into something with a next step.
+ *
+ * These two have one cause each and no way to guess it from the raw output,
+ * which runs to dozens of lines of C++ diagnostics. Anything else is passed
+ * through unchanged rather than papered over with a friendlier lie.
+ */
+function explain(msg: string): string {
+  if (/no usable sandbox|namespace sandbox|clone helper|SUID sandbox/i.test(msg)) {
+    return "Chromium's OS sandbox could not start — this host does not allow unprivileged user namespaces. Set AEMULUS_CHROMIUM_SANDBOX=0 to run without it (a real reduction in isolation, recorded in the receipt).";
+  }
+  if (/executable doesn't exist|Failed to launch|ENOENT.*chrome/i.test(msg)) {
+    return "The browser is missing from this image — Playwright's browsers were not installed in the build.";
+  }
+  return msg;
 }

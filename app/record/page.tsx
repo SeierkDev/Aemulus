@@ -156,7 +156,13 @@ export default function RecordPage() {
         body: JSON.stringify({ title, startUrl }),
       });
       const data = await r.json();
-      if (!r.ok) throw new Error(data.error || "Failed to start");
+      // detail carries WHY. Dropping it is what turned a specific server error
+      // into "Couldn't start the recording." and left the cause to guesswork.
+      if (!r.ok) {
+        throw new Error(
+          [data.error || "Failed to start", data.detail].filter(Boolean).join(" — "),
+        );
+      }
       setState(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to start");
