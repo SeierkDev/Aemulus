@@ -6,6 +6,7 @@ import { logError } from "@/lib/log";
 import { enforceRateLimit } from "@/lib/ratelimit";
 import { readJson, RecordStartBody } from "@/lib/validate";
 import { storageWritable } from "@/lib/storage-health";
+import { osSandboxEnabled } from "@/lib/sandbox";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -94,6 +95,16 @@ export async function POST(req: Request) {
  * through unchanged rather than papered over with a friendlier lie.
  */
 function explain(msg: string): string {
+  // Chromium dying during launch, with the OS sandbox on, in a container. The
+  // headless shell does NOT print "No usable sandbox" — it exits, and Playwright
+  // reports only that the target closed. Matching the friendly text alone missed
+  // the case the text was written for.
+  if (
+    osSandboxEnabled() &&
+    /Target page, context or browser has been closed|browserType\.launch/i.test(msg)
+  ) {
+    return "Chromium exited immediately while launching. The most likely cause is its OS sandbox: this host does not allow unprivileged user namespaces. Set AEMULUS_CHROMIUM_SANDBOX=0 to run without it — a real reduction in isolation, recorded in the receipt as osSandbox:false.";
+  }
   if (/no usable sandbox|namespace sandbox|clone helper|SUID sandbox/i.test(msg)) {
     return "Chromium's OS sandbox could not start — this host does not allow unprivileged user namespaces. Set AEMULUS_CHROMIUM_SANDBOX=0 to run without it (a real reduction in isolation, recorded in the receipt).";
   }
