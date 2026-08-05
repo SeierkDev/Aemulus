@@ -1,7 +1,8 @@
 import { getSkill } from "./skills";
 import { completeRun } from "./run-service";
-import { finishRun } from "./runs";
+import { finishRun, getRun } from "./runs";
 import { dispatchRunEvent } from "./webhooks";
+import { alertRunFinished, alertRunNeverStarted } from "./run-alert-telegram";
 import {
   claimNextJob,
   completeJob,
@@ -52,6 +53,9 @@ async function processJob(job: Job): Promise<void> {
     }).catch(() => {});
     await failJob(job.id, "skill removed", 0); // 0 attempts allowed → permanent
     incr("jobs.failed");
+    // The only path here that does not even dispatch a webhook, so without this
+    // a scheduled run whose skill was deleted fails on every channel silently.
+    void alertRunNeverStarted(job.runId, "a skill that no longer exists").catch(() => {});
     return;
   }
   try {
@@ -79,6 +83,25 @@ async function processJob(job: Job): Promise<void> {
         status: "failed",
         at: Date.now(),
       }).catch(() => {});
+      // And tell the owner. This path never reaches finalizeRunAccounting, so
+      // the Telegram alert that fires for every other terminal run does not
+      // fire here — the run that died hardest was the only one going unsaid.
+      //
+      // watchWillReport:false because evaluateWatchForRun never ran either. Its
+      // failure streak has not advanced, so the watch's own "this is broken"
+      // message will not come; excluding watch runs here would be silence from
+      // both directions, and the only symptom is a watch that stops speaking.
+      void (async () => {
+        const [run, skill] = await Promise.all([
+          getRun(job.runId),
+          getSkill(job.skillId),
+        ]);
+        if (run) {
+          await alertRunFinished(run, skill?.name ?? "your skill", Date.now(), {
+            watchWillReport: false,
+          });
+        }
+      })().catch((err) => logError("worker.alert", err, { run: job.runId }));
     }
   }
 }

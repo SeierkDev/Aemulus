@@ -66,6 +66,7 @@ const ROADMAP: { phase: string; title: string; body: Item[] }[] = [
       },
       {
         t: "Alerts for ordinary runs too, not only watches, so a finished or failed run can reach you the same way (signed webhooks are already live today).",
+        done: true,
       },
       {
         t: "A creator analytics dashboard: per skill, how often it runs, how often it succeeds, how many distinct people use it, what it has earned and what it cost to run, over a window you choose. Counts only, never who ran what.",

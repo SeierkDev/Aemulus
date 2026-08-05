@@ -48,6 +48,7 @@ import { runIsWatch } from "./runs";
 import { learnSelectors } from "./skills";
 import { startChainedRun } from "./chain";
 import { agenticStep, agentFallbackEnabled } from "./agent";
+import { alertRunPaused } from "./run-alert-telegram";
 import { verifyOutcome } from "./verify-outcome";
 import { incr } from "./metrics";
 import { logError, logInfo } from "./log";
@@ -297,6 +298,9 @@ export async function executeRun(
         }
         captchaPauses += 1;
         await setRunStatus(runId, "awaiting_input");
+        // Tell them now, while the window is open. Fire-and-forget: a message
+        // must never delay or break the pause it is announcing.
+        void alertRunPaused({ id: runId, owner }, skill.name, LIVE_TIMEOUT_MS).catch(() => {});
         const pauseStart = Date.now();
         await registerLive(runId, page);
         let outcome: "resumed" | "timeout";
@@ -377,6 +381,7 @@ export async function executeRun(
         // starve the pool, so size the pool for expected interactive concurrency.
         if (step.interactive && liveHandoffEnabled()) {
           await setRunStatus(runId, "awaiting_input");
+          void alertRunPaused({ id: runId, owner }, skill.name, LIVE_TIMEOUT_MS).catch(() => {});
           const pauseStart = Date.now();
           let outcome: "resumed" | "timeout";
           // finally so the LiveSession (Page + CDP + screencast) is always torn

@@ -14,6 +14,7 @@ import { creditEarningOnce } from "./earnings";
 import { evaluateWatchForRun } from "./watch-runner";
 import { activeSink } from "./watch-sink-telegram";
 import { dispatchRunEvent, eventForStatus } from "./webhooks";
+import { alertRunFinished, alertRunNeverStarted } from "./run-alert-telegram";
 import { recordRunOnChain, registryEnabled } from "./registry";
 import { recordRunCompressed, zkReceiptsEnabled } from "./zk-receipts";
 import { enqueueRunJob } from "./jobs";
@@ -111,6 +112,9 @@ export async function startRun(args: RunArgs): Promise<Run> {
     });
   } catch (e) {
     await finishRun(run.id, { status: "failed", error: "Could not queue the run." }).catch(() => {});
+    // The throw reaches the caller, which for a scheduled run is the scheduler
+    // and not the person whose schedule just produced nothing.
+    void alertRunNeverStarted(run.id, args.skill.name).catch(() => {});
     throw e;
   }
   return run; // status: "running"
@@ -211,6 +215,10 @@ export async function finalizeRunAccounting(
   // reason as the webhooks above: the run has already settled and its receipt is
   // attached, so a watch must never be able to break settlement.
   void evaluateWatchForRun(final, activeSink()).catch(() => {});
+  // And tell the owner directly when the run itself needs them. Excludes watch
+  // runs, which speak through their own rule — two messages for one event is
+  // how a bot gets muted, and a muted bot takes the watch alerts with it.
+  void alertRunFinished(final, skill.name).catch(() => {});
   if (final.output && Object.keys(final.output).length > 0) {
     void dispatchRunEvent(runner, "run.output", {
       runId,

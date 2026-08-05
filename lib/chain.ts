@@ -4,6 +4,7 @@ import { quotaReserveForOwner } from "./quota";
 import { enqueueRunJob } from "./jobs";
 import { incr } from "./metrics";
 import type { SkillInputField, SkillStep } from "./types";
+import { alertRunNeverStarted } from "./run-alert-telegram";
 
 /**
  * Skill chaining (composition). A "run_skill" step starts a CHILD run of another
@@ -90,6 +91,9 @@ export async function startChainedRun(args: {
     });
   } catch (e) {
     await finishRun(run.id, { status: "failed", error: "Could not queue the chained run." }).catch(() => {});
+    // Chaining is fire-and-forget, so this throw has nobody to reach. Without
+    // this the parent reports success and the child simply never happened.
+    void alertRunNeverStarted(run.id, sub.name).catch(() => {});
     throw e;
   }
   incr("chains.started");

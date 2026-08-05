@@ -239,6 +239,29 @@ export async function ownerForChat(chatId: string): Promise<string | null> {
  * one path that serves the people publishing skills, and it needs no page, no
  * skill and no quota — the numbers already exist.
  */
+/**
+ * The owner's PRIVATE chats only.
+ *
+ * A group link exists because somebody ran /here, which is consent for a page
+ * watch to reach a room — not for their account's activity to. A failing skill
+ * announcing itself, with its error text, to a trading group is a different
+ * thing entirely, and nobody asked for it.
+ *
+ * Strict equality, so a link made before chat_type was recorded is excluded
+ * rather than assumed private. It costs a missed message until that chat next
+ * says anything to the bot, at which point noteChatType fills it in — which is
+ * the right way round, because the alternative is guessing "private" about a
+ * row that might be a room.
+ */
+export async function privateChatsForOwner(owner: string): Promise<string[]> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT chat_id FROM telegram_links WHERE owner = ? AND chat_type = 'private'`,
+    args: [owner],
+  });
+  return r.rows.map((row) => String(row.chat_id));
+}
+
 export async function chatsDueDigest(everyMs: number): Promise<
   { chatId: string; owner: string }[]
 > {
