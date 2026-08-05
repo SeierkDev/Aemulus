@@ -217,7 +217,67 @@ console.log(run.output);   // { total: "$42.00" }`}
                 title="verify"
                 code={`const proof = await aemulus.verify(run.id);
 console.log(proof.matches);           // true
-console.log(proof.batch?.proofValid); // true`}
+console.log(proof.batch?.proofValid); // true
+console.log(proof.sandbox);           // the isolation policy it ran under
+console.log(proof.repairedSteps);     // steps the agent had to finish`}
+              />
+            </div>
+          </Step>
+
+          <Step n={6} title="Prove one field, and nothing else">
+            Show a counterparty a single value from a run - a total, a status -
+            provable against the run&apos;s on-chain anchored root, without
+            handing over the rest of the run. They check it themselves, with no
+            API key and no account.
+            <div className="mt-3">
+              <CodeBlock
+                title="selective disclosure"
+                code={`const d = await aemulus.disclose(run.id, "output.total");
+// send d to anyone - it reveals only this field
+
+const { valid, bound } = await aemulus.verifyDisclosure(d);
+// valid: the proof holds.  bound: it belongs to that run.
+// Accept only when both are true.`}
+              />
+            </div>
+          </Step>
+
+          <Step n={7} title="Watch a page and be told when it changes">
+            A watch is a schedule plus the rule that reads its output, created
+            together. The cadence is checked against your tier before the watch
+            exists - an unaffordable one is refused with the list you can
+            sustain, rather than accepted and then silently skipped.
+            <div className="mt-3">
+              <CodeBlock
+                title="watches"
+                code={`const w = await aemulus.createWatch({
+  skillId: "skl_…",
+  cadence: "every30m",
+  rule: { key: "price", op: "changed" },
+});
+
+await aemulus.listWatches();          // current value + last checked
+await aemulus.setWatchActive(w.id, false);  // pause, keeps its history
+await aemulus.deleteWatch(w.id);`}
+              />
+            </div>
+          </Step>
+
+          <Step n={8} title="Check a webhook really came from us">
+            Deliveries are signed. Verify against the RAW body - a framework that
+            hands you a parsed object has already destroyed the bytes that were
+            signed.
+            <div className="mt-3">
+              <CodeBlock
+                title="webhooks"
+                code={`import { verifyWebhook } from "aemulus";
+
+const ok = await verifyWebhook({
+  secret,                                   // from your webhook settings
+  signature: req.headers["x-aemulus-signature"],
+  body: rawBody,                            // not JSON.parse'd
+});
+if (!ok) return res.status(400).end();`}
               />
             </div>
           </Step>

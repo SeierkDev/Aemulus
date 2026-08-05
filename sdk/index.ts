@@ -32,6 +32,66 @@ export interface Run {
   receiptHash?: string | null;
   steps?: number;
   createdAt?: number;
+  /** Which version of the skill actually executed. A success rate that moves
+   *  usually moves because of an edit, and this is what ties the two together. */
+  skillVersion?: number | null;
+  /** Whether a model confirmed, from the final screen, that the goal was met.
+   *  "completed" means the steps ran; this means the point of them was achieved. */
+  outcomeStatus?: "achieved" | "unconfirmed" | null;
+  outcomeReason?: string | null;
+  /** Canonical JSON of the isolation policy this run executed under. */
+  sandbox?: string | null;
+  /** AgenC canonical constraint hash for this run's output vector. */
+  agencHash?: string | null;
+  /** Root of the run's hiding commitment — what a disclosure proves against. */
+  commitmentRoot?: string | null;
+  /** Steps the agent finished after the recorded selector failed. Above zero
+   *  means the run reached its goal without following the plan exactly. */
+  repairedSteps?: number;
+}
+
+export type Cadence =
+  | "every10m" | "every15m" | "every30m" | "hourly"
+  | "every6h" | "every12h" | "daily" | "weekdays" | "weekly";
+
+/** What counts as a change worth telling you about. */
+export interface WatchRule {
+  /** Which of the skill's output keys to watch. */
+  key: string;
+  op: "changed" | "equals" | "contains" | "not_contains" | "appears" | "disappears" | "above" | "below";
+  /** Operand for equals / contains / not_contains / above / below. */
+  value?: string;
+  /** Consecutive checks that must agree before alerting. 2+ absorbs a value
+   *  that flickers — an A/B test, a number mid-recalculation. */
+  confirm?: number;
+  /** Minimum gap between alerts, in ms. */
+  cooldownMs?: number;
+}
+
+export interface Watch {
+  id: string;
+  skillId?: string;
+  skillName?: string;
+  cadence?: Cadence;
+  active?: boolean;
+  rule: WatchRule;
+  /** What the page said at the last successful check. */
+  lastValue?: string | null;
+  /** Consecutive failed checks. A watch reports itself broken at three. */
+  failStreak?: number;
+  mutedUntil?: number | null;
+  lastRunAt?: number | null;
+  nextRunAt?: number;
+}
+
+/** A proof that one field of a run had a particular value, and nothing else. */
+export interface Disclosure {
+  runId: string;
+  field: string;
+  value: string;
+  salt: string;
+  root: string;
+  proof: { siblings: { hash: string; left: boolean }[] };
 }
 
 export interface SkillSummary {
@@ -64,6 +124,24 @@ export interface Verification {
       memoMatches: boolean | null; // null = chain unreachable (unknown), not "no match"
     } | null;
   };
+  /** The isolation policy the run executed under, as canonical JSON. Part of
+   *  what the receipt attests, so it cannot be edited after the fact. */
+  sandbox?: string | null;
+  /** Commitment root for selective disclosure. Reveals nothing by itself. */
+  commitmentRoot?: string | null;
+  /** Steps the agent performed after the recorded selector failed. Inside the
+   *  receipt: it can be neither scrubbed from a run nor forged onto one. */
+  repairedSteps?: number;
+  /** Steps whose screenshot the receipt commits to but that is no longer
+   *  stored. A mismatch caused by this is missing evidence, NOT altered
+   *  evidence — the difference between "cannot check" and "was changed". */
+  missingShots?: number;
+  /** On-chain registry record, when the run was anchored individually. */
+  registry?: { sig: string; cluster: string; url: string };
+  /** AgenC interop: a public commitment to a private result. */
+  agenc?: { constraintHash: string; commitment: string | null; arity: number };
+  /** Screenshots the owner chose to publish permanently, on Arweave. */
+  shots?: { hash: string; url: string }[];
 }
 
 export class AemulusError extends Error {
@@ -193,6 +271,86 @@ export class Aemulus {
     }
   }
 
+  /**
+   * Prove ONE field of a run without revealing the others.
+   *
+   * Returns a bundle anyone can check against the run's committed root — which
+   * is anchored on chain — so you can show a counterparty a single total, or a
+   * single status, without handing over the run. Owner-only, read scope.
+   */
+  async disclose(runId: string, field: string): Promise<Disclosure> {
+    const r = await this.call<{ disclosure: Disclosure }>(
+      `/api/v1/runs/${runId}/disclose?field=${encodeURIComponent(field)}`,
+    );
+    return r.disclosure;
+  }
+
+  /**
+   * Check a disclosure bundle. Public — no API key, and it works for a bundle
+   * somebody else produced, which is the entire point.
+   *
+   * `bound` is separate from `valid` on purpose: a proof can be internally
+   * consistent and still belong to a tree the sender invented. Only accept it
+   * when both are true.
+   */
+  async verifyDisclosure(
+    disclosure: Disclosure,
+  ): Promise<{ valid: boolean; bound: boolean; runId?: string }> {
+    // The endpoint reads the bundle's fields at the top level, not wrapped in
+    // a { disclosure } envelope — spread it, or every check fails the shape
+    // test and comes back { valid: false } with nothing to explain why.
+    return this.call(
+      "/api/disclosures/verify",
+      { method: "POST", body: JSON.stringify(disclosure) },
+      false,
+    );
+  }
+
+  /**
+   * Watch a page and be told when a value on it changes.
+   *
+   * A watch is a schedule plus the rule that reads its output, created
+   * together — a schedule without a rule burns the allowance every cadence and
+   * reports nothing. The cadence is checked against your tier BEFORE the watch
+   * exists: an unaffordable one is refused with the list you can actually
+   * sustain, rather than accepted and then silently skipped.
+   */
+  createWatch(opts: {
+    skillId: string;
+    cadence: Cadence;
+    rule: WatchRule;
+    input?: Record<string, string>;
+    notify?: { channel: "telegram"; chatId: string; redact?: boolean } | null;
+  }): Promise<{ id: string; cadence: Cadence; rule: WatchRule }> {
+    return this.call("/api/v1/watches", {
+      method: "POST",
+      body: JSON.stringify(opts),
+    });
+  }
+
+  /** Every watch you have, with its current value and when it last looked. */
+  async listWatches(): Promise<Watch[]> {
+    const r = await this.call<{ watches: Watch[] }>("/api/v1/watches");
+    return r.watches;
+  }
+
+  /** One watch, including how many checks in a row have failed. */
+  getWatch(id: string): Promise<Watch> {
+    return this.call<Watch>(`/api/v1/watches/${id}`);
+  }
+
+  /** Pause or resume. A paused watch keeps everything it has learned. */
+  setWatchActive(id: string, active: boolean): Promise<{ id: string; active: boolean }> {
+    return this.call(`/api/v1/watches/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ active }),
+    });
+  }
+
+  deleteWatch(id: string): Promise<{ id: string; deleted: boolean }> {
+    return this.call(`/api/v1/watches/${id}`, { method: "DELETE" });
+  }
+
   /** Run and poll until the run reaches a terminal state (or times out). */
   async runAndWait(
     skillId: string,
@@ -219,4 +377,66 @@ export class Aemulus {
 
 export function createClient(opts: AemulusOptions): Aemulus {
   return new Aemulus(opts);
+}
+
+/**
+ * Check that a webhook delivery really came from Aemulus.
+ *
+ * Ships here because every integrator otherwise writes this themselves, and the
+ * two ways to get it wrong are both silent. Comparing with === leaks timing;
+ * ignoring the timestamp means a delivery captured once can be replayed
+ * forever. Neither failure is visible until somebody exploits it.
+ *
+ * Header is `x-aemulus-signature: t=<unix>,sha256=<hex>`, over `${t}.${body}`.
+ * Pass the RAW body — parsing and re-serialising changes the bytes and the
+ * signature will not match, which is the commonest way this is misused.
+ *
+ * Uses Web Crypto so it works in Node, Deno, browsers and edge runtimes alike.
+ */
+export async function verifyWebhook(opts: {
+  secret: string;
+  /** The x-aemulus-signature header, verbatim. */
+  signature: string;
+  /** The raw request body, exactly as received. */
+  body: string;
+  /** How old a delivery may be, in seconds. Default 5 minutes. */
+  toleranceSec?: number;
+  /** Override for tests. */
+  now?: number;
+}): Promise<boolean> {
+  const m = /^t=(\d+),sha256=([a-f0-9]{64})$/i.exec(opts.signature.trim());
+  if (!m) return false;
+  const ts = Number(m[1]);
+  const given = m[2].toLowerCase();
+
+  const tolerance = opts.toleranceSec ?? 300;
+  const now = Math.floor((opts.now ?? Date.now()) / 1000);
+  // Both directions: a timestamp far in the FUTURE is as much a forgery signal
+  // as a stale one, and only checking one side leaves the obvious bypass.
+  if (Math.abs(now - ts) > tolerance) return false;
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(opts.secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    new TextEncoder().encode(`${ts}.${opts.body}`),
+  );
+  const expected = [...new Uint8Array(sig)]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  // Constant time. A === on hex strings returns early on the first differing
+  // character, which is enough to recover a signature byte by byte.
+  if (expected.length !== given.length) return false;
+  let diff = 0;
+  for (let i = 0; i < expected.length; i++) {
+    diff |= expected.charCodeAt(i) ^ given.charCodeAt(i);
+  }
+  return diff === 0;
 }

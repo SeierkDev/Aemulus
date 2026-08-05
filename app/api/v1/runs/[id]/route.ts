@@ -35,5 +35,17 @@ export async function GET(
     receiptHash: run.receiptHash,
     steps: run.steps.length,
     createdAt: run.createdAt,
+    // What the run knows about itself. All of it already existed and none of it
+    // was reachable from code: the version executed, whether the goal was
+    // confirmed, the isolation policy it ran under, its AgenC constraint hash,
+    // and how many steps the agent had to repair. A caller deciding whether to
+    // trust a result needs these more than it needs the result.
+    skillVersion: run.skillVersion,
+    outcomeStatus: run.outcomeStatus,
+    outcomeReason: run.outcomeReason,
+    sandbox: run.sandbox,
+    agencHash: run.agencHash,
+    commitmentRoot: run.commitmentRoot,
+    repairedSteps: run.steps.filter((s) => s.repaired).length,
   });
 }

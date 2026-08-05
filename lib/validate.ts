@@ -150,6 +150,53 @@ export const ResolveBody = z.object({
   skip: z.boolean().optional(),
 });
 
+/**
+ * A watch created through the API: the schedule and the rule that reads it, in
+ * one body. Cadences include the sub-hourly ones — the schedule form predates
+ * them and still offers hourly upward, but a watch is the thing those exist for.
+ * Whether the caller's tier can sustain the one they picked is decided in the
+ * route, against their balance, not here.
+ */
+export const WatchCreateBody = z.object({
+  skillId: z.string().min(1).max(64),
+  cadence: z.enum([
+    "every10m",
+    "every15m",
+    "every30m",
+    "hourly",
+    "every6h",
+    "every12h",
+    "daily",
+    "weekdays",
+    "weekly",
+  ]),
+  input: inputRecord.optional(),
+  rule: z.object({
+    key: z.string().min(1).max(120),
+    op: z.enum([
+      "changed",
+      "equals",
+      "contains",
+      "not_contains",
+      "appears",
+      "disappears",
+      "above",
+      "below",
+    ]),
+    value: z.string().max(2000).optional(),
+    confirm: z.number().int().min(1).max(10).optional(),
+    cooldownMs: z.number().int().min(0).max(7 * 24 * 60 * 60 * 1000).optional(),
+  }),
+  notify: z
+    .object({
+      channel: z.literal("telegram"),
+      chatId: z.string().min(1).max(64),
+      redact: z.boolean().optional(),
+    })
+    .nullable()
+    .optional(),
+});
+
 export const ScheduleCreateBody = z.object({
   skillId: z.string().min(1).max(64),
   cadence: z.enum([

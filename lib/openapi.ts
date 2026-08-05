@@ -244,6 +244,109 @@ export const OPENAPI: OpenApiDoc = {
         },
       },
     },
+    "/api/v1/runs/{id}/disclose": {
+      get: {
+        summary: "Prove one field of a run",
+        description:
+          "A selective-disclosure bundle for a single field, provable against the run's committed root (which is anchored on chain) without revealing any other field. Owner-only. Verify one with POST /api/disclosures/verify, which needs no key.",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+          {
+            name: "field",
+            in: "query",
+            required: true,
+            description: "Which committed field to prove.",
+            schema: { type: "string" },
+          },
+        ],
+        responses: {
+          200: {
+            description: "The disclosure bundle",
+            ...json({
+              type: "object",
+              properties: {
+                disclosure: {
+                  type: "object",
+                  properties: {
+                    runId: { type: "string" },
+                    field: { type: "string" },
+                    value: { type: "string" },
+                    salt: { type: "string" },
+                    root: { type: "string" },
+                    proof: { type: "object" },
+                  },
+                },
+              },
+            }),
+          },
+          400: { description: "No field given", ...json(ref("Error")) },
+          404: {
+            description: "Run not found, no commitment, or unknown field",
+            ...json(ref("Error")),
+          },
+          ...ERR,
+        },
+      },
+    },
+    "/api/v1/watches": {
+      get: {
+        summary: "List your watches",
+        responses: {
+          200: { description: "Your watches, with each one's current value" },
+          ...ERR,
+        },
+      },
+      post: {
+        summary: "Create a watch",
+        description:
+          "A schedule plus the rule that reads its output, created together — a schedule with no rule burns the watch allowance every cadence and reports nothing. The cadence is checked against your tier first: an unaffordable one is refused, with the list you can sustain, rather than accepted and silently skipped.",
+        responses: {
+          201: { description: "The watch" },
+          403: {
+            description: "Cadence your tier cannot sustain, or missing scope",
+            ...json(ref("Error")),
+          },
+          404: { description: "Skill not found", ...json(ref("Error")) },
+          409: { description: "Schedule limit reached", ...json(ref("Error")) },
+          ...ERR,
+        },
+      },
+    },
+    "/api/v1/watches/{id}": {
+      get: {
+        summary: "Get one watch",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          200: { description: "The watch, with its failure streak and mute state" },
+          404: { description: "Watch not found", ...json(ref("Error")) },
+          ...ERR,
+        },
+      },
+      patch: {
+        summary: "Pause or resume a watch",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          200: { description: "The new state" },
+          404: { description: "Watch not found", ...json(ref("Error")) },
+          ...ERR,
+        },
+      },
+      delete: {
+        summary: "Delete a watch",
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+        ],
+        responses: {
+          200: { description: "Deleted" },
+          404: { description: "Watch not found", ...json(ref("Error")) },
+          ...ERR,
+        },
+      },
+    },
     "/api/v1/skills": {
       get: {
         summary: "List published skills",
