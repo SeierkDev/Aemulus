@@ -36,6 +36,20 @@ import { logError } from "./log";
  *
  * Anyone can rebuild this from a public receipt and check our number.
  */
+/**
+ * A field element as fixed-width hex.
+ *
+ * bigint.toString(16) drops leading zeros, so roughly one hash in sixteen comes
+ * out 63 characters instead of 64 — and the whole point of using AgenC's
+ * canonical hashing is that somebody else can recompute it with their SDK and
+ * compare. They will pad to the field width; an unpadded string then fails a
+ * comparison that should have succeeded. Observed on a live run:
+ * d13bca…84cff, 63 characters.
+ */
+function fieldHex(n: bigint): string {
+  return n.toString(16).padStart(64, "0");
+}
+
 export const OUTPUT_ARITY = 4;
 
 /**
@@ -143,7 +157,7 @@ export async function commitRun(run: {
     // The constraint hash needs no secret at all. Computed on its own so a run
     // still gets its interop number even when the witness below cannot be
     // derived.
-    const constraintHash = computeConstraintHash(vector).toString(16);
+    const constraintHash = fieldHex(computeConstraintHash(vector));
 
     // The private witness for nullifier derivation. Their SDK is explicit that
     // it must be known only to the agent — and a value derived purely from the
@@ -180,8 +194,8 @@ export async function commitRun(run: {
 
     return {
       constraintHash,
-      outputCommitment: res.outputCommitment.toString(16),
-      salt: salt.toString(16),
+      outputCommitment: fieldHex(res.outputCommitment),
+      salt: fieldHex(salt),
     };
   } catch (e) {
     logError("agenc.commit", e, { run: run.id });
@@ -214,8 +228,11 @@ export async function verifyConstraintHash(
 ): Promise<boolean> {
   try {
     const { computeConstraintHash, FIELD_MODULUS } = await import("@tetsuo-ai/sdk");
-    const got = computeConstraintHash(outputVector(run, FIELD_MODULUS)).toString(16);
-    return got === expected;
+    const got = fieldHex(computeConstraintHash(outputVector(run, FIELD_MODULUS)));
+    // Compare padded on BOTH sides. Runs written before this was fixed hold an
+    // unpadded hash, and re-padding only what we compute would break their
+    // verification — the value is right, only its width was wrong.
+    return got === expected.padStart(64, "0");
   } catch (e) {
     logError("agenc.verify", e, { run: run.id });
     return false;
