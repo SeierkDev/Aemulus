@@ -409,6 +409,20 @@ export async function routeWebSockets(
 export type SandboxPolicy = {
   /** Policy version, so a receipt stays interpretable as this evolves. */
   v: number;
+  /**
+   * The outermost boundary this run actually executed behind.
+   *
+   * "micro-vm" — the browser ran inside a VM with its own kernel.
+   * "process"  — the browser was its own process on a kernel shared with the
+   *              rest of the box.
+   *
+   * Set from what was obtained, never from what was configured. A deployment
+   * that asks for micro-VMs and doesn't get one records "process", because a
+   * receipt is only worth anything if it describes the run that happened.
+   */
+  isolation: "micro-vm" | "process";
+  /** Follows `isolation`; spelled out so a receipt reads without a lookup table. */
+  kernel: "dedicated" | "shared";
   /** Hosts the skill declared; [] means the skill declared none. */
   allowedHosts: string[];
   /** "strict" | "standard" | "unrestricted" */
@@ -427,14 +441,31 @@ export type SandboxPolicy = {
   serviceWorkers: "blocked";
 };
 
-export function sandboxPolicy(allowedHosts: string[]): SandboxPolicy {
+/**
+ * What the run executed under.
+ *
+ * `actual` carries the facts only the acquisition path knows: which boundary was
+ * obtained, and — for a micro-VM, where the browser is launched by the broker
+ * rather than by us — whether Chromium's OS sandbox was confirmed on inside it.
+ * Omitted for callers that launch locally, where the environment is the answer.
+ */
+export function sandboxPolicy(
+  allowedHosts: string[],
+  actual?: { isolation: "micro-vm" | "process"; osSandbox: boolean },
+): SandboxPolicy {
   const unrestricted = allowedHosts.length === 0;
+  const isolation = actual?.isolation ?? "process";
   return {
-    v: 1,
+    // v2 adds isolation/kernel. Older receipts stay valid as written: the policy
+    // is stored per run at run time, so bumping this cannot alter the canonical
+    // form of anything already hashed.
+    v: 2,
+    isolation,
+    kernel: isolation === "micro-vm" ? "dedicated" : "shared",
     allowedHosts,
     egress: unrestricted ? "unrestricted" : strictEgress() ? "strict" : "standard",
     websockets: unrestricted ? "unrestricted" : "allowlist",
-    osSandbox: osSandboxEnabled(),
+    osSandbox: actual ? actual.osSandbox : osSandboxEnabled(),
     ephemeralProfile: true,
     serviceWorkers: "blocked",
   };

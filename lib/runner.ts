@@ -1,5 +1,5 @@
 import { type Browser, type Locator, type Page } from "playwright";
-import { launchBrowser } from "./browser";
+import { acquireRunBrowser, type RunBrowser } from "./browser";
 import {
   decideEgress,
   followNavigation,
@@ -129,6 +129,7 @@ export async function executeRun(
   const isWatch = await runIsWatch(runId);
 
   let browser: Browser | null = null;
+  let runBrowser: RunBrowser | null = null; // owns the boundary + its teardown
   let capture: RrwebCapture | null = null; // rrweb session events (if enabled)
   let finalStatus: RunStatus = "completed";
   let error: string | null = null;
@@ -141,13 +142,17 @@ export async function executeRun(
   // Bound concurrent Chromium launches; excess runs queue here.
   await runSlots.acquire();
   try {
-    // Isolation boundary for this run: its own Chromium process with its own
-    // profile (destroyed on close), the OS sandbox on, and the host-reaching
-    // flags stripped. See lib/sandbox.ts.
-    browser = await launchBrowser({
+    // Isolation boundary for this run. A micro-VM with its own kernel where the
+    // deployment provides one, otherwise its own Chromium process — either way
+    // with its own profile (destroyed on close), the OS sandbox on, and the
+    // host-reaching flags stripped. Which one it got is recorded below rather
+    // than assumed. See lib/sandbox.ts and lib/microvm.ts.
+    runBrowser = await acquireRunBrowser({
+      runId,
       headless: process.env.AEMULUS_RUN_HEADED !== "1",
-      ...runLaunchOptions(),
+      launch: runLaunchOptions(),
     });
+    browser = runBrowser.browser;
     const context = await browser.newContext({
       viewport: { width: 1280, height: 800 },
       acceptDownloads: false, // a hostile page can't fill disk via downloads
@@ -170,9 +175,15 @@ export async function executeRun(
     // Persist the boundary before the first step executes, so a run that dies
     // mid-flight still records what it was confined to. Best-effort: failing to
     // write the policy must never stop the run itself.
-    await setRunSandbox(runId, JSON.stringify(sandboxPolicy(allowedHosts))).catch(
-      (e) => logError("runner.sandbox-policy", e),
-    );
+    await setRunSandbox(
+      runId,
+      JSON.stringify(
+        sandboxPolicy(allowedHosts, {
+          isolation: runBrowser.isolation,
+          osSandbox: runBrowser.osSandbox,
+        }),
+      ),
+    ).catch((e) => logError("runner.sandbox-policy", e));
     // Every check a URL must pass, in one place, so a redirect hop is held to
     // exactly the same standard as the request that started the navigation.
     const urlPasses = async (u: string, isNav: boolean, type: string) => {
@@ -691,8 +702,9 @@ export async function executeRun(
     throw err instanceof Error ? err : new Error("Run failed to start.");
   } finally {
     // Closing the browser also destroys the run's profile directory, which
-    // Playwright created for this launch alone.
-    await browser?.close().catch(() => {});
+    // Playwright created for this launch alone — and, for a micro-VM run, hands
+    // the VM back so the broker can destroy it rather than waiting out its lease.
+    await runBrowser?.dispose();
     // Persist the rrweb events (best-effort) for the replay - even for failed
     // runs, where the replay is most useful for debugging.
     if (capture) await saveRrwebEvents(RUNS_DIR, owner, runId, capture.events);
