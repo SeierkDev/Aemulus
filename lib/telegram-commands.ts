@@ -385,7 +385,12 @@ export async function cmdWatch(owner: string): Promise<Reply> {
       text: [
         "To watch a page I need a skill that reads a value off it, and you don't have one yet.",
         "",
-        "Record a skill that picks something up from the page: an order status, a price, a stock count, a balance. Then come back here and send /watch again.",
+        // Was: "record a skill that picks something up from the page" — which
+        // described a flow that did not exist. Recording captured clicks and
+        // typing; reading a value meant hand-writing a CSS selector in the skill
+        // editor, so anyone following this advice recorded another action skill
+        // and hit the same wall.
+        "When you record, turn on *Capture a value* and click the thing you want watched: an order status, a price, a stock count, a balance. Then come back here and send /watch again.",
         "",
         `${SITE()}/skills`,
       ].join("\n"),

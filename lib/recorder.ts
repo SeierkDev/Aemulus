@@ -28,6 +28,9 @@ const RawActionSchema = z.object({
   text: z.string().max(2000).optional(),
   value: z.string().max(5000).optional(),
   sensitive: z.boolean().optional(),
+  /** For a capture: the name the value is stored under. Named after the fact
+   *  from the recorder UI, so it arrives empty and is filled in on stop. */
+  outputKey: z.string().max(120).optional(),
   key: z.string().max(40).optional(),
 });
 
@@ -61,6 +64,8 @@ export type InputEvent =
 
 class RecorderSession {
   state: RecorderState | null = null;
+  /** Name to attach to the next capture, if the user typed one. */
+  private captureKey = "";
   private browser: Browser | null = null;
   private context: BrowserContext | null = null;
   private page: Page | null = null;
@@ -101,6 +106,10 @@ class RecorderSession {
     }
     const sid = id("rec");
     this.accepted = 0;
+    // Per-owner recorders are reused, so anything held on the instance outlives
+    // the recording that set it. accepted was already reset here; the capture
+    // name was not, and would have been inherited by the next recording.
+    this.captureKey = "";
     this.state = {
       id: sid,
       owner,
@@ -196,6 +205,14 @@ class RecorderSession {
     // somewhere the guard would have refused — blanking the page before any of
     // it is screencast, screenshotted, or written into an action.
     const guard = this.guardLandedUrl;
+    // Capture mode lives on the window object, so a navigation wipes it. Without
+    // this, turning capture on and then clicking through to the page holding the
+    // value you actually wanted would silently drop you back into normal
+    // recording, and your click would press the thing instead of reading it.
+    this.page.on("framenavigated", (frame) => {
+      if (frame === this.page?.mainFrame()) void this.applyCapture();
+    });
+
     this.page.on("framenavigated", (frame) => {
       if (frame !== this.page?.mainFrame() || !guard) return;
       void (async () => {
@@ -323,6 +340,40 @@ class RecorderSession {
       };
       this.state.actions.push(action);
     });
+  }
+
+  /**
+   * Turn capture mode on or off mid-recording.
+   *
+   * Applied to the page that is open, and re-applied on every navigation from
+   * `applyCapture` below. NOT via addInitScript: Playwright has no way to remove
+   * one, so a script per toggle accumulates — flip capture ten times and ten
+   * scripts run on every subsequent page load, each overwriting the last. The
+   * final value happens to be right, which is what makes it easy to miss.
+   */
+  async setCapture(on: boolean, key = ""): Promise<void> {
+    if (!this.state || this.state.status !== "recording") return;
+    this.state.capturing = on;
+    this.captureKey = key;
+    await this.applyCapture();
+  }
+
+  /** Push the current capture state into the live page. Safe to call any time. */
+  private async applyCapture(): Promise<void> {
+    const on = this.state?.capturing === true;
+    const key = this.captureKey;
+    await this.page
+      ?.evaluate(
+        ([v, k]) => {
+          const w = window as unknown as { __aemCapture?: boolean; __aemCaptureKey?: string };
+          w.__aemCapture = v as boolean;
+          w.__aemCaptureKey = k as string;
+        },
+        [on, key] as [boolean, string],
+      )
+      .catch(() => {
+        /* mid-navigation; framenavigated re-applies once the document exists */
+      });
   }
 
   async stop(): Promise<RecorderState> {

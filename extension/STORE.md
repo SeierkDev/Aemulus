@@ -17,7 +17,9 @@ other people can install it with one click instead of dev mode.
 > Aemulus turns a repetitive browser task into a reusable skill. Record yourself
 > doing it once — entering a record, filling a form, updating a tool — and
 > Aemulus replays it on new inputs, right in your own browser, so it's already
-> signed in and behaves like you. Every run captures step-by-step proof and a
+> signed in and behaves like you. Want to be told when something changes? Turn
+> on Capture a value and click the number, price or status you care about — no
+> selectors, no config. Every run captures step-by-step proof and a
 > tamper-evident receipt.
 >
 > The extension connects to your own Aemulus account (you provide the URL + an

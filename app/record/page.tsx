@@ -54,6 +54,31 @@ export default function RecordPage() {
   const [state, setState] = useState<RecorderState | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [capturing, setCapturing] = useState(false);
+  const [captureKey, setCaptureKey] = useState("");
+  /** True while a capture toggle is in flight, so the poll does not undo it. */
+  const togglingRef = useRef(false);
+  /**
+   * Whether the extension is installed. null while unknown.
+   *
+   * The page told everyone to go and get it, installed or not — which reads as
+   * the site not knowing anything about you. The extension marks the document
+   * when its content script runs; absence is not proof it is missing (it only
+   * injects on pages it has access to), so this only ever downgrades the nudge,
+   * never blocks anything.
+   */
+  const [hasExt, setHasExt] = useState<boolean | null>(null);
+  useEffect(() => {
+    const seen = () =>
+      document.documentElement.hasAttribute("data-aemulus-extension") ||
+      !!(window as unknown as { __aemulusExtension?: unknown }).__aemulusExtension;
+    // Always deferred, never set synchronously inside the effect: a setState in
+    // the effect body triggers a cascading render, and the content script may
+    // land after us anyway, so checking immediately would report "missing" for
+    // an extension that is simply a beat behind.
+    const t = setTimeout(() => setHasExt(seen()), seen() ? 0 : 1200);
+    return () => clearTimeout(t);
+  }, []);
   const [frame, setFrame] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
@@ -64,7 +89,30 @@ export default function RecordPage() {
 
   const poll = useCallback(async () => {
     const r = await fetch("/api/record/status", { cache: "no-store" });
-    if (r.ok) setState(await r.json());
+    if (!r.ok) return;
+    const next = (await r.json()) as RecorderState;
+    setState(next);
+    /**
+     * Follow the recorder, do not just remember what we asked for.
+     *
+     * The button was driven entirely by local state, so reloading the page
+     * mid-recording showed "Capture a value" while the recorder was still
+     * capturing — and that is the dangerous direction. You look at an off
+     * button, click something in the live view expecting to press it, and it
+     * gets read instead. The server is the truth here; this is the only place
+     * that can tell.
+     */
+    // Not while a toggle is in flight. The poll runs every 1.2s and the server
+    // does not know about the switch until its POST lands, so one arriving in
+    // that window would report the OLD value and flip the button back under the
+    // user's finger.
+    if (
+      !togglingRef.current &&
+      next.status === "recording" &&
+      typeof next.capturing === "boolean"
+    ) {
+      setCapturing(next.capturing);
+    }
   }, []);
 
   // Poll status (trace) while recording.
@@ -144,6 +192,12 @@ export default function RecordPage() {
 
   async function start() {
     setError(null);
+    // A fresh recorder starts with capture off. Without this the button still
+    // reads "Capturing" from the previous session while the server is not, and
+    // the first click presses the thing you were aiming at instead of reading
+    // it — the one mistake that costs you the whole recording.
+    setCapturing(false);
+    setCaptureKey("");
     if (!startUrl.trim()) {
       setError("Enter a URL to start from.");
       return;
@@ -168,6 +222,58 @@ export default function RecordPage() {
       setError(e instanceof Error ? e.message : "Failed to start");
     } finally {
       setBusy(false);
+    }
+  }
+
+  /**
+   * Capture mode.
+   *
+   * Kept out of the live view's own click handling: while it is on, a click in
+   * the streamed page is forwarded as usual, and the injected script swallows
+   * it there and reports a capture instead. Doing it here would mean guessing
+   * what the click landed on from a screenshot.
+   */
+  /**
+   * Send the name as it is typed, not only when capture is switched on.
+   *
+   * The key was posted with the toggle and nowhere else, so turning capture on
+   * and THEN typing a name left the server with the old one — and the capture
+   * came back named after the element's label instead, which reads as the
+   * naming field being ignored. The extension already pushes it live on every
+   * keystroke; this is the web recorder catching up.
+   *
+   * Debounced, because the alternative is a request per character.
+   */
+  useEffect(() => {
+    if (!capturing) return;
+    const t = setTimeout(() => {
+      void fetch("/api/record/capture", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ on: true, key: captureKey.trim() }),
+      }).catch(() => {
+        /* the name is a nicety; a failure here must not interrupt recording */
+      });
+    }, 350);
+    return () => clearTimeout(t);
+  }, [captureKey, capturing]);
+
+  async function toggleCapture() {
+    const next = !capturing;
+    setCapturing(next); // optimistic: the streamed view should respond instantly
+    togglingRef.current = true;
+    try {
+      const r = await fetch("/api/record/capture", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ on: next, key: captureKey.trim() }),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Failed");
+    } catch (e) {
+      setCapturing(!next); // put the button back where the recorder actually is
+      setError(e instanceof Error ? e.message : "Could not switch capture mode.");
+    } finally {
+      togglingRef.current = false;
     }
   }
 
@@ -197,6 +303,11 @@ export default function RecordPage() {
   }
 
   const actions = state?.actions ?? [];
+
+  // What has been marked so far, so you can see it read the right thing before
+  // you stop — the commonest way to waste a recording is capturing the wrong
+  // element and only finding out at the watch step.
+  const captured = actions.filter((a) => a.type === "extract");
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6">
@@ -271,11 +382,14 @@ export default function RecordPage() {
             <Card className="flex items-center justify-between gap-3 p-4 transition-colors hover:bg-surface-2">
               <div>
                 <p className="text-sm font-medium">
-                  Recording a tool you log into?
+                  {hasExt
+                    ? "Extension installed"
+                    : "Recording a tool you log into?"}
                 </p>
                 <p className="mt-0.5 text-xs leading-relaxed text-ink-3">
-                  Use the browser extension - it records as you, already signed
-                  in.
+                  {hasExt
+                    ? "Record straight from the tab you're signed into - as you, on your own connection."
+                    : "Use the browser extension - it records as you, already signed in."}
                 </p>
               </div>
               <span className="mono shrink-0 text-sm text-ink-3">→</span>
@@ -330,7 +444,7 @@ export default function RecordPage() {
           {recording && (
             <Card className="flex flex-col gap-3 p-5">
               <div className="flex items-center justify-between">
-                <Label>Capturing</Label>
+                <Label>Recorded</Label>
                 <span className="mono text-2xl font-semibold">
                   {actions.length}
                 </span>
@@ -339,6 +453,70 @@ export default function RecordPage() {
                 Steps recorded. Click and type directly in the live view, then
                 stop when done.
               </p>
+
+              {capturing && (
+                <input
+                  value={captureKey}
+                  onChange={(e) => setCaptureKey(e.target.value)}
+                  maxLength={32}
+                  placeholder="Name it (optional) - price, status, balance"
+                  aria-label="Name for the captured value"
+                  className={input}
+                />
+              )}
+
+              <button
+                onClick={toggleCapture}
+                aria-pressed={capturing}
+                className={cx(
+                  "rounded-[var(--radius-base)] border px-4 py-3 text-left text-sm transition-colors",
+                  capturing
+                    ? "border-ink bg-ink text-bg"
+                    : "border-border-strong bg-surface-2 text-ink hover:border-ink-3",
+                )}
+              >
+                <span className="font-semibold">
+                  {capturing ? "Capturing a value — click it" : "Capture a value"}
+                </span>
+                <span
+                  className={cx(
+                    "mt-1 block text-xs",
+                    capturing ? "text-bg/70" : "text-ink-3",
+                  )}
+                >
+                  {capturing
+                    ? "The next click reads that element instead of clicking it."
+                    : "Turn this on, then click the number or status you want watched."}
+                </span>
+              </button>
+
+              {captured.length > 0 && (
+                <div className="rounded-[var(--radius-base)] border border-border bg-surface-2 p-3">
+                  <Label>Captured</Label>
+                  <div className="mt-2 flex flex-col gap-1.5">
+                    {captured.map((c, i) => (
+                      <div key={i} className="flex items-baseline gap-3 text-xs">
+                        <span className="mono shrink-0 text-ink-3">
+                          {c.outputKey || c.name || "value"}
+                        </span>
+                        {/* A refused capture had its value blanked, so it
+                            rendered here as a key with nothing beside it and
+                            looked like it had worked. It never becomes a step,
+                            and this panel sits next to the button — it has to
+                            say so, not only the trace below. */}
+                        {c.sensitive ? (
+                          <span className="truncate text-ink-3">
+                            refused - credential field, no step created
+                          </span>
+                        ) : (
+                          <span className="truncate text-ink-2">{c.value}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <Button variant="primary" onClick={stop} disabled={busy}>
                 {busy ? "Saving…" : "Stop & save"}
               </Button>

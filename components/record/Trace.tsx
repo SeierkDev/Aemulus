@@ -15,6 +15,16 @@ function actionLabel(a: RecordedAction): string {
       return `Press ${a.key}`;
     case "submit":
       return `Submit ${a.name || "form"}`;
+    // Without this a capture rendered as the bare word "extract" with nothing
+    // after it — and the live trace is the only place you can confirm it read
+    // the right thing before you stop recording.
+    case "extract":
+      // Refused: a capture on a credential field is dropped rather than turned
+      // into a step, because the step would read that field live on every run.
+      if (a.sensitive) return "Capture refused - that looks like a credential field";
+      return a.value
+        ? `Capture ${a.outputKey || a.name || "value"} = "${a.value}"`
+        : `Capture ${a.outputKey || a.name || "value"}`;
     default:
       return a.type;
   }

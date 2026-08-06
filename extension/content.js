@@ -11,7 +11,22 @@
   if (w.__aemExtAttached || w.top !== window) return;
   w.__aemExtAttached = true;
 
+  // Let the site know we are here. /record used to tell everyone to install the
+  // extension whether they had it or not, which reads as a site that knows
+  // nothing about you. Absence of this attribute is not proof of absence — the
+  // script only injects where it has access — so the page only ever softens its
+  // nudge, never gates anything on it.
+  try {
+    document.documentElement.setAttribute("data-aemulus-extension", "1");
+    w.__aemulusExtension = true;
+  } catch { /* hostile page may seal the element */ }
+
   let recording = false;
+  let capturing = false;
+  let captureKey = "";
+  // Same default as the cloud runner's AEMULUS_LOOP_MAX. A page with thousands
+  // of rows must not turn one step into an unbounded payload.
+  const LOOP_MAX = 500;
 
   const esc = (s) =>
     typeof CSS !== "undefined" && CSS.escape
@@ -89,9 +104,87 @@
     } catch { /* extension reloaded */ }
   }
 
+  // ---- capture mode ----------------------------------------------------
+  // A watch needs a skill that READS a value. Until now the only way to make
+  // one was to open DevTools, copy a CSS selector and paste it into the skill
+  // editor. Here you point at the value and click it.
+  let outline = null;
+  function showOutline(el) {
+    if (!outline) {
+      outline = document.createElement("div");
+      outline.setAttribute("data-aem-outline", "1");
+      outline.style.cssText =
+        "position:fixed;pointer-events:none;z-index:2147483647;border:2px solid #f4f4f5;" +
+        "border-radius:4px;box-shadow:0 0 0 2px rgba(0,0,0,.55);display:none";
+      document.documentElement.appendChild(outline);
+    }
+    if (!el) { outline.style.display = "none"; return; }
+    const r = el.getBoundingClientRect();
+    outline.style.display = "block";
+    outline.style.left = (r.left - 2) + "px";
+    outline.style.top = (r.top - 2) + "px";
+    outline.style.width = r.width + "px";
+    outline.style.height = r.height + "px";
+  }
+  /**
+   * What a capture reads.
+   *
+   * textContent, NOT innerText — that is what the runner uses (captureValue in
+   * lib/runner.ts). They disagree on hidden nodes and whitespace, so previewing
+   * one and capturing the other shows a value the watch will never compare
+   * against.
+   *
+   * `max` because the two uses want different limits. While RECORDING it is a
+   * preview, and 300 characters is plenty to see you grabbed the right thing.
+   * While REPLAYING it is the value itself, and truncating at 300 would mean a
+   * long value read differently here than in the cloud — a watch would then see
+   * a change that never happened, or miss one past character 300.
+   *
+   * The replay ceiling is the server's own limit for a client-reported output
+   * (4000, in the finish route) rather than the cloud runner's 20,000: the
+   * runner reads the page itself, while this is a number the extension claims,
+   * so the tighter bound on the untrusted path is deliberate.
+   */
+  const CAPTURE_PREVIEW_MAX = 300;
+  const CAPTURE_VALUE_MAX = 4000;
+  function readValue(el, max) {
+    const cap = max || CAPTURE_VALUE_MAX;
+    if (/^(input|textarea|select)$/i.test(el.tagName) && el.value !== undefined) {
+      return String(el.value).trim().slice(0, cap);
+    }
+    return (el.textContent || "").trim().slice(0, cap);
+  }
+  document.addEventListener("mousemove", (e) => {
+    if (!recording || !capturing) { if (outline) outline.style.display = "none"; return; }
+    const el = e.target;
+    if (!el || !el.tagName || el.hasAttribute("data-aem-outline")) return;
+    showOutline(el);
+  }, true);
+
   document.addEventListener("click", (e) => {
     const el = e.target;
     if (!el || !el.tagName) return;
+
+    if (recording && capturing) {
+      // Swallow it. A capture is not a click, and letting it through would
+      // follow the link or submit the form and move the page out from under the
+      // value being pointed at.
+      e.preventDefault();
+      e.stopPropagation();
+      // A capture on a credential field is still a credential — same redaction
+      // the typed-input path has always applied.
+      const secret = isSensitive(el);
+      send({
+        type: "extract",
+        ...base(el),
+        value: secret ? "" : readValue(el, CAPTURE_PREVIEW_MAX),
+        ...(secret ? { sensitive: true } : {}),
+        outputKey: captureKey || undefined,
+        text: (el.innerText || "").trim().slice(0, 80),
+      });
+      return;
+    }
+
     const clickable = el.closest("button, a, [role='button'], input, label, select") || el;
     send({ type: "click", ...base(clickable), text: (clickable.innerText || "").trim().slice(0, 80) });
   }, true);
@@ -125,10 +218,24 @@
       } catch { /* ignore */ }
     }
   }
+  function setCapturing(on, key) {
+    capturing = !!on;
+    if (key !== undefined) captureKey = String(key || "");
+    if (!capturing && outline) outline.style.display = "none";
+  }
   try {
-    chrome.storage.local.get("aemRecording", (r) => setRecording(r && r.aemRecording));
+    chrome.storage.local.get(["aemRecording", "aemCapturing", "aemCaptureKey"], (r) => {
+      setRecording(r && r.aemRecording);
+      setCapturing(r && r.aemCapturing, r && r.aemCaptureKey);
+    });
     chrome.storage.onChanged.addListener((ch, area) => {
-      if (area === "local" && ch.aemRecording) setRecording(ch.aemRecording.newValue);
+      if (area !== "local") return;
+      if (ch.aemRecording) setRecording(ch.aemRecording.newValue);
+      // Without this the toggle only takes effect on the next page load, which
+      // is exactly the wrong moment — you turn it on to grab the value on the
+      // page you are already looking at.
+      if (ch.aemCapturing) setCapturing(ch.aemCapturing.newValue);
+      if (ch.aemCaptureKey) captureKey = String(ch.aemCaptureKey.newValue || "");
     });
   } catch { /* not in extension context */ }
 
@@ -186,6 +293,37 @@
           const form = target.closest && target.closest("form");
           if (form) (form.requestSubmit ? form.requestSubmit() : form.submit());
         }
+      } else if (action === "extract") {
+        // Read it, do not act on it. Without this branch an extract step fell
+        // through every case and returned ok having read nothing — so a skill
+        // with a capture ran "successfully" and produced no value, and a watch
+        // on it failed every single check with "did not capture the field".
+        //
+        // step.loop mirrors the cloud runner: capture EVERY element matching
+        // the selector into a JSON array, not just the first. Ignoring it here
+        // meant the same skill produced a single value in the extension and an
+        // array in the cloud — a watch would then compare one shape against the
+        // other depending on where the run happened.
+        if (step.loop) {
+          let els = [];
+          try { els = Array.from(document.querySelectorAll(used)); } catch { els = []; }
+          // NOT .map(readValue): map passes (element, index, array), so the
+          // index would land in readValue's `max` and truncate element 1 to one
+          // character, element 2 to two, and so on.
+          const values = els.slice(0, LOOP_MAX).map((e) => readValue(e));
+          return {
+            ok: true,
+            selectorUsed: used,
+            confidence: forcedSelector ? undefined : 0.99,
+            value: JSON.stringify(values),
+          };
+        }
+        return {
+          ok: true,
+          selectorUsed: used,
+          confidence: forcedSelector ? undefined : 0.99,
+          value: readValue(el),
+        };
       } else if (action === "submit") {
         const form = (el && el.closest("form")) || document.querySelector("form");
         if (form) (form.requestSubmit ? form.requestSubmit() : form.submit());

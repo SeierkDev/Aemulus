@@ -20,6 +20,10 @@ const ACTION_TYPES = new Set<ActionType>([
   "select",
   "key",
   "submit",
+  // Without this the filter below drops every capture the extension records —
+  // silently, because a filtered action leaves no trace of having existed. The
+  // extension half of capture mode did nothing at all until this was added.
+  "extract",
 ]);
 const MAX_ACTIONS = 1000;
 
@@ -65,6 +69,11 @@ export async function POST(req: Request) {
           value: sensitive ? "" : str(a.value, 2000),
           sensitive,
           key: str(a.key, 20),
+          // The name the user gave a capture. Dropping it here would not lose
+          // the capture, only its name — which then silently falls back to a
+          // slug of the element's label and looks like the naming field is
+          // broken rather than unread.
+          outputKey: str(a.outputKey, 120),
         };
       });
 

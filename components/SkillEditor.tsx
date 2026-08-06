@@ -397,7 +397,11 @@ export function SkillEditor({
                   {String(i).padStart(2, "0")}
                 </span>
                 <select
-                  className={cx(input, "w-28 shrink-0")}
+                  // Width BEFORE the shared input class, and the class stripped
+                  // of its own w-full: the two collided, the select rendered
+                  // full width, and it pushed Remove out past the card's edge
+                  // where it could not be clicked.
+                  className={cx(input.replace("w-full", ""), "w-28 shrink-0")}
                   value={s.action}
                   onChange={(e) =>
                     patchStep(i, { action: e.target.value as ActionType })
@@ -447,6 +451,15 @@ export function SkillEditor({
                     <input
                       className={input}
                       value={s.outputKey ?? ""}
+                      // Bounded because the /watch wizard offers each capture as
+                      // a Telegram button carrying the skill id and this key, and
+                      // silently drops any button whose data runs over. A longer
+                      // name still captures fine and simply never appears as
+                      // something you can watch — which reads as the capture
+                      // having failed. Editing here is the normal way to rename
+                      // one, so capping the recorders alone left the front door
+                      // open.
+                      maxLength={32}
                       placeholder="e.g. price"
                       aria-label="Output key"
                       onChange={(e) =>
@@ -454,6 +467,15 @@ export function SkillEditor({
                       }
                     />
                   </div>
+                  {(s.outputKey?.length ?? 0) > 32 && (
+                    <div className="grid grid-cols-[160px_1fr] gap-3">
+                      <span />
+                      <p className="text-xs text-ink-3">
+                        This name is too long to pick in a Telegram watch.
+                        Shorten it to 32 characters or fewer.
+                      </p>
+                    </div>
+                  )}
                   <div className="grid grid-cols-[160px_1fr] items-center gap-3">
                     <span className="text-xs text-ink-3">selector</span>
                     <input

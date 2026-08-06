@@ -112,6 +112,7 @@ The demonstration is one example of a repetitive task (e.g. entering data into a
    - Personal/record data the user typed (names, emails, amounts, IDs) → almost always inputFields.
    - Fixed dropdown choices, canned text, or UI toggles that would be identical every run → constants.
 2. Produce an ordered step plan that reproduces the task. Preserve the trace's selectors (best-first). Keep navigation, clicks, key presses, and submits as steps with valueSource "none".
+   - IGNORE any "extract" entries in the trace. They are values the user marked to read, they are re-inserted verbatim afterwards, and anything you emit for them is discarded.
 3. For each value-bearing step (input/select), set valueSource to "input" and inputKey to the matching field key, OR "constant" with the literal value.
    - Any step whose value is shown as <secret> (a password or sensitive field) MUST be an inputField with valueSource "input" - NEVER a constant. Its example must be "".
 
@@ -164,6 +165,144 @@ function isCredentialName(key: string, label: string): boolean {
  * runner's step-record/screenshot masking (gated on `secret`) doesn't fire — so a
  * published skill run by a non-owner would persist the typed secret in cleartext.
  */
+
+/**
+ * Put the user's captures back into the plan.
+ *
+ * A capture is not something to generalize. The user pointed at an element and
+ * said "read this one" — the selector, the position and the key are all exact
+ * intent, and a model rewriting them can only lose information. So extract
+ * steps never leave the trace: the generalizer is told to ignore them, its
+ * schema cannot express them, and they are spliced back in here from the
+ * recording.
+ *
+ * Position is preserved by counting non-extract actions. A capture recorded
+ * after the 3rd real interaction is inserted after the 3rd generalized step, so
+ * it reads the page in the state the user was looking at. Appending them all at
+ * the end would capture whatever the page happened to show last, which for a
+ * multi-page task is the wrong page entirely.
+ */
+export function restoreCaptures(skill: GeneralizedSkill, demo: Demonstration): GeneralizedSkill {
+  type Cap = { step: GeneralizedSkill["steps"][number]; anchor: string[]; ordinal: number };
+  const caps: Cap[] = [];
+  const used = new Set<string>();
+  let ordinal = 0;
+  let lastSelectors: string[] = [];
+
+  for (const a of demo.trace) {
+    if (a.type !== "extract") {
+      ordinal++;
+      if (a.selectors?.length) lastSelectors = a.selectors;
+      continue;
+    }
+    /**
+     * A capture on a credential field never becomes a step.
+     *
+     * The recorder already blanks the value, which protects the RECORDING. It
+     * does nothing for the skill: an extract step reads its element live on
+     * every run, and there is no masking on that path — outputs[key] is
+     * persisted, folded into the commitment and the receipt, returned by the
+     * SDK and disclosable. The recording happens once; the step would leak the
+     * password every time it ran, forever.
+     *
+     * So it is dropped here, and the live trace says it was refused rather than
+     * leaving somebody to wonder why their capture vanished.
+     */
+    if (a.sensitive) continue;
+    // Unique, stable key. A page with two "Total" cells would otherwise collapse
+    // into one output and silently drop a capture.
+    let key =
+      (a.outputKey || "").trim().slice(0, OUTPUT_KEY_MAX) ||
+      slugKey(a.name || a.text || "value");
+    if (used.has(key)) {
+      let n = 2;
+      while (used.has(`${key}_${n}`)) n++;
+      key = `${key}_${n}`;
+    }
+    used.add(key);
+
+    caps.push({
+      anchor: lastSelectors,
+      ordinal,
+      step: {
+        intent: `Read ${key}`,
+        action: "extract",
+        selectors: a.selectors ?? [],
+        target: "",
+        valueSource: "none",
+        value: "",
+        inputKey: "",
+        key: "",
+        outputKey: key,
+      } as GeneralizedSkill["steps"][number],
+    });
+  }
+  if (caps.length === 0) return skill;
+
+  /**
+   * Where each capture goes back.
+   *
+   * ANCHOR FIRST: the step whose selectors match the last real action before the
+   * capture. That survives the model merging or splitting steps, which it does —
+   * the plan is a generalization of the trace, not a copy of it.
+   *
+   * Order is only a fallback, and only when the two sequences line up 1:1, the
+   * same discipline markSecretFields already applies for the same reason. A
+   * capture put in the wrong place reads the wrong page, which for a multi-page
+   * task means it silently watches something nobody asked about.
+   *
+   * Neither matched: append. Last is a guess, but it is the least wrong guess —
+   * a capture is usually the end of what you were doing.
+   */
+  const aligned =
+    demo.trace.filter((a) => a.type !== "extract").length === skill.steps.length;
+
+  const after = new Map<number, GeneralizedSkill["steps"]>();
+  for (const c of caps) {
+    let at = -1;
+    if (c.anchor.length) {
+      at = skill.steps.findIndex((s) => s.selectors?.some((sel) => c.anchor.includes(sel)));
+    }
+    if (at < 0 && aligned) at = c.ordinal - 1;
+    if (at < 0) at = skill.steps.length - 1;
+    const list = after.get(at) ?? [];
+    list.push(c.step);
+    after.set(at, list);
+  }
+
+  const out: GeneralizedSkill["steps"] = [];
+  // A capture taken before anything else happened belongs at the very front.
+  for (const c of caps) if (c.ordinal === 0 && !c.anchor.length) out.push(c.step);
+  skill.steps.forEach((step, i) => {
+    out.push(step);
+    for (const c of after.get(i) ?? []) if (!out.includes(c)) out.push(c);
+  });
+  // No renumbering: a generalized step is Omit<SkillStep,"idx"> — the index is
+  // assigned when the skill is persisted, so order in the array is the order.
+  return { ...skill, steps: out };
+}
+
+/**
+ * A safe output key from a label: snake_case, letters/digits/underscore only.
+ *
+ * Capped at OUTPUT_KEY_MAX, which is not an arbitrary number. The /watch wizard
+ * offers each capture as a Telegram button carrying `w|f|<skillId>|<key>`, and
+ * Telegram callback data is bounded — the wizard silently drops any button that
+ * exceeds it. That leaves 39 characters for the key, so a longer name means the
+ * capture never appears as something you can watch, with no error anywhere. 32
+ * keeps headroom.
+ */
+export const OUTPUT_KEY_MAX = 32;
+
+function slugKey(s: string): string {
+  const k = s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, OUTPUT_KEY_MAX);
+  return k || "value";
+}
+
 export function markSecretFields(skill: GeneralizedSkill, demo: Demonstration): GeneralizedSkill {
   const sensitiveSelectors = new Set<string>();
   for (const a of demo.trace) {
@@ -258,5 +397,8 @@ ${traceForPrompt(demo)}
     throw new Error("Generalizer did not return a skill.");
   }
   // Mark credential inputs secret from the trace's ground truth (see markSecretFields).
-  return markSecretFields(GeneralizedSchema.parse(block.input) as GeneralizedSkill, demo);
+  const parsed = markSecretFields(GeneralizedSchema.parse(block.input) as GeneralizedSkill, demo);
+  // Captures last: they are the user's exact intent and are spliced in from the
+  // trace rather than produced by the model.
+  return restoreCaptures(parsed, demo);
 }

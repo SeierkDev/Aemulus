@@ -179,6 +179,8 @@ async function runSkill(msg) {
   }
 
   const results = [];
+  /** What each extract step read, keyed by its output name. */
+  const outputs = {};
   let status = "completed";
   let error = null;
   let tokensIn = 0, tokensOut = 0;
@@ -205,12 +207,14 @@ async function runSkill(msg) {
 
     // Deterministic selector missed → vision fallback (the operator picks the
     // element from the live page's candidates). Added in Phase 3.
+    let extracted;
     if (!res || !res.ok) {
       const rescue = await visionRescue(server, key, runId, tabId, step, value);
       tokensIn += rescue.tokensIn; tokensOut += rescue.tokensOut;
       if (rescue.ok) {
         selectorUsed = rescue.selectorUsed;
         confidence = rescue.confidence;
+        extracted = rescue.value;
         flagged = rescue.confidence < CONFIDENCE_FLOOR;
         note = flagged ? `Vision fallback, low confidence (${rescue.confidence.toFixed(2)}).` : "Recovered via vision fallback.";
       } else {
@@ -224,10 +228,23 @@ async function runSkill(msg) {
     }
 
     await settle(tabId);
+    // An extract step's whole purpose is the value it read. The cloud runner
+    // collects these into the run's output; the extension was dropping them, so
+    // a capture recorded in your own browser could never be watched.
+    // `read` rather than res.value: on a rescued step res holds the FAILED
+    // attempt, and the value came back from the vision path instead. Naming it
+    // outKey, not key — key is the API key this function posts with.
+    const read = String((extracted !== undefined ? extracted : res && res.value) || "");
+    if (step.action === "extract") {
+      const outKey = step.outputKey || `value_${step.idx}`;
+      // 4000 = the finish route's own cap. Slicing shorter here would silently
+      // shorten a value the server was willing to store.
+      outputs[outKey] = read.slice(0, 4000);
+    }
     results.push({
       idx: step.idx,
       selectorUsed,
-      value: isSecret ? "" : value,
+      value: step.action === "extract" ? read.slice(0, 300) : (isSecret ? "" : value),
       confidence,
       flagged,
       note,
@@ -238,7 +255,7 @@ async function runSkill(msg) {
   await setStatus({ state: "finishing", runId, server });
   let fin;
   try {
-    fin = await post(server, key, `/api/ext/runs/${runId}/finish`, { status, error, steps: results, tokensIn, tokensOut });
+    fin = await post(server, key, `/api/ext/runs/${runId}/finish`, { status, error, steps: results, outputs, tokensIn, tokensOut });
   } catch (e) { const err = (e && e.message) || String(e); await setStatus({ state: "error", error: err, runId, server }); return { ok: false, error: err }; }
   const receiptHash = fin.data && fin.data.receiptHash;
   await setStatus({ state: "done", status, runId, server, receiptHash });
@@ -267,7 +284,10 @@ async function visionRescue(server, key, runId, tabId, step, value) {
     await ensureReady(tabId, 8000);
     const res = await perform(tabId, step, value, chosen);
     if (res && res.ok) {
-      return { ok: true, selectorUsed: chosen, confidence: conf, tokensIn: r.data.tokensIn || 0, tokensOut: r.data.tokensOut || 0 };
+      // value rides along: an extract rescued by the vision fallback still has
+      // to report what it read, or the output is silently empty on exactly the
+      // runs where the page had drifted.
+      return { ok: true, selectorUsed: chosen, confidence: conf, value: res.value, tokensIn: r.data.tokensIn || 0, tokensOut: r.data.tokensOut || 0 };
     }
     return { ...empty, tokensIn: r.data.tokensIn || 0, tokensOut: r.data.tokensOut || 0 };
   } catch {

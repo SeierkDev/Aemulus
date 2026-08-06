@@ -13,6 +13,13 @@ running as *you* — logged in, on your own connection.
   the field values you type, and a proof screenshot per step. This only happens
   **while you have explicitly started a recording or a run.** When idle, the
   extension reads nothing.
+- **Values you capture** — with *Capture a value* switched on, clicking an
+  element reads its text so the skill can watch it later. That is text you did
+  not type, so it is called out separately: it is read only on the element you
+  click, only while capture mode is on, and it is shown back to you in the
+  extension before the recording is saved. A capture on a password or other
+  credential-shaped field is refused outright — no value is recorded and no step
+  is created, because such a step would re-read that field on every future run.
 - **Your connection settings** — the Aemulus server URL and API key you enter,
   stored locally in the browser (`chrome.storage.local`) so you don't re-enter
   them. The API key is a credential for *your* account; it is never sent anywhere

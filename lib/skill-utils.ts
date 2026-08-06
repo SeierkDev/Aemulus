@@ -14,6 +14,19 @@ export const MIN_MEANINGFUL_STEPS = Math.max(
 export function incompleteRecordingReason(
   trace: { type: string }[],
 ): string | null {
+  /**
+   * A capture is a finished recording on its own.
+   *
+   * Open a page, click the number you want watched, stop. That is exactly the
+   * shape a watch needs, and it has one interaction — so the three-interaction
+   * rule rejected it as "unfinished" and there was no way to make a watchable
+   * skill without padding the recording with clicks that do nothing.
+   *
+   * The rule still does its job for what it was written for: a task abandoned
+   * on a captcha has no capture either.
+   */
+  if (trace.some((a) => a.type === "extract")) return null;
+
   const meaningful = trace.filter((a) => a.type !== "navigate").length;
   if (meaningful < MIN_MEANINGFUL_STEPS) {
     return `This recording only captured ${meaningful} action${meaningful === 1 ? "" : "s"} — it looks unfinished (a task that got blocked or was stopped early). Record the full task through to completion, then turn it into a skill.`;

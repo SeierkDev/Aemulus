@@ -32,6 +32,8 @@ export interface RecordedAction {
   key?: string;
   /** Relative path of the proof screenshot under .data/recordings. */
   screenshot?: string;
+  /** For a capture: the key its value is stored under. */
+  outputKey?: string;
 }
 
 export type RecorderStatus =
@@ -52,6 +54,8 @@ export interface RecorderState {
   startedAt: number;
   /** id of the saved demonstration once persisted. */
   demonstrationId?: string;
+  /** Capture mode: a click marks a value to read instead of clicking it. */
+  capturing?: boolean;
   error?: string;
 }
 

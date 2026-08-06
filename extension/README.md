@@ -27,7 +27,11 @@ _(For a one-click install for everyone, see `STORE.md`.)_
 1. Open the tool you want to automate (log in normally — it's your browser).
 2. Extension → optionally name it → **Start recording**.
 3. Do the task once (click, type, submit).
-4. **Stop & save** → open **/skills** on the site → **Generalize** into a skill.
+4. To watch a value, hit **Capture a value**, optionally name it, then click the
+   number or status you want. The click reads that element instead of pressing
+   it, and the extension shows you what it read. Without a capture a skill can
+   only *do* things; a watch needs one that *reads* something.
+5. **Stop & save** → open **/skills** on the site → **Generalize** into a skill.
 
 ## Run a skill
 

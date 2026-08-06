@@ -6,6 +6,44 @@ function setRecState(recording) {
   $("start").disabled = recording;
   $("stop").disabled = !recording;
   $("recdot").style.opacity = recording ? "1" : "0.2";
+  // Capture only means anything while recording, and it must not survive a
+  // recording ending — otherwise the next one starts silently in capture mode
+  // and the user's first click reads a value instead of pressing the button
+  // they were aiming at.
+  $("capture").disabled = !recording;
+  if (!recording) setCaptureState(false);
+}
+
+/**
+ * Capture mode: the next click marks a value instead of clicking it.
+ *
+ * This is what makes a skill watchable. Without it, reading a value off a page
+ * meant opening DevTools, copying a CSS selector and pasting it into the skill
+ * editor by hand.
+ */
+/**
+ * Draw the capture controls. Reads nothing, writes nothing.
+ *
+ * Split from the setter because reopening the popup called the setter merely to
+ * REFLECT the stored state — and the setter persists the key from the input
+ * box, which is empty on open because nothing had filled it in yet. So looking
+ * at the popup erased the name you had typed.
+ */
+function renderCapture(on) {
+  const b = $("capture");
+  b.textContent = on ? "Capturing — click the value" : "Capture a value";
+  b.classList.toggle("primary", on);
+  $("capturehint").style.display = on ? "block" : "none";
+  $("capturekey").style.display = on ? "block" : "none";
+}
+
+/** Draw AND persist. Only for an actual change the user made. */
+function setCaptureState(on) {
+  renderCapture(on);
+  chrome.storage.local.set({
+    aemCapturing: !!on,
+    aemCaptureKey: on ? $("capturekey").value.trim() : "",
+  });
 }
 function status(text) { $("status").textContent = text; }
 function showLink(url, label) {
@@ -91,11 +129,28 @@ function pollRunStatus() {
 }
 
 // ---- wire up ----
-chrome.storage.local.get(["aemServer", "aemKey", "aemTitle", "aemRecording"], (c) => {
+// Typing a name while capture is on updates it for the next click, so you can
+// point at two values in a row and name each without toggling off between them.
+$("capturekey").addEventListener("input", () => {
+  chrome.storage.local.get("aemCapturing", (c) => {
+    if (c.aemCapturing) chrome.storage.local.set({ aemCaptureKey: $("capturekey").value.trim() });
+  });
+});
+
+$("capture").addEventListener("click", () => {
+  chrome.storage.local.get("aemCapturing", (c) => setCaptureState(!c.aemCapturing));
+});
+
+chrome.storage.local.get(["aemServer", "aemKey", "aemTitle", "aemRecording", "aemCapturing", "aemCaptureKey"], (c) => {
   $("server").value = c.aemServer || "";
   $("key").value = c.aemKey || "";
   $("title").value = c.aemTitle || "";
   setRecState(!!c.aemRecording);
+  if (c.aemRecording) {
+    // Restore, do not re-save: fill the box from storage first, then draw.
+    $("capturekey").value = c.aemCaptureKey || "";
+    renderCapture(!!c.aemCapturing);
+  }
   if (c.aemRecording) status("Recording — do your task, then Stop & save.");
   loadSkills();
 });
