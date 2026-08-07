@@ -184,6 +184,23 @@ describe("collections", () => {
     expect(await addToCollection(c.id, ids[0], 99)).toBe(true);
   });
 
+  it("an unpublished member stops occupying a slot", async () => {
+    // The cap has to count what the shelf shows. Otherwise a collection full of
+    // taken-down skills refuses new ones, the curator looks at it, counts the
+    // visible entries, and nothing on screen explains the refusal.
+    const c = (await createCollection({ slug: "c", title: "C" }))!;
+    const ids: string[] = [];
+    for (let i = 0; i < MAX_SKILLS_PER_COLLECTION; i++) {
+      const sid = await makeSkill(`F${i}`);
+      ids.push(sid);
+      await addToCollection(c.id, sid, i);
+    }
+    expect(await addToCollection(c.id, await makeSkill("Nope"), 99)).toBe(false);
+
+    await db.execute({ sql: `UPDATE skills SET published = 0 WHERE id = ?`, args: [ids[0]] });
+    expect(await addToCollection(c.id, await makeSkill("Now"), 99)).toBe(true);
+  });
+
   it("removes a member without touching the collection", async () => {
     const c = (await createCollection({ slug: "c", title: "C" }))!;
     const a = await makeSkill("Alpha");
@@ -240,6 +257,19 @@ describe("spotlights", () => {
       expect(await setSpotlight(await makeSkill(`Sp${i}`), "x", i)).toBe(true);
     }
     expect(await setSpotlight(await makeSkill("Extra"), "x", 9)).toBe(false);
+  });
+
+  it("an unpublished feature stops occupying a slot", async () => {
+    const ids: string[] = [];
+    for (let i = 0; i < MAX_SPOTLIGHTS; i++) {
+      const sid = await makeSkill(`Sp${i}`);
+      ids.push(sid);
+      await setSpotlight(sid, "x", i);
+    }
+    expect(await setSpotlight(await makeSkill("Nope"), "x", 9)).toBe(false);
+
+    await db.execute({ sql: `UPDATE skills SET published = 0 WHERE id = ?`, args: [ids[0]] });
+    expect(await setSpotlight(await makeSkill("Now"), "x", 9)).toBe(true);
   });
 
   it("clears", async () => {

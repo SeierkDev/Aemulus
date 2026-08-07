@@ -180,7 +180,8 @@ export async function createCollection(input: {
   if (await getCollectionBySlug(slug)) return null;
   const now = Date.now();
   const cid = id("col");
-  await db.execute({
+  try {
+    await db.execute({
     sql: `INSERT INTO collections (id, slug, title, blurb, position, created_at, updated_at)
           VALUES (?, ?, ?, ?, ?, ?, ?)`,
     args: [
@@ -192,7 +193,13 @@ export async function createCollection(input: {
       now,
       now,
     ],
-  });
+    });
+  } catch {
+    // The slug check above is not atomic. Two curators creating the same slug at
+    // once race it, and the loser hits the unique index — which is a taken slug,
+    // the same answer the check gives, not a 500.
+    return null;
+  }
   return {
     id: cid,
     slug,
@@ -273,8 +280,15 @@ export async function addToCollection(
     args: [skillId],
   });
   if (!sk.rows.length) return false;
+  // Counts only members that are STILL PUBLISHED, which is the same set the
+  // shelf renders. Counting every row meant a collection whose skills had been
+  // unpublished or taken down was full of entries nobody could see: the curator
+  // is told it is full, looks at it, counts four visible skills, and there is
+  // nothing on screen that explains the refusal.
   const n = await db.execute({
-    sql: `SELECT COUNT(*) AS n FROM collection_skills WHERE collection_id = ?`,
+    sql: `SELECT COUNT(*) AS n FROM collection_skills cs
+          JOIN skills s ON s.id = cs.skill_id AND s.published = 1
+          WHERE cs.collection_id = ?`,
     args: [collectionId],
   });
   // Counted before the insert, and an existing member re-added is an UPDATE of
@@ -344,7 +358,11 @@ export async function setSpotlight(
     args: [skillId],
   });
   if (!already.rows.length) {
-    const n = await db.execute(`SELECT COUNT(*) AS n FROM spotlights`);
+    // Same rule as a collection's cap: a spotlight whose skill is gone is not
+    // occupying a slot anyone can see, so it must not occupy one the curator
+    // is trying to fill.
+    const n = await db.execute(`SELECT COUNT(*) AS n FROM spotlights sp
+      JOIN skills s ON s.id = sp.skill_id AND s.published = 1`);
     if (Number(n.rows[0]?.n ?? 0) >= MAX_SPOTLIGHTS) return false;
   }
   const now = Date.now();

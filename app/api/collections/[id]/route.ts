@@ -21,12 +21,12 @@ export const dynamic = "force-dynamic";
  * reason the create route does: the existence of an editorial layer is not
  * something an arbitrary wallet needs confirmed.
  */
-async function gate(pubkeyNeeded = true) {
+async function gate() {
   const session = await requireAccess();
   if (!session) {
     return { res: NextResponse.json({ error: "Not authorized" }, { status: 401 }) };
   }
-  if (pubkeyNeeded && !isCurator(session.pubkey)) {
+  if (!isCurator(session.pubkey)) {
     return { res: NextResponse.json({ error: "Not found" }, { status: 404 }) };
   }
   const limited = enforceRateLimit(`curate:${session.pubkey}`, 30, 60_000, "Too many edits");
