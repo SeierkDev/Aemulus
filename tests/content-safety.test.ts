@@ -64,6 +64,17 @@ describe("run inputs are not prose", () => {
     }
   });
 
+  it("strips a transaction signature, not just an address", () => {
+    // ~88 base58 chars, twice the length of an address and twice the chance of
+    // containing a flagged sequence. A 64-char ceiling let these through.
+    // 88 chars, all from the real base58 alphabet (no 0/O/I/l).
+    const sig =
+      "o93dmW2Cb9DuD7NjDy98XmjyLt7npp47amgEMCA6KiKeZ8VpBLNzx78u1UnxN79PodNcnGYhAXfveAW92SaXAFqW";
+    expect(blocklistHit(sig)).toBe(true);
+    expect(stripIdentifiers(sig).trim()).toBe("");
+    expect(stripIdentifiers(`https://solscan.io/tx/${sig}`).includes(sig)).toBe(false);
+  });
+
   it("strips 0x addresses and long hashes too", () => {
     // Hex is 0-9a-f, so an 0x address can never contain these terms in the
     // first place — it is stripped for consistency, not because it was at risk.

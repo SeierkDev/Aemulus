@@ -107,10 +107,13 @@ export async function checkText(text: string): Promise<SafetyResult> {
  * inputs are routinely wallet addresses, that is not a rare edge case.
  *
  * Base58 excludes 0/O/I/l, and the 26-char floor is well above any real word,
- * so this cannot swallow ordinary text — a space ends the token.
+ * so this cannot swallow ordinary text — a space ends the token. The ceiling is
+ * 128 rather than 64 because a Solana TRANSACTION signature is ~88 characters,
+ * twice an address: a 64-char cap let every tx URL straight through to the
+ * wordlist, which is exactly the input a Solscan skill carries.
  */
 const IDENTIFIER_RE =
-  /\b(?:0x[0-9a-fA-F]{6,}|[0-9a-fA-F]{32,}|[1-9A-HJ-NP-Za-km-z]{26,64}|[A-Za-z0-9_-]{20,}_[A-Za-z0-9_-]{8,})\b/g;
+  /\b(?:0x[0-9a-fA-F]{6,}|[0-9a-fA-F]{32,}|[1-9A-HJ-NP-Za-km-z]{26,128}|[A-Za-z0-9_-]{20,}_[A-Za-z0-9_-]{8,})\b/g;
 
 /** Exported for the tests: what the blocklist actually sees for a run input. */
 export function stripIdentifiers(text: string): string {
