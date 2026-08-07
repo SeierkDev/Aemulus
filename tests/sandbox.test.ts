@@ -478,3 +478,26 @@ describe("receipt digest", () => {
     expect(strict).not.toBe(receiptDigest(base));
   });
 });
+
+describe("the OS-sandbox escape hatch accepts how people actually spell it", () => {
+  const saved = process.env.AEMULUS_CHROMIUM_SANDBOX;
+  afterEach(() => {
+    if (saved === undefined) delete process.env.AEMULUS_CHROMIUM_SANDBOX;
+    else process.env.AEMULUS_CHROMIUM_SANDBOX = saved;
+  });
+
+  // A container without user namespaces fails EVERY run when this is misread,
+  // and the error names a Chromium source file rather than the variable.
+  it.each(["0", "false", "FALSE", "off", "no", " 0 "])("%s turns it off", (v) => {
+    process.env.AEMULUS_CHROMIUM_SANDBOX = v;
+    expect(osSandboxEnabled()).toBe(false);
+    expect(runLaunchOptions().chromiumSandbox).toBe(false);
+  });
+
+  it("stays on for anything else, including unset", () => {
+    delete process.env.AEMULUS_CHROMIUM_SANDBOX;
+    expect(osSandboxEnabled()).toBe(true);
+    process.env.AEMULUS_CHROMIUM_SANDBOX = "1";
+    expect(osSandboxEnabled()).toBe(true);
+  });
+});

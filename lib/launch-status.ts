@@ -2,6 +2,8 @@ import { gatingEnabled } from "./solana";
 import { registryEnabled } from "./registry";
 import { zkReceiptsEnabled } from "./zk-receipts";
 import { payoutsEnabled } from "./payout";
+import { osSandboxEnabled } from "./sandbox";
+import { microvmMode } from "./microvm";
 
 /**
  * The live launch configuration — which gated systems are actually ON, derived
@@ -55,6 +57,10 @@ export function launchStatusLine(): string {
       : "off (pre-launch)";
   return (
     `gating=${gate} · anchor[memo=${on(s.memoAnchor)} registry=${on(s.registryAnchor)} zk=${on(s.zkAnchor)}]` +
-    ` · payouts=${on(s.payouts)} · reconciler=${on(s.reconciler)}`
+    ` · payouts=${on(s.payouts)} · reconciler=${on(s.reconciler)}` +
+    // Printed because getting this wrong fails EVERY run at browser launch with
+    // a Chromium source-file assertion that names no variable. One line in the
+    // boot log turns "why does nothing run" into a thing you can read off.
+    ` · chromiumSandbox=${on(osSandboxEnabled())} · microvm=${microvmMode()}`
   );
 }

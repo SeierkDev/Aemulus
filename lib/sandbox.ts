@@ -158,7 +158,14 @@ export function hardenedLaunchArgs(): string[] {
  * hash changes. The escape hatch cannot be used quietly.
  */
 export function osSandboxEnabled(): boolean {
-  return process.env.AEMULUS_CHROMIUM_SANDBOX !== "0";
+  // Any ordinary spelling of "off" turns it off. The check used to be `!== "0"`,
+  // which meant AEMULUS_CHROMIUM_SANDBOX=false left the sandbox ON — and a
+  // container that cannot grant user namespaces then fails EVERY run with
+  // "sandbox/linux/services/credentials.cc: Permission denied", before step 00,
+  // with nothing in the message connecting it to the variable that was supposed
+  // to prevent exactly that. Trailing whitespace did the same.
+  const raw = (process.env.AEMULUS_CHROMIUM_SANDBOX ?? "").trim().toLowerCase();
+  return !(raw === "0" || raw === "false" || raw === "off" || raw === "no");
 }
 
 /**
