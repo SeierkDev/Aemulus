@@ -95,7 +95,38 @@ export async function checkText(text: string): Promise<SafetyResult> {
   return ALLOWED;
 }
 
-/** Moderate the values of a run's input map (search queries, field values). */
+/**
+ * Machine identifiers: base58 chain addresses, 0x-hex addresses, long hashes,
+ * and api-key-shaped tokens.
+ *
+ * These are not prose, and matching a wordlist inside one is a category error.
+ * A 44-character base58 Solana address is a random string, and a random string
+ * eventually contains any four letters you care to name — measured, an ordinary
+ * wallet address tripped "kike" and another tripped "chink". The user is then
+ * told their input is hate speech and the run is refused. In a product whose
+ * inputs are routinely wallet addresses, that is not a rare edge case.
+ *
+ * Base58 excludes 0/O/I/l, and the 26-char floor is well above any real word,
+ * so this cannot swallow ordinary text — a space ends the token.
+ */
+const IDENTIFIER_RE =
+  /\b(?:0x[0-9a-fA-F]{6,}|[0-9a-fA-F]{32,}|[1-9A-HJ-NP-Za-km-z]{26,64}|[A-Za-z0-9_-]{20,}_[A-Za-z0-9_-]{8,})\b/g;
+
+/** Exported for the tests: what the blocklist actually sees for a run input. */
+export function stripIdentifiers(text: string): string {
+  return text.replace(IDENTIFIER_RE, " ");
+}
+
+/**
+ * Moderate the values of a run's input map (search queries, field values).
+ *
+ * Identifiers are removed FIRST, and only here. Published skill names and
+ * descriptions still go through checkText untouched: those are read by other
+ * people, so the trade there runs the other way — a false positive on a name is
+ * an annoyance the author can rewrite, while a slur hidden in a 30-character
+ * token would be on the marketplace. A run input is seen by nobody but the
+ * person who typed it.
+ */
 export async function checkValues(
   values: Record<string, string>,
 ): Promise<SafetyResult> {
@@ -103,5 +134,5 @@ export async function checkValues(
     .filter((v) => typeof v === "string")
     .join("\n")
     .trim();
-  return checkText(joined);
+  return checkText(stripIdentifiers(joined));
 }
