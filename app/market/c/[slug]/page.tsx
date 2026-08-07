@@ -17,6 +17,31 @@ import { isVerified } from "@/lib/moderation";
 export const dynamic = "force-dynamic";
 
 /**
+ * A collection page exists to be sent to someone. Without this, a link pasted
+ * into a chat or a timeline unfurls as the generic site title with no
+ * description — for the one artifact in this feature whose whole purpose is
+ * being shared, which makes the sharing worth less than the curation that went
+ * into it.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const c = await getCollectionBySlug(slug);
+  if (!c) return { title: "Collection not found - Aemulus" };
+  return {
+    title: `${c.title} - Aemulus`,
+    description: c.blurb || `Curated skills on Aemulus: ${c.title}.`,
+    openGraph: {
+      title: `${c.title} - Aemulus`,
+      description: c.blurb || `Curated skills on Aemulus: ${c.title}.`,
+    },
+  };
+}
+
+/**
  * One curated collection.
  *
  * The slug existed before this page did: it was stored, uniquely indexed and

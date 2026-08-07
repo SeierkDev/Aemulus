@@ -20,6 +20,12 @@ import { isVerified } from "@/lib/moderation";
 
 export const dynamic = "force-dynamic";
 
+export const metadata = {
+  title: "Skill marketplace - Aemulus",
+  description:
+    "Skills published by the community. Run any of them on your own inputs, no recording required.",
+};
+
 export default async function MarketPage({
   searchParams,
 }: {
