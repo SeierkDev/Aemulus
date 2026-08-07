@@ -3,6 +3,7 @@ import { requireAccess } from "@/lib/auth";
 import { logError } from "@/lib/log";
 import { enforceRateLimit } from "@/lib/ratelimit";
 import { readJson, CollectionCreateBody } from "@/lib/validate";
+import { publishedSkillsByIds } from "@/lib/skills";
 import {
   createCollection,
   isCurator,
@@ -23,7 +24,32 @@ export async function GET() {
       listSpotlights(),
       listCollectionsWithSkills(),
     ]);
-    return NextResponse.json({ spotlights, collections });
+    // Resolved to something renderable. Returning bare ids meant any consumer —
+    // the docs example, an MCP client, anyone building on the API — had to make
+    // one more request per card before it could draw anything, which is not an
+    // endpoint so much as a lookup table.
+    const byId = await publishedSkillsByIds([
+      ...spotlights.map((s) => s.skillId),
+      ...collections.flatMap((c) => c.skillIds),
+    ]);
+    const card = (id: string) => {
+      const s = byId.get(id);
+      return s
+        ? { id: s.id, name: s.name, description: s.description, owner: s.owner, runCount: s.runCount }
+        : null;
+    };
+    return NextResponse.json({
+      spotlights: spotlights
+        .map((sp) => ({ ...card(sp.skillId), blurb: sp.blurb }))
+        .filter((sp) => sp.id),
+      collections: collections.map((c) => ({
+        slug: c.slug,
+        title: c.title,
+        blurb: c.blurb,
+        url: `/market/c/${c.slug}`,
+        skills: c.skillIds.map(card).filter(Boolean),
+      })),
+    });
   } catch (e) {
     logError("collections.list", e);
     return NextResponse.json({ error: "Failed to load collections" }, { status: 500 });

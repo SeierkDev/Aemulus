@@ -70,8 +70,20 @@ export function CuratedShelf({
       {collections.map((c) => (
         <section key={c.id}>
           <div className="flex items-baseline gap-3">
-            <h2 className="text-base font-semibold tracking-tight">{c.title}</h2>
+            {/* The heading is the link to the collection — a curated group you
+                cannot send someone to is most of the point missing. */}
+            <Link href={`/market/c/${c.slug}`} className="group/head">
+              <h2 className="text-base font-semibold tracking-tight group-hover/head:text-ink-2">
+                {c.title}
+              </h2>
+            </Link>
             {c.blurb && <p className="text-sm text-ink-2">{c.blurb}</p>}
+            <Link
+              href={`/market/c/${c.slug}`}
+              className="ml-auto font-mono text-[11px] uppercase tracking-[0.16em] text-ink-3 hover:text-ink-2"
+            >
+              All &rarr;
+            </Link>
           </div>
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {c.items.map((it) => (

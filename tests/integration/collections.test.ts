@@ -7,6 +7,7 @@ import {
   collectionSkillIds,
   createCollection,
   deleteCollection,
+  getCollectionBySlug,
   isCurator,
   listCollectionsWithSkills,
   listSpotlights,
@@ -288,5 +289,34 @@ describe("publishedSkillsByIds", () => {
     const got = await publishedSkillsByIds([a, a, draft, "skl_missing"]);
     expect([...got.keys()]).toEqual([a]);
     expect((await publishedSkillsByIds([])).size).toBe(0);
+  });
+});
+
+describe("a collection can be linked to", () => {
+  // The slug was stored and uniquely indexed from the start, and nothing
+  // resolved it — a collection was something you could be shown but never sent
+  // to. getCollectionBySlug backs /market/c/[slug].
+  it("resolves by slug, however the link was spelled", async () => {
+    const c = (await createCollection({ slug: "Crypto & Wallets", title: "Crypto" }))!;
+    expect(c.slug).toBe("crypto-wallets");
+    expect((await getCollectionBySlug("crypto-wallets"))?.id).toBe(c.id);
+    expect((await getCollectionBySlug("  CRYPTO-WALLETS "))?.id).toBe(c.id);
+  });
+
+  it("returns null for an unknown or unusable slug", async () => {
+    expect(await getCollectionBySlug("nope")).toBeNull();
+    expect(await getCollectionBySlug("!!!")).toBeNull();
+    expect(await getCollectionBySlug("")).toBeNull();
+  });
+
+  it("keeps curated order for the collection page", async () => {
+    const c = (await createCollection({ slug: "ord", title: "Ord" }))!;
+    const a = await makeSkill("A");
+    const b = await makeSkill("B");
+    const d = await makeSkill("D");
+    await addToCollection(c.id, d, 0);
+    await addToCollection(c.id, a, 1);
+    await addToCollection(c.id, b, 2);
+    expect(await collectionSkillIds(c.id)).toEqual([d, a, b]);
   });
 });
