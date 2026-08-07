@@ -303,6 +303,27 @@ function slugKey(s: string): string {
   return k || "value";
 }
 
+/**
+ * Drop a leading navigation that nothing depends on.
+ *
+ * The recorder's first step is whatever page the tab was showing when Start was
+ * pressed. If the very next thing is another navigation, that opening step did
+ * nothing — the user pressed Start on one tab and then went where they meant to
+ * go. Left in, it is a step that can fail, that shows up in the plan, and that
+ * makes every replay load an unrelated page first. Measured on real recordings:
+ * a skill for a Solscan page opened aemulusai.com as step 00 because that was
+ * the tab in front of the user when they clicked the extension.
+ *
+ * Only ever removes step 0, only when step 1 is also a navigate, and never when
+ * step 0 is the only step.
+ */
+export function dropDeadOpeningNavigation(skill: GeneralizedSkill): GeneralizedSkill {
+  const steps = skill.steps ?? [];
+  if (steps.length < 2) return skill;
+  if (steps[0].action !== "navigate" || steps[1].action !== "navigate") return skill;
+  return { ...skill, steps: steps.slice(1) };
+}
+
 export function markSecretFields(skill: GeneralizedSkill, demo: Demonstration): GeneralizedSkill {
   const sensitiveSelectors = new Set<string>();
   for (const a of demo.trace) {
@@ -400,5 +421,5 @@ ${traceForPrompt(demo)}
   const parsed = markSecretFields(GeneralizedSchema.parse(block.input) as GeneralizedSkill, demo);
   // Captures last: they are the user's exact intent and are spliced in from the
   // trace rather than produced by the model.
-  return restoreCaptures(parsed, demo);
+  return dropDeadOpeningNavigation(restoreCaptures(parsed, demo));
 }

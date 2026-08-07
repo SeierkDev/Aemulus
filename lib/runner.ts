@@ -252,6 +252,13 @@ export async function executeRun(
     const secretFieldKeys = new Set(
       skill.inputSchema.fields.filter((f) => f.secret).map((f) => f.key),
     );
+    // What each input field was when the task was demonstrated, for steps the
+    // run left blank. Secrets are excluded — see resolveValue.
+    const exampleFallbacks = new Map(
+      skill.inputSchema.fields
+        .filter((f) => !f.secret && typeof f.example === "string" && f.example.trim() !== "")
+        .map((f) => [f.key, f.example]),
+    );
     try {
       if (vaultHost && owner === skill.owner) {
         const creds = await resolveCredentials(owner, vaultHost);
@@ -333,7 +340,7 @@ export async function executeRun(
         break;
       }
 
-      const value = resolveValue(step, effInput);
+      const value = resolveValue(step, effInput, exampleFallbacks);
       const override = overrides[step.idx];
       const shotFile = `step-${String(step.idx).padStart(4, "0")}.png`;
       const shotRel = path.posix.join("recordings", owner, runId, shotFile);
@@ -804,8 +811,34 @@ async function conditionMet(
   return cond.kind === "exists" ? present : !present;
 }
 
-function resolveValue(step: SkillStep, input: Record<string, string>): string {
-  if (step.valueSource === "input") return input[step.inputKey] ?? "";
+/**
+ * What a step actually types or navigates to.
+ *
+ * An input-bound step falls back to the example the DEMONSTRATION recorded when
+ * the run supplies nothing for that key. Without that fallback a freshly
+ * recorded skill does not run: generalization turns the URL you browsed to into
+ * an input, and a run that doesn't fill it in navigates to the empty string,
+ * which fails as "Invalid URL." before step 00 does anything. Recording a task
+ * and pressing Run has to reproduce the task — an input exists to let you
+ * CHANGE the value, not to make the skill unusable until you retype it.
+ *
+ * Two things it deliberately does not do:
+ *  - Secrets never fall back. A recorded password is redacted at capture time,
+ *    so there is nothing to fall back TO, and reaching for one would be exactly
+ *    the wrong instinct.
+ *  - A supplied value always wins, including a deliberate override. Only an
+ *    absent or blank one reaches for the example.
+ */
+export function resolveValue(
+  step: SkillStep,
+  input: Record<string, string>,
+  examples?: Map<string, string>,
+): string {
+  if (step.valueSource === "input") {
+    const given = input[step.inputKey];
+    if (given != null && given.trim() !== "") return given;
+    return examples?.get(step.inputKey) ?? given ?? "";
+  }
   if (step.valueSource === "constant") return step.value;
   return "";
 }
