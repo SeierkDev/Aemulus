@@ -98,6 +98,29 @@ export const PublishBody = z.object({ published: z.boolean() });
 
 export const ReportBody = z.object({ reason: z.string().max(500).optional() });
 
+// Curated collections + spotlights. Lengths mirror the caps in lib/collections.ts
+// so a body that would be silently truncated there is rejected here instead.
+export const CollectionCreateBody = z.object({
+  slug: z.string().min(1).max(60),
+  title: z.string().min(1).max(60),
+  blurb: z.string().max(200).optional(),
+  position: z.number().int().min(-9999).max(9999).optional(),
+});
+export const CollectionUpdateBody = z.object({
+  title: z.string().min(1).max(60).optional(),
+  blurb: z.string().max(200).optional(),
+  position: z.number().int().min(-9999).max(9999).optional(),
+});
+export const CollectionSkillBody = z.object({
+  skillId: z.string().min(1).max(64),
+  position: z.number().int().min(-9999).max(9999).optional(),
+});
+export const SpotlightBody = z.object({
+  skillId: z.string().min(1).max(64),
+  blurb: z.string().max(200).optional(),
+  position: z.number().int().min(-9999).max(9999).optional(),
+});
+
 export const OrgCreateBody = z.object({ name: z.string().min(1).max(80) });
 export const OrgMemberBody = z.object({
   wallet: z.string().min(32).max(64),

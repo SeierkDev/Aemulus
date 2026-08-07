@@ -246,6 +246,44 @@ CREATE TABLE IF NOT EXISTS skill_reports (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_skill_reports_uniq ON skill_reports(skill_id, reporter);
 
+-- Curated marketplace collections + editorial spotlights.
+--
+-- Membership is a pointer, never a copy: a collection stores skill ids and the
+-- read path re-checks that each one is still published. A skill that is
+-- unpublished by its owner, or taken down by reports, must not keep appearing
+-- because a curator once picked it.
+CREATE TABLE IF NOT EXISTS collections (
+  id         TEXT PRIMARY KEY,
+  slug       TEXT NOT NULL,
+  title      TEXT NOT NULL,
+  blurb      TEXT NOT NULL DEFAULT '',
+  position   INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_collections_slug ON collections(slug);
+CREATE INDEX IF NOT EXISTS idx_collections_pos ON collections(position, created_at);
+
+CREATE TABLE IF NOT EXISTS collection_skills (
+  collection_id TEXT NOT NULL,
+  skill_id      TEXT NOT NULL,
+  position      INTEGER NOT NULL DEFAULT 0,
+  created_at    INTEGER NOT NULL,
+  PRIMARY KEY (collection_id, skill_id)
+);
+CREATE INDEX IF NOT EXISTS idx_collection_skills_pos ON collection_skills(collection_id, position);
+
+-- The spotlight: a handful of skills with an editorial line, shown above the
+-- collections. Same pointer rule — publication is checked at read time.
+CREATE TABLE IF NOT EXISTS spotlights (
+  skill_id   TEXT PRIMARY KEY,
+  blurb      TEXT NOT NULL DEFAULT '',
+  position   INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_spotlights_pos ON spotlights(position, created_at);
+
 -- User star ratings/reviews for published skills (one per wallet per skill).
 CREATE TABLE IF NOT EXISTS ratings (
   id          TEXT PRIMARY KEY,

@@ -725,4 +725,39 @@ export const MIGRATIONS: Migration[] = [
     addColumns: [{ table: "run_steps", column: "repaired", def: "INTEGER NOT NULL DEFAULT 0" }],
   },
 
+  // 49 - curated collections + editorial spotlights for the marketplace.
+  {
+    id: 49,
+    name: "curated_collections",
+    statements: [
+      `CREATE TABLE IF NOT EXISTS collections (
+         id         TEXT PRIMARY KEY,
+         slug       TEXT NOT NULL,
+         title      TEXT NOT NULL,
+         blurb      TEXT NOT NULL DEFAULT '',
+         position   INTEGER NOT NULL DEFAULT 0,
+         created_at INTEGER NOT NULL,
+         updated_at INTEGER NOT NULL
+       );`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_collections_slug ON collections(slug);`,
+      `CREATE INDEX IF NOT EXISTS idx_collections_pos ON collections(position, created_at);`,
+      `CREATE TABLE IF NOT EXISTS collection_skills (
+         collection_id TEXT NOT NULL,
+         skill_id      TEXT NOT NULL,
+         position      INTEGER NOT NULL DEFAULT 0,
+         created_at    INTEGER NOT NULL,
+         PRIMARY KEY (collection_id, skill_id)
+       );`,
+      `CREATE INDEX IF NOT EXISTS idx_collection_skills_pos ON collection_skills(collection_id, position);`,
+      `CREATE TABLE IF NOT EXISTS spotlights (
+         skill_id   TEXT PRIMARY KEY,
+         blurb      TEXT NOT NULL DEFAULT '',
+         position   INTEGER NOT NULL DEFAULT 0,
+         created_at INTEGER NOT NULL,
+         updated_at INTEGER NOT NULL
+       );`,
+      `CREATE INDEX IF NOT EXISTS idx_spotlights_pos ON spotlights(position, created_at);`,
+    ],
+  },
+
 ];

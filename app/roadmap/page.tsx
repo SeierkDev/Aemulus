@@ -73,7 +73,8 @@ const ROADMAP: { phase: string; title: string; body: Item[] }[] = [
         done: true,
       },
       {
-        t: "Curated collections and editorial spotlights - full-text search and auto-categories already ship today.",
+        t: "Curated collections and editorial spotlights, so what is worth running is in front of you when you land instead of behind a search box you have to know what to type into. Full-text search and auto-categories already shipped.",
+        done: true,
       },
     ],
   },

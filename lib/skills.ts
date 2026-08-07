@@ -218,6 +218,33 @@ export async function listPublishedSkills(limit = 50): Promise<Skill[]> {
   return r.rows.map(rowToSkill);
 }
 
+/**
+ * Published skills by id, in ONE query, keyed for lookup.
+ *
+ * For the curated shelf, which knows the ids it wants and needs them ordered
+ * the way a curator chose rather than the way SQL feels like returning them —
+ * so this hands back a Map and lets the caller do the ordering. Republishes the
+ * `published = 1` filter rather than trusting the caller's ids.
+ */
+export async function publishedSkillsByIds(ids: string[]): Promise<Map<string, Skill>> {
+  await ready();
+  const out = new Map<string, Skill>();
+  // Bounded: the placeholder list goes straight into the SQL, so a caller that
+  // one day hands over a huge id array must not be able to build a huge query.
+  const unique = [...new Set(ids.filter(Boolean))].slice(0, 1000);
+  if (!unique.length) return out;
+  const holes = unique.map(() => "?").join(",");
+  const r = await db.execute({
+    sql: `SELECT * FROM skills WHERE published = 1 AND id IN (${holes})`,
+    args: unique,
+  });
+  for (const row of r.rows) {
+    const s = rowToSkill(row);
+    out.set(s.id, s);
+  }
+  return out;
+}
+
 /** Total number of published skills on the platform. */
 export async function countPublishedSkills(): Promise<number> {
   await ready();
