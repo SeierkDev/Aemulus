@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Badge } from "@/components/ui";
+import { Badge, Card } from "@/components/ui";
 import { Nav } from "@/components/Nav";
-import { MarketBrowser, type MarketItem } from "@/components/MarketBrowser";
+import { type MarketItem } from "@/components/MarketBrowser";
+import { Stars } from "@/components/Stars";
 import {
   publishedSkillsByIds,
   categorize,
@@ -85,7 +86,34 @@ export default async function CollectionPage({
             Nothing in this collection is published right now.
           </p>
         ) : (
-          <MarketBrowser items={items} />
+          // A plain grid, deliberately, not MarketBrowser. Its search box
+          // navigates to /market — on this page a single keystroke would throw
+          // you out of the collection you were reading. A curated set of at most
+          // two dozen skills does not need a search box anyway.
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {items.map((it) => (
+              <Link key={it.id} href={`/market/${it.id}`} className="group">
+                <Card className="h-full p-4 transition-colors group-hover:border-ink-3">
+                  <div className="flex items-baseline gap-2">
+                    <h3 className="text-sm font-semibold tracking-tight">{it.name}</h3>
+                    {it.verified && (
+                      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3">
+                        verified
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-ink-2">
+                    {it.description}
+                  </p>
+                  <div className="mt-3 flex items-center gap-3 text-xs text-ink-3">
+                    <Stars value={it.avgStars} />
+                    <span className="font-mono">{it.category}</span>
+                    <span className="font-mono">{it.runCount} runs</span>
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
         )}
       </div>
       <div className="py-10" />
