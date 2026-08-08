@@ -147,7 +147,16 @@ declare global {
 export function startRunActivity(): void {
   if (!runActivityEnabled() || globalThis.__aemRunActivity) return;
   const ms = Math.max(60_000, Number(process.env.AEMULUS_ACTIVITY_RUNS_MS) || 3_600_000);
-  setTimeout(() => void runActivityTick(Date.now()), 10_000);
-  globalThis.__aemRunActivity = setInterval(() => void runActivityTick(Date.now()), ms);
+  // .catch, not `void`. A voided promise that rejects is an UNHANDLED REJECTION,
+  // which Node terminates the process for — so a transient database blip inside
+  // a cosmetic activity ticker would take down the API, the job worker and every
+  // in-flight run with it. `await ready()` at the top of the tick sits outside
+  // every try/catch in there, which is exactly the call most likely to reject.
+  setTimeout(() => {
+    runActivityTick(Date.now()).catch((e) => logError("runs.activity.tick", e));
+  }, 10_000);
+  globalThis.__aemRunActivity = setInterval(() => {
+    runActivityTick(Date.now()).catch((e) => logError("runs.activity.tick", e));
+  }, ms);
   logInfo("runs.activity", `started (${ms}ms tick)`);
 }

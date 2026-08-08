@@ -83,6 +83,10 @@ declare global {
 export function startApActivity(): void {
   if (!apActivityEnabled() || globalThis.__aemApActivity) return;
   const ms = Math.max(5_000, Number(process.env.AEMULUS_AP_ACTIVITY_MS) || 60_000);
-  globalThis.__aemApActivity = setInterval(() => void runApActivityTick(Date.now()), ms);
+  // See lib/run-activity.ts: a voided rejection ends the process, and this tick
+  // is decorative.
+  globalThis.__aemApActivity = setInterval(() => {
+    runApActivityTick(Date.now()).catch((e) => logError("ap.activity.tick", e));
+  }, ms);
   logInfo("ap.activity", `started (${ms}ms tick)`);
 }

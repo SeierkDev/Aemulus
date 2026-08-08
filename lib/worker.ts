@@ -147,7 +147,11 @@ declare global {
 /** Start the job worker (idempotent; HMR-safe via globalThis). */
 export function startJobWorker(): void {
   if (globalThis.__aemWorker) return;
-  globalThis.__aemWorker = setInterval(() => void tick(), TICK_MS);
+  // tick() guards its own body, but the catch is kept here too: a reject from
+  // anything added ahead of that try later would otherwise end the process.
+  globalThis.__aemWorker = setInterval(() => {
+    tick().catch((e) => logError("worker.tick", e));
+  }, TICK_MS);
   // Recover anything stranded by a previous process immediately on boot.
   void recoverStuckJobs(Date.now(), STALE_MS)
     .then((n) => {

@@ -124,10 +124,13 @@ export function startScheduler(): void {
   if (globalThis.__aemScheduler) return;
   const tickMs = Math.max(1000, Number(process.env.AEMULUS_SCHEDULER_MS) || 60_000);
   globalThis.__aemScheduler = setInterval(() => {
-    void runDue();
+    // Both are caught rather than voided. An unhandled rejection terminates the
+    // process, and the scheduler is the last thing that should be able to do
+    // that — it is what keeps every watch and schedule alive.
+    runDue().catch((e) => logError("scheduler.tick", e));
     // Rides the same tick rather than owning a timer: it is rate-limited by a
     // per-chat timestamp, so a frequent tick costs one indexed query.
-    void sweepDigests();
+    sweepDigests().catch((e) => logError("scheduler.digests", e));
   }, tickMs);
   logInfo("scheduler", `started (${tickMs}ms tick)`);
 }
