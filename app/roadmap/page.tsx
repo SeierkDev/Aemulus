@@ -41,7 +41,8 @@ const ROADMAP: { phase: string; title: string; body: Item[] }[] = [
         done: true,
       },
       {
-        t: "Micro-VM isolation per run, adding a kernel-level boundary on top of the process-level one that ships today.",
+        t: "Micro-VM isolation per run: a run's browser executes inside a VM with its own kernel, adding a kernel-level boundary beneath the process-level one. Which boundary a run actually got is recorded in its receipt rather than assumed, and there is a mode that refuses to run at all rather than quietly fall back to the weaker one.",
+        done: true,
       },
       // Split for the same reason as the isolation entry above. What ships is
       // the batch bundle - the Merkle root, every leaf hash and every proof -
