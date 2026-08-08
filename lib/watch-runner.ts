@@ -2,6 +2,7 @@ import { getWatch, setWatchState } from "./schedules";
 import type { WatchState } from "./watches";
 import { evaluate, evaluateFailure, type WatchDecision } from "./watches";
 import { logError, logInfo } from "./log";
+import { fireWatchAction, shouldAlert } from "./watch-action";
 import type { Run, WatchNotify } from "./types";
 
 /**
@@ -116,6 +117,23 @@ export async function evaluateWatchForRun(
 
     const muted = watch.mutedUntil != null && watch.mutedUntil > now;
 
+    /**
+     * Is this the first check this watch has ever completed?
+     *
+     * "changed" already refuses to fire without a baseline — the comment in
+     * watches.ts says alerting then would fire for every new watch. The
+     * threshold ops never consult the baseline at all, which is defensible for
+     * a MESSAGE ("it is already below 5, you should know") and is not
+     * defensible for an ACTION: creating a watch on a page whose condition is
+     * already true would immediately run a skill, spend a run, and do something
+     * on the owner's behalf before anything had actually happened. So the alert
+     * behaviour is left exactly as it was, and only the action waits for a
+     * second check. With alsoAlert:false the message comes back anyway, because
+     * fired.ran stays false — nothing done and nothing said is the one outcome
+     * to avoid.
+     */
+    const firstCheck = watch.state.lastValue === null;
+
     // Muting is not pausing: the check still runs and lastValue still moves, so
     // /watches keeps telling the truth about what the page says right now.
     //
@@ -142,18 +160,54 @@ export async function evaluateWatchForRun(
     if (lifted && !decision.broken) {
       const from = watch.state.mutedFrom ?? null;
       const to = decision.state.lastValue ?? "";
-      if (from !== to) {
-        await sink.changed({
-          scheduleId: run.scheduleId,
-          owner: watch.owner,
-          runId: run.id,
-          skillId: run.skillId,
-          key: watch.rule.key,
-          notify: watch.notify,
-          at: now,
-          from,
-          to,
-        });
+      // Judged by the RULE, not by raw difference.
+      //
+      // This used to alert whenever the two strings differed, which is right
+      // for "tell me when it changes" and wrong for every threshold: a watch
+      // for "above 100" reported 50 → 60 as its event, purely because a mute
+      // had lapsed. Re-running the evaluator against the value from before the
+      // quiet asks the actual question — did it CROSS — with one reading in
+      // place of the many that were skipped.
+      const across =
+        run.status === "completed" && typeof raw === "string"
+          ? evaluate(
+              watch.rule,
+              { ...watch.state, lastValue: from, pendingValue: null, pendingCount: 0 },
+              raw,
+              now,
+            )
+          : null;
+      if (across ? across.notify : from !== to) {
+        // And the ACTION fires here too. It did not, so a watch that was muted
+        // over the weekend came back, said the thing had happened, and never
+        // did the thing — with the new baseline already persisted above, so the
+        // next check saw no change and the action for that event was gone for
+        // good. With alsoAlert:false it was the exact inverse of what the owner
+        // asked for: the message they turned off, and none of the work.
+        const fired =
+          from === null
+            ? ({ ran: false, reason: "no baseline from before the quiet" } as const)
+            : await fireWatchAction({
+                action: watch.action,
+                owner: watch.owner,
+                watchedSkillId: run.skillId,
+                key: watch.rule.key,
+                value: to,
+                scheduleId: run.scheduleId,
+              });
+        if (shouldAlert(watch.action) || !fired.ran) {
+          await sink.changed({
+            scheduleId: run.scheduleId,
+            owner: watch.owner,
+            runId: run.id,
+            skillId: run.skillId,
+            key: watch.rule.key,
+            notify: watch.notify,
+            at: now,
+            from,
+            to,
+          });
+        }
         return decision;
       }
       // Nothing net changed across the quiet, so there is no event to report —
@@ -172,9 +226,31 @@ export async function evaluateWatchForRun(
         at: now,
       };
       if (decision.broken) {
+        // A failing watch never triggers anything. "The check could not read the
+        // value" is the one state where acting on it is exactly wrong.
         await sink.broken({ ...base, note: decision.note ?? "This watch is failing." });
       } else {
-        await sink.changed({ ...base, from: decision.from ?? null, to: decision.to ?? "" });
+        // The action fires on a real change, on the same events and under the
+        // same cooldown as the message. It is awaited so the run row exists
+        // before the alert names it, and it never throws.
+        const fired = firstCheck
+          ? ({ ran: false, reason: "first check — no baseline yet" } as const)
+          : await fireWatchAction({
+          action: watch.action,
+          owner: watch.owner,
+          watchedSkillId: run.skillId,
+          key: watch.rule.key,
+          value: decision.to ?? "",
+          scheduleId: run.scheduleId,
+        });
+        if (shouldAlert(watch.action)) {
+          await sink.changed({ ...base, from: decision.from ?? null, to: decision.to ?? "" });
+        } else if (!fired.ran) {
+          // The owner asked for the action INSTEAD of the message. If the action
+          // did not happen, silence would be the worst of both — nothing done
+          // and nothing said — so the message comes back for that case only.
+          await sink.changed({ ...base, from: decision.from ?? null, to: decision.to ?? "" });
+        }
       }
     }
     return decision;

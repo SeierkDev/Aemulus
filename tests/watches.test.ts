@@ -227,3 +227,53 @@ describe("a watch that could not run at all", () => {
     expect(told.lastAlertAt).toBeUndefined();
   });
 });
+
+describe("a threshold fires on the crossing, not for as long as it holds", () => {
+  const rule = { key: "dev", op: "below" as const, value: "5" };
+  const fresh = () => ({ lastValue: null as string | null, failStreak: 0 });
+
+  it("reports a page that already meets the rule, once", () => {
+    // Losing this would be a real loss, and it is the behaviour people have.
+    const d = evaluate(rule, fresh(), "4.2%", 1000);
+    expect(d.notify).toBe(true);
+  });
+
+  it("stays quiet while it keeps meeting it", () => {
+    // "below 5" used to match every check, so an hourly watch sent 24 identical
+    // messages a day — and once a watch could act, ran the skill 24 times.
+    let state = evaluate(rule, fresh(), "4.2%", 1000).state;
+    for (const v of ["4.1%", "4.3%", "4.0%"]) {
+      const d = evaluate(rule, state, v, 2000);
+      expect(d.notify).toBe(false);
+      state = d.state;
+    }
+  });
+
+  it("fires again after it goes back over and crosses down once more", () => {
+    let state = evaluate(rule, fresh(), "4.2%", 1000).state;
+    state = evaluate(rule, state, "6.0%", 2000).state; // back above
+    const d = evaluate(rule, state, "4.4%", 3000); // crosses again
+    expect(d.notify).toBe(true);
+  });
+
+  it("does the same for above", () => {
+    const above = { key: "n", op: "above" as const, value: "100" };
+    let state = evaluate(above, fresh(), "120", 1000).state;
+    expect(evaluate(above, state, "130", 2000).notify).toBe(false);
+    state = evaluate(above, state, "90", 3000).state;
+    expect(evaluate(above, state, "150", 4000).notify).toBe(true);
+  });
+
+  it("does the same for contains", () => {
+    const c = { key: "s", op: "contains" as const, value: "shipped" };
+    let state = evaluate(c, fresh(), "order shipped", 1000).state;
+    expect(evaluate(c, state, "order shipped today", 2000).notify).toBe(false);
+    state = evaluate(c, state, "order packed", 3000).state;
+    expect(evaluate(c, state, "order shipped", 4000).notify).toBe(true);
+  });
+
+  it("an unreadable previous value does not swallow a real crossing", () => {
+    const state = { lastValue: "n/a", failStreak: 0 };
+    expect(evaluate(rule, state, "4.2%", 1000).notify).toBe(true);
+  });
+});

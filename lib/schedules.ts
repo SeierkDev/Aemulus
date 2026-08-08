@@ -2,6 +2,7 @@ import { db, ready } from "./db";
 import { id } from "./ids";
 import { decryptJSON, encryptJSON } from "./encrypt";
 import { emptyState, type WatchRule, type WatchState } from "./watches";
+import { DEFAULT_ACTION, parseAction, type WatchAction } from "./watch-action";
 import type { Cadence, Schedule, WatchNotify } from "./types";
 
 const HOUR = 60 * 60 * 1000;
@@ -277,10 +278,12 @@ export async function getWatch(scheduleId: string): Promise<{
   notify: WatchNotify | null;
   /** Quiet until this timestamp. Checks still run. */
   mutedUntil: number | null;
+  /** What to DO when the rule fires. Alert-only unless set. */
+  action: WatchAction;
 } | null> {
   await ready();
   const r = await db.execute({
-    sql: `SELECT owner, watch_rule, watch_state, notify, muted_until FROM schedules WHERE id = ?`,
+    sql: `SELECT owner, watch_rule, watch_state, notify, muted_until, watch_action FROM schedules WHERE id = ?`,
     args: [scheduleId],
   });
   const row = r.rows[0];
@@ -297,6 +300,10 @@ export async function getWatch(scheduleId: string): Promise<{
     notify:
       row.notify == null ? null : safeJson<WatchNotify | null>(String(row.notify), null),
     mutedUntil: row.muted_until == null ? null : Number(row.muted_until),
+    action:
+      row.watch_action == null
+        ? DEFAULT_ACTION
+        : parseAction(safeJson<unknown>(String(row.watch_action), null)),
   };
 }
 
@@ -340,7 +347,45 @@ export async function muteUntil(
   return r.rowsAffected > 0;
 }
 
-/** Attach or replace the watch rule on a schedule. */
+/** Set what a watch does when it fires. Alert-only clears the stored action. */
+export async function setWatchAction(
+  scheduleId: string,
+  owner: string,
+  action: WatchAction,
+): Promise<boolean> {
+  await ready();
+  const r = await db.execute({
+    sql: `UPDATE schedules SET watch_action = ? WHERE id = ? AND owner = ?`,
+    args: [action.kind === "alert" ? null : JSON.stringify(action), scheduleId, owner],
+  });
+  return r.rowsAffected > 0;
+}
+
+/**
+ * Change only where a watch's alerts go.
+ *
+ * Separate from setWatch because that one deliberately resets the baseline — a
+ * NEW RULE has to start from a clean slate. Moving alerts to a different chat
+ * is not a new rule, and routing it through setWatch made /here wipe what the
+ * page last said: the next check then had nothing to compare against, so a
+ * change that happened while the person was setting the chat up was recorded as
+ * the new normal and never reported. Silently, and at the exact moment they were
+ * adding people to watch it.
+ */
+export async function setWatchNotify(
+  scheduleId: string,
+  owner: string,
+  notify: WatchNotify | null,
+): Promise<boolean> {
+  await ready();
+  const r = await db.execute({
+    sql: `UPDATE schedules SET notify = ? WHERE id = ? AND owner = ?`,
+    args: [notify ? JSON.stringify(notify) : null, scheduleId, owner],
+  });
+  return r.rowsAffected > 0;
+}
+
+/** Attach or replace the watch rule on a schedule. Resets the baseline. */
 export async function setWatch(
   scheduleId: string,
   owner: string,
@@ -397,5 +442,22 @@ function rowToSchedule(row: Record<string, unknown>): Schedule {
     lastRunAt: row.last_run_at == null ? null : Number(row.last_run_at),
     nextRunAt: Number(row.next_run_at),
     createdAt: Number(row.created_at),
+    watch: watchSummary(row),
+  };
+}
+
+/** The rule + action on a row, flattened for display. Null when not a watch. */
+function watchSummary(row: Record<string, unknown>): Schedule["watch"] {
+  if (row.watch_rule == null) return null;
+  const rule = safeJson<WatchRule | null>(String(row.watch_rule), null);
+  if (!rule || typeof rule.key !== "string") return null;
+  const action = row.watch_action == null
+    ? null
+    : parseAction(safeJson<unknown>(String(row.watch_action), null));
+  return {
+    key: rule.key,
+    op: String(rule.op ?? "changed"),
+    value: rule.value,
+    actionSkillId: action && action.kind === "run_skill" ? action.skillId : undefined,
   };
 }

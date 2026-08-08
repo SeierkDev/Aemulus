@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { SkillEditor } from "@/components/SkillEditor";
-import { getSkill, listSkillVersions, listSkills, skillAccess } from "@/lib/skills";
+import { getSkill, listSkillVersions, listSkills, skillAccess, templateTool } from "@/lib/skills";
+import { planHasChaining } from "@/lib/chain";
 import { listTriggers } from "@/lib/triggers";
 import { listMyOrgs } from "@/lib/orgs";
 import { getSession } from "@/lib/auth";
@@ -24,8 +25,19 @@ export default async function SkillPage({
     listMyOrgs(session.pubkey),
   ]);
   // Other skills this owner can chain to (exclude self).
-  const otherSkills = mine
-    .filter((s) => s.id !== id)
+  const others = mine.filter((s) => s.id !== id);
+  const otherSkills = others.map((s) => ({ id: s.id, name: s.name }));
+  // What a watch may actually TRIGGER, which is narrower.
+  //
+  // Chaining refuses a marketplace TEMPLATE (placeholder steps, nothing to
+  // replay) and a skill that itself chains (one level, so there is no recursion
+  // to bound). Offered anyway, one could be picked, saved without complaint,
+  // and then refused on every single fire — a watch that looked armed and could
+  // never do the thing it was made for. Kept as a separate list from the one
+  // above on purpose: the chain-step editor shows an ALREADY SAVED target by
+  // id, so filtering that list would draw an existing step as unset.
+  const triggerableSkills = others
+    .filter((s) => !templateTool(s) && !planHasChaining(s.plan))
     .map((s) => ({ id: s.id, name: s.name }));
   return (
     <SkillEditor
@@ -33,6 +45,7 @@ export default async function SkillPage({
       versions={versions}
       triggers={triggers}
       otherSkills={otherSkills}
+      triggerableSkills={triggerableSkills}
       myOrgs={myOrgs}
       isOwner={skill.owner === session.pubkey}
     />

@@ -7,6 +7,7 @@ import {
   countAllSchedules,
   listSchedules,
   setWatch,
+  setWatchAction,
   getWatch,
   MAX_ACTIVE_SCHEDULES,
   MAX_TOTAL_SCHEDULES,
@@ -14,6 +15,8 @@ import {
 } from "@/lib/schedules";
 import { computeTier, getAemulusBalance, watchLimitForLevel } from "@/lib/solana";
 import { readJson, WatchCreateBody } from "@/lib/validate";
+import { actionTargetProblem, parseAction } from "@/lib/watch-action";
+import { ruleFitsCapture, ruleIsUsable } from "@/lib/watches";
 import { logError } from "@/lib/log";
 
 export const runtime = "nodejs";
@@ -53,6 +56,13 @@ export async function GET(req: Request) {
       cadence: s.cadence,
       active: s.active,
       rule: w.rule,
+      // Surfaced because a watch that STARTS A SKILL is materially different
+      // from one that only messages, and a consumer had no way to tell them
+      // apart — including the one it just created itself.
+      action:
+        w.action && w.action.kind === "run_skill"
+          ? { kind: "run_skill", skillId: w.action.skillId }
+          : { kind: "alert" },
       lastValue: w.state.lastValue,
       mutedUntil: w.mutedUntil ?? null,
       lastRunAt: s.lastRunAt ?? null,
@@ -73,7 +83,7 @@ export async function POST(req: Request) {
   }
   const parsed = await readJson(req, WatchCreateBody);
   if (!parsed.ok) return parsed.res;
-  const { skillId, cadence, input, rule, notify } = parsed.data;
+  const { skillId, cadence, input, rule, notify, action } = parsed.data;
 
   const skill = await getSkill(skillId);
   if (!skill || (skill.owner !== auth.owner && !skill.published)) {
@@ -95,6 +105,22 @@ export async function POST(req: Request) {
         affordable,
       },
       { status: 403 },
+    );
+  }
+
+  // Refused BEFORE a schedule exists: an unsatisfiable rule would otherwise
+  // create a watch that runs every cadence and can never fire, which reads as
+  // "the page has not changed" rather than as the mistake it is.
+  if (!ruleFitsCapture(rule, skill.plan)) {
+    return NextResponse.json(
+      { error: `"${rule.key}" captures a list, so it cannot be compared as a number.` },
+      { status: 400 },
+    );
+  }
+  if (!ruleIsUsable(rule)) {
+    return NextResponse.json(
+      { error: `"${rule.op}" needs a value to compare against.` },
+      { status: 400 },
     );
   }
 
@@ -121,6 +147,28 @@ export async function POST(req: Request) {
   });
 
   const attached = await setWatch(id, auth.owner, rule, notify ?? null);
+  // Set before the failure check below: an unusable action must not leave a
+  // schedule that fires runs nothing reads, and the rollback path covers both.
+  if (attached && action && action.kind === "run_skill") {
+    const parsed = parseAction(action);
+    if (parsed.kind !== "run_skill") {
+      const { deleteSchedule } = await import("@/lib/schedules");
+      await deleteSchedule(id, auth.owner).catch(() => {});
+      return NextResponse.json(
+        { error: "A run_skill action needs a skillId." },
+        { status: 400 },
+      );
+    }
+    // Same principle as the rule above: an action the engine will always refuse
+    // makes a watch that fires, does nothing, and says so every cadence.
+    const problem = await actionTargetProblem(parsed.skillId, auth.owner, skillId);
+    if (problem) {
+      const { deleteSchedule } = await import("@/lib/schedules");
+      await deleteSchedule(id, auth.owner).catch(() => {});
+      return NextResponse.json({ error: problem }, { status: 400 });
+    }
+    await setWatchAction(id, auth.owner, parsed);
+  }
   if (!attached) {
     // Never leave a schedule firing runs that nothing reads. It would burn the
     // watch allowance every cadence and report nothing, forever.

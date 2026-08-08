@@ -292,14 +292,17 @@ export const OPENAPI: OpenApiDoc = {
       get: {
         summary: "List your watches",
         responses: {
-          200: { description: "Your watches, with each one's current value" },
+          200: {
+            description:
+              "Your watches, with each one's current value and whether it runs a skill when it fires",
+          },
           ...ERR,
         },
       },
       post: {
         summary: "Create a watch",
         description:
-          "A schedule plus the rule that reads its output, created together — a schedule with no rule burns the watch allowance every cadence and reports nothing. The cadence is checked against your tier first: an unaffordable one is refused, with the list you can sustain, rather than accepted and silently skipped.",
+          "A schedule plus the rule that reads its output, created together — a schedule with no rule burns the watch allowance every cadence and reports nothing. The cadence is checked against your tier first: an unaffordable one is refused, with the list you can sustain, rather than accepted and silently skipped. Optionally pass action:{kind:\"run_skill\",skillId} to run one of your skills when the rule fires, handed the value that fired it; it is metered against your daily run quota like any other run.",
         responses: {
           201: { description: "The watch" },
           403: {
@@ -325,7 +328,9 @@ export const OPENAPI: OpenApiDoc = {
         },
       },
       patch: {
-        summary: "Pause or resume a watch",
+        summary: "Pause, resume, or disarm a watch",
+        description:
+          'Send active to pause or resume. Send action:"alert" to stop it running a skill while leaving the watch and its baseline intact — deleting and recreating would lose the baseline, so the replacement stays quiet through the first real change. Either field alone is enough.',
         parameters: [
           { name: "id", in: "path", required: true, schema: { type: "string" } },
         ],

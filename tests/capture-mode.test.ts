@@ -175,7 +175,7 @@ describe("the extension announces itself", () => {
 
   it("ships as a new version", () => {
     const m = JSON.parse(readFileSync("extension/manifest.json", "utf8"));
-    expect(m.version).toBe("0.1.2");
+    expect(m.version).toBe("0.1.3");
   });
 });
 
@@ -535,7 +535,7 @@ describe("the name reaches the recorder while you type it", () => {
   const page = readFileSync("app/record/page.tsx", "utf8");
 
   it("posts the key on change, not only on toggle", () => {
-    expect(page).toMatch(/useEffect\([\s\S]{0,600}captureKey\.trim\(\)[\s\S]{0,400}\[captureKey, capturing\]/);
+    expect(page).toMatch(/useEffect\([\s\S]{0,900}captureKey\.trim\(\)[\s\S]{0,600}\[captureKey,[^\]]*capturing\]/);
   });
 
   it("debounces, rather than a request per keystroke", () => {
@@ -765,7 +765,10 @@ describe("the popup restoring itself", () => {
   it("restores the name from storage rather than overwriting it", () => {
     expect(popup).toMatch(/\$\("capturekey"\)\.value = c\.aemCaptureKey \|\| ""/);
     expect(popup).toMatch(/renderCapture\(!!c\.aemCapturing\)/);
-    expect(popup).toMatch(/"aemCaptureKey"\]/); // asked for in the get
+    // Asked for in the restore get. Matched loosely on purpose: pinning it to
+    // the end of the array broke the moment another key was added after it,
+    // which says nothing about whether the name is still restored.
+    expect(popup).toMatch(/storage\.local\.get\(\[[^\]]*"aemCaptureKey"/);
   });
 
   // Clearing on a popup opened while NOT recording is correct — there is
@@ -877,5 +880,36 @@ describe("renaming a capture in the skill editor", () => {
   // key can still be shortened rather than becoming uneditable.
   it("explains why, rather than silently clipping", () => {
     expect(editor).toMatch(/too long to pick in a Telegram watch/);
+  });
+});
+
+describe("both recorders can ask the same question", () => {
+  const read = (p: string) => readFileSync(p, "utf8");
+
+  it("the site recorder offers the rule, not only the name", () => {
+    // Which recorder you happened to use decided whether you could answer
+    // "when do you care" at all: the extension asked, the website did not.
+    const page = read("app/record/page.tsx");
+    expect(page).toMatch(/aria-label="Tell me when"/);
+    expect(page).toMatch(/OPS_NEEDING_VALUE\.includes\(captureOp as never\)/);
+  });
+
+  it("the rule reaches the page through the injected state", () => {
+    expect(read("lib/recorder.ts")).toMatch(/__aemWatchOp = o as string/);
+    expect(read("lib/recorder-inject.ts")).toMatch(/watchOp: w\.__aemWatchOp \|\| undefined/);
+  });
+
+  it("clears with the toggle, like the name", () => {
+    // Otherwise the next capture silently inherits the last one's condition.
+    expect(read("lib/recorder.ts")).toMatch(/this\.watchOp = on \? op : ""/);
+  });
+
+  it("the route only accepts operators the evaluator knows", () => {
+    // Derived from the evaluator's own list rather than a copy of it: a copy
+    // that gains an op stores rules nothing can satisfy, and one that loses an
+    // op silently discards a rule somebody set while recording.
+    const src = read("app/api/record/capture/route.ts");
+    expect(src).toMatch(/z\.enum\(WATCH_OPS\)/);
+    expect(src).toMatch(/import \{ WATCH_OPS \} from "@\/lib\/watches"/);
   });
 });

@@ -7,7 +7,12 @@ import {
   countAllSchedules,
   MAX_ACTIVE_SCHEDULES,
   MAX_TOTAL_SCHEDULES,
+  setWatch,
+  setWatchAction,
+  deleteSchedule,
 } from "@/lib/schedules";
+import { actionTargetProblem, parseAction } from "@/lib/watch-action";
+import { ruleFitsCapture, ruleIsUsable } from "@/lib/watches";
 import { readJson, ScheduleCreateBody } from "@/lib/validate";
 
 export const runtime = "nodejs";
@@ -21,7 +26,7 @@ export async function POST(req: Request) {
   }
   const parsed = await readJson(req, ScheduleCreateBody);
   if (!parsed.ok) return parsed.res;
-  const { skillId, cadence, input } = parsed.data;
+  const { skillId, cadence, input, rule, action } = parsed.data;
 
   const skill = await getSkill(skillId);
   if (!skill || (skill.owner !== session.pubkey && !skill.published)) {
@@ -51,5 +56,52 @@ export async function POST(req: Request) {
     level: session.level,
     tier: session.tier,
   });
-  return NextResponse.json({ id });
+
+  // A rule turns the schedule into a watch. If attaching it fails, the schedule
+  // is removed rather than left running checks nothing reads — that would burn
+  // the allowance every cadence and report nothing, forever.
+  if (rule) {
+    if (!ruleFitsCapture(rule, skill.plan)) {
+      await deleteSchedule(id, session.pubkey).catch(() => {});
+      return NextResponse.json(
+        { error: `"${rule.key}" captures a list, so it cannot be compared as a number.` },
+        { status: 400 },
+      );
+    }
+    if (!ruleIsUsable(rule)) {
+      await deleteSchedule(id, session.pubkey).catch(() => {});
+      return NextResponse.json(
+        { error: `"${rule.op}" needs something to compare against.` },
+        { status: 400 },
+      );
+    }
+    const attached = await setWatch(id, session.pubkey, rule, null);
+    if (!attached) {
+      await deleteSchedule(id, session.pubkey).catch(() => {});
+      return NextResponse.json({ error: "Could not attach the rule." }, { status: 500 });
+    }
+    if (action) {
+      const parsedAction = parseAction(action);
+      if (action.kind === "run_skill" && parsedAction.kind !== "run_skill") {
+        await deleteSchedule(id, session.pubkey).catch(() => {});
+        return NextResponse.json(
+          { error: "Choose a skill to run, or set the action back to alert only." },
+          { status: 400 },
+        );
+      }
+      if (parsedAction.kind === "run_skill") {
+        // Same principle as the rule above: an action the engine will always
+        // refuse makes a watch that fires, does nothing, and says so every
+        // cadence. The picker no longer offers these, but the route is what
+        // guarantees it.
+        const problem = await actionTargetProblem(parsedAction.skillId, session.pubkey, skillId);
+        if (problem) {
+          await deleteSchedule(id, session.pubkey).catch(() => {});
+          return NextResponse.json({ error: problem }, { status: 400 });
+        }
+      }
+      await setWatchAction(id, session.pubkey, parsedAction);
+    }
+  }
+  return NextResponse.json({ id, watching: !!rule });
 }

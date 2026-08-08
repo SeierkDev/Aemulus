@@ -15,15 +15,40 @@
  * you did not want, after which people mute it and never come back.
  */
 
-export type WatchOp =
-  | "changed"
-  | "equals"
-  | "contains"
-  | "not_contains"
-  | "above"
-  | "below"
-  | "appears"
-  | "disappears";
+/**
+ * A NOTE ON "appears" / "disappears".
+ *
+ * They compare the captured TEXT going empty or non-empty — not the element
+ * being added to or removed from the page. If the element is gone, the extract
+ * step cannot locate it, the run ends in needs_review, and evaluateWatchForRun
+ * treats that as a failed check, which is deliberate: a value missing because a
+ * login lapsed must not be reported as the value disappearing. That guard is
+ * worth more than the convenience, so the UI labels these as "starts/stops
+ * showing a value" rather than promising element-removal detection the runner
+ * cannot deliver.
+ */
+/**
+ * Every operator a rule may use — the one list.
+ *
+ * It was hand-copied into the zod schema for a skill save, the trace edge, the
+ * capture route and back into this file, four places that had to agree and
+ * nothing that made them. A copy that gains an op stores rules the evaluator
+ * cannot satisfy; a copy that loses one silently discards a rule somebody set.
+ * Consumers derive from this now, so drift is a type error rather than a
+ * behaviour.
+ */
+export const WATCH_OPS = [
+  "changed",
+  "equals",
+  "contains",
+  "not_contains",
+  "above",
+  "below",
+  "appears",
+  "disappears",
+] as const;
+
+export type WatchOp = (typeof WATCH_OPS)[number];
 
 export type WatchRule = {
   /** Which of the run's output keys to watch. */
@@ -122,31 +147,70 @@ export function parseNumber(s: string): number | null {
 }
 
 /** Does the value satisfy the rule, given what we saw last time? */
-function matches(rule: WatchRule, prev: string | null, next: string): boolean | null {
+/**
+ * Does one reading satisfy the rule, considered on its own?
+ *
+ * Null means inconclusive — the page gave us something that is not a number
+ * where a number was needed.
+ */
+function satisfies(rule: WatchRule, value: string): boolean | null {
   const operand = rule.value ?? "";
+  switch (rule.op) {
+    case "equals":
+      return value === normalize(operand);
+    case "contains":
+      return value.includes(normalize(operand));
+    case "not_contains":
+      return !value.includes(normalize(operand));
+    case "above":
+    case "below": {
+      const a = parseNumber(value);
+      const b = parseNumber(operand);
+      if (a === null || b === null) return null;
+      return rule.op === "above" ? a > b : a < b;
+    }
+    default:
+      return null;
+  }
+}
+
+/**
+ * Does the value satisfy the rule, given what we saw last time?
+ *
+ * The state predicates — above, below, equals, contains, not_contains — are
+ * EDGE-TRIGGERED: they fire when the reading starts satisfying the rule, not
+ * for as long as it keeps satisfying it. Comparing only the current reading
+ * meant "below 5" matched on every single check while the value stayed below
+ * five: an hourly watch sent twenty-four identical messages a day, and once a
+ * watch could ACT, it ran the skill twenty-four times a day. cooldownMs would
+ * have blunted that, but it defaults to none and no screen sets one, so the
+ * default behaviour was the broken one. It is also what the words say: "goes
+ * below" is a crossing, not a state.
+ *
+ * A missing baseline counts as NOT satisfied, so a watch created on a page that
+ * already meets the rule still reports it once — losing that would be a real
+ * loss, and it is the behaviour people already have. (The ACTION separately
+ * waits for a baseline; see watch-runner.)
+ */
+function matches(rule: WatchRule, prev: string | null, next: string): boolean | null {
   switch (rule.op) {
     case "changed":
       // No baseline yet is not a change. The first check establishes what
       // "normal" is; alerting on it would fire an alert for every new watch.
       return prev !== null && prev !== next;
-    case "equals":
-      return next === normalize(operand);
-    case "contains":
-      return next.includes(normalize(operand));
-    case "not_contains":
-      return !next.includes(normalize(operand));
     case "appears":
       return prev !== null && prev === "" && next !== "";
     case "disappears":
       return prev !== null && prev !== "" && next === "";
-    case "above":
-    case "below": {
-      const a = parseNumber(next);
-      const b = parseNumber(operand);
-      // Inconclusive: the page gave us something unparseable. Do not alert, and
-      // do not treat it as a threshold crossing in either direction.
-      if (a === null || b === null) return null;
-      return rule.op === "above" ? a > b : a < b;
+    default: {
+      const now = satisfies(rule, next);
+      if (now === null) return null; // inconclusive: change nothing
+      if (!now) return false;
+      // Inconclusive on the PREVIOUS reading is treated as not-satisfied: the
+      // alternative is swallowing a real crossing because the page was
+      // unreadable once.
+      const before = prev === null ? false : satisfies(rule, prev) === true;
+      return !before;
     }
   }
 }
@@ -245,4 +309,127 @@ export function evaluate(
       failStreak: 0,
     },
   };
+}
+
+/** Ops that compare against an operand the user has to supply. */
+export const OPS_NEEDING_VALUE: WatchOp[] = [
+  "equals",
+  "contains",
+  "not_contains",
+  "above",
+  "below",
+];
+
+/**
+ * Is this rule actually satisfiable?
+ *
+ * "below" with no number is not a stricter rule, it is a DEAD one: parseNumber
+ * returns null for an empty operand, matches() then answers inconclusive, and
+ * the watch runs every cadence forever without ever being able to fire. It
+ * looks armed on the schedules page and burns the watch allowance the whole
+ * time. Refusing it at the edge is the only place that can tell the difference,
+ * because by the time it is stored it is indistinguishable from a rule whose
+ * page is simply not changing.
+ */
+export function ruleIsUsable(rule: { op: WatchOp; value?: string }): boolean {
+  if (!OPS_NEEDING_VALUE.includes(rule.op)) return true;
+  return (rule.value ?? "").trim().length > 0;
+}
+
+/** Numeric comparisons — meaningless against a captured LIST. */
+export const NUMERIC_OPS: WatchOp[] = ["above", "below"];
+
+/**
+ * Does this rule make sense against the thing it watches?
+ *
+ * A loop capture stores every matching element as a JSON array, and
+ * parseNumber's regex happily finds the first number anywhere in that string —
+ * measured, ["42 items","7 items"] parses as 42. So "alert when below 5" on a
+ * list does not fail loudly, it silently watches whatever number happens to
+ * appear first and reports it as if it were the list. Wrong answers are worse
+ * than refusals, so the pairing is refused instead.
+ */
+export function ruleFitsCapture(
+  rule: { key: string; op: WatchOp | string },
+  steps: { action: string; outputKey?: string; loop?: boolean }[],
+): boolean {
+  if (!NUMERIC_OPS.includes(rule.op as WatchOp)) return true;
+  const step = (steps ?? []).find(
+    (s) => s.action === "extract" && (s.outputKey ?? "") === rule.key,
+  );
+  // Unknown key: not this function's call to make. The route already resolves
+  // the skill, and a key that matches no capture fails elsewhere.
+  return !step?.loop;
+}
+
+/**
+ * The rule in plain words, for a confirmation message.
+ *
+ * A watch created from a recorded rule behaves differently from the default
+ * "tell me when it changes", and saying which one is in force is the difference
+ * between a quiet watch working and a quiet watch looking broken.
+ */
+export function ruleSentence(rule: { key: string; op: string; value?: string }): string {
+  const k = rule.key;
+  switch (rule.op) {
+    case "above":
+      return `when ${k} goes above ${rule.value}`;
+    case "below":
+      return `when ${k} goes below ${rule.value}`;
+    case "equals":
+      return `when ${k} becomes "${rule.value}"`;
+    case "contains":
+      return `when ${k} contains "${rule.value}"`;
+    case "not_contains":
+      return `when ${k} stops containing "${rule.value}"`;
+    case "appears":
+      return `when ${k} starts showing a value`;
+    case "disappears":
+      return `when ${k} stops showing a value`;
+    default:
+      return `when ${k} is different from the time before`;
+  }
+}
+
+/**
+ * The rule a skill was recorded with, if any.
+ *
+ * A capture can carry the answer to "when do you care" from the moment it was
+ * made — the only moment the person is actually looking at the value. This
+ * turns that into a WatchRule so a watch can be created without asking the
+ * question again, out of context, days later.
+ *
+ * Returns null when nothing was recorded, which is every skill made before
+ * v0.1.3 and every capture the user did not put a rule on.
+ */
+export function recordedRule(
+  steps: { action: string; outputKey?: string; watchOp?: string; watchValue?: string }[],
+  /**
+   * Which capture the rule is wanted for.
+   *
+   * Without this it answers with the FIRST rule in the recording, whatever
+   * capture you are actually watching. Record two values with a rule each —
+   * price below 5, status equals sold — ask for the second, and you were handed
+   * the first; the key did not match, so it was thrown away and the watch
+   * silently became "tell me when it changes". Which is the exact loss this
+   * function exists to prevent, just one capture further in.
+   */
+  forKey?: string,
+): WatchRule | null {
+  const want = (forKey ?? "").trim();
+  for (const s of steps ?? []) {
+    if (s.action !== "extract") continue;
+    const key = (s.outputKey ?? "").trim();
+    if (want && key !== want) continue;
+    const op = (s.watchOp ?? "").trim() as WatchOp;
+    if (!key || !(WATCH_OPS as readonly string[]).includes(op)) continue;
+    const value = (s.watchValue ?? "").trim();
+    // An operand-taking op with no operand is not a rule, it is half of one.
+    // Falling back to "changed" keeps the capture useful instead of creating a
+    // watch that can never be satisfied.
+    const needsValue = OPS_NEEDING_VALUE.includes(op);
+    if (needsValue && !value) return { key, op: "changed" };
+    return needsValue ? { key, op, value } : { key, op };
+  }
+  return null;
 }

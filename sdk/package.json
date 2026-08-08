@@ -1,6 +1,6 @@
 {
   "name": "aemulus",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "TypeScript client for the Aemulus protocol: run browser-automation skills and verify their sealed receipts.",
   "license": "AGPL-3.0-or-later",
   "author": "SeierkDev",

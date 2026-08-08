@@ -34,6 +34,9 @@ export interface RecordedAction {
   screenshot?: string;
   /** For a capture: the key its value is stored under. */
   outputKey?: string;
+  /** For a capture: the watch rule set while recording (see SkillStep.watchOp). */
+  watchOp?: string;
+  watchValue?: string;
 }
 
 export type RecorderStatus =
@@ -110,6 +113,16 @@ export interface SkillStep {
   /** For "extract" steps: capture EVERY matching element into a list (in-skill
    *  loop over the DOM), not just the first. Output is a JSON array. */
   loop?: boolean;
+  /**
+   * For "extract" steps: the watch rule the user set WHILE RECORDING.
+   *
+   * Not used by the run — a run always just reads the value. It is the answer
+   * to "when do you care", captured at the only moment the person is actually
+   * looking at the number, so a watch built from this skill starts with the
+   * rule already filled in instead of asking again later out of context.
+   */
+  watchOp?: string;
+  watchValue?: string;
   /** For "run_skill" steps: the skill to invoke as a child run (composition). */
   subSkillId?: string;
   /** Human checkpoint: pause for a live takeover (e.g. a 2FA prompt). */
@@ -268,6 +281,16 @@ export interface Schedule {
   lastRunAt: number | null;
   nextRunAt: number;
   createdAt: number;
+  /**
+   * The watch on this schedule, when it has one.
+   *
+   * Carried on the list row because a schedule that is really a watch, and a
+   * watch that RUNS SOMETHING when it fires, were both indistinguishable from a
+   * plain scheduled run everywhere they were displayed. Something that spends
+   * quota and starts skills on your behalf has to be visible from the list you
+   * manage it in.
+   */
+  watch?: { key: string; op: string; value?: string; actionSkillId?: string } | null;
 }
 
 export interface Run {

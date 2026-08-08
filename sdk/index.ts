@@ -68,6 +68,23 @@ export interface WatchRule {
   cooldownMs?: number;
 }
 
+/**
+ * What a watch does when its rule fires.
+ *
+ * "alert" is the default and the only behaviour before v0.1.3: you get a
+ * message. "run_skill" runs another of your skills at that moment and hands it
+ * the value that fired the rule, which is the difference between being told
+ * about a claim window and being in it.
+ */
+export type WatchAction =
+  | { kind: "alert" }
+  | {
+      kind: "run_skill";
+      skillId: string;
+      /** Send the message as well. Defaults to true. */
+      alsoAlert?: boolean;
+    };
+
 export interface Watch {
   id: string;
   skillId?: string;
@@ -75,6 +92,8 @@ export interface Watch {
   cadence?: Cadence;
   active?: boolean;
   rule: WatchRule;
+  /** What happens when the rule fires. Always present; "alert" when unset. */
+  action?: WatchAction;
   /** What the page said at the last successful check. */
   lastValue?: string | null;
   /** Consecutive failed checks. A watch reports itself broken at three. */
@@ -321,6 +340,8 @@ export class Aemulus {
     rule: WatchRule;
     input?: Record<string, string>;
     notify?: { channel: "telegram"; chatId: string; redact?: boolean } | null;
+    /** Run one of your skills when the rule fires, instead of only messaging. */
+    action?: WatchAction;
   }): Promise<{ id: string; cadence: Cadence; rule: WatchRule }> {
     return this.call("/api/v1/watches", {
       method: "POST",
@@ -344,6 +365,19 @@ export class Aemulus {
     return this.call(`/api/v1/watches/${id}`, {
       method: "PATCH",
       body: JSON.stringify({ active }),
+    });
+  }
+
+  /**
+   * Stop a watch running a skill, without touching the watch itself.
+   *
+   * Deleting and recreating would lose the baseline, so the replacement stays
+   * quiet through the first real change — exactly the one you were watching for.
+   */
+  clearWatchAction(id: string): Promise<{ id: string; action: "alert" }> {
+    return this.call(`/api/v1/watches/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ action: "alert" }),
     });
   }
 

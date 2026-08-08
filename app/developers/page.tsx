@@ -242,22 +242,28 @@ const { valid, bound } = await aemulus.verifyDisclosure(d);
             </div>
           </Step>
 
-          <Step n={7} title="Watch a page and be told when it changes">
+          <Step n={7} title="Watch a page, and do something when it moves">
             A watch is a schedule plus the rule that reads its output, created
             together. The cadence is checked against your tier before the watch
             exists - an unaffordable one is refused with the list you can
-            sustain, rather than accepted and then silently skipped.
+            sustain, rather than accepted and then silently skipped. A rule can
+            do more than &ldquo;changed&rdquo;, and when it fires it can run
+            another of your skills rather than only messaging you.
             <div className="mt-3">
               <CodeBlock
                 title="watches"
                 code={`const w = await aemulus.createWatch({
   skillId: "skl_…",
   cadence: "every30m",
-  rule: { key: "price", op: "changed" },
+  rule: { key: "dev_holding", op: "below", value: "5" },
+  // Optional: run a skill at that moment, handed the value that fired it.
+  // Metered against your daily run quota like any other run.
+  action: { kind: "run_skill", skillId: "skl_exit" },
 });
 
-await aemulus.listWatches();          // current value + last checked
+await aemulus.listWatches();                // value, last checked, its action
 await aemulus.setWatchActive(w.id, false);  // pause, keeps its history
+await aemulus.clearWatchAction(w.id);       // stop it running the skill
 await aemulus.deleteWatch(w.id);`}
               />
             </div>

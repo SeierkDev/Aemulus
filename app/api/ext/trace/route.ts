@@ -3,6 +3,11 @@ import { apiKeyAuth } from "@/lib/api-keys";
 import { createDemonstration } from "@/lib/demonstrations";
 import { logError } from "@/lib/log";
 import type { RecordedAction, ActionType } from "@/lib/types";
+import { WATCH_OPS } from "@/lib/watches";
+
+/** Ops a capture may be recorded with. Anything else is dropped rather than
+ *  stored, so a client cannot invent an operator the evaluator does not know. */
+const KNOWN_OPS = new Set<string>(WATCH_OPS);
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -74,6 +79,11 @@ export async function POST(req: Request) {
           // slug of the element's label and looks like the naming field is
           // broken rather than unread.
           outputKey: str(a.outputKey, 120),
+          // The watch rule set while recording. Dropping it here would not lose
+          // the capture, only the answer to "when do you care" — which is the
+          // whole point of asking at record time rather than later.
+          watchOp: KNOWN_OPS.has(String(a.watchOp)) ? String(a.watchOp) : undefined,
+          watchValue: str(a.watchValue, 2000),
         };
       });
 

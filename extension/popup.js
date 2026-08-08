@@ -29,12 +29,19 @@ function setRecState(recording) {
  * box, which is empty on open because nothing had filled it in yet. So looking
  * at the popup erased the name you had typed.
  */
+/** The operand box only makes sense for the ops that compare against something. */
+function needsOperand(op) {
+  return ["equals", "contains", "not_contains", "above", "below"].includes(op);
+}
+
 function renderCapture(on) {
   const b = $("capture");
   b.textContent = on ? "Capturing — click the value" : "Capture a value";
   b.classList.toggle("primary", on);
   $("capturehint").style.display = on ? "block" : "none";
   $("capturekey").style.display = on ? "block" : "none";
+  $("rulerow").style.display = on ? "flex" : "none";
+  $("ruleval").style.display = on && needsOperand($("ruleop").value) ? "block" : "none";
 }
 
 /** Draw AND persist. Only for an actual change the user made. */
@@ -43,6 +50,10 @@ function setCaptureState(on) {
   chrome.storage.local.set({
     aemCapturing: !!on,
     aemCaptureKey: on ? $("capturekey").value.trim() : "",
+    // The rule travels with the capture. Cleared when capture mode goes off so
+    // the next capture cannot silently inherit the last one's condition.
+    aemWatchOp: on ? $("ruleop").value : "",
+    aemWatchValue: on ? $("ruleval").value.trim() : "",
   });
 }
 function status(text) { $("status").textContent = text; }
@@ -137,18 +148,35 @@ $("capturekey").addEventListener("input", () => {
   });
 });
 
+// Changing the rule mid-capture updates it for the NEXT click, matching how the
+// name field already behaves — otherwise you would have to toggle capture off
+// and on again to correct a condition.
+$("ruleop").addEventListener("change", () => {
+  $("ruleval").style.display = needsOperand($("ruleop").value) ? "block" : "none";
+  chrome.storage.local.get("aemCapturing", (c) => {
+    if (c.aemCapturing) chrome.storage.local.set({ aemWatchOp: $("ruleop").value });
+  });
+});
+$("ruleval").addEventListener("input", () => {
+  chrome.storage.local.get("aemCapturing", (c) => {
+    if (c.aemCapturing) chrome.storage.local.set({ aemWatchValue: $("ruleval").value.trim() });
+  });
+});
+
 $("capture").addEventListener("click", () => {
   chrome.storage.local.get("aemCapturing", (c) => setCaptureState(!c.aemCapturing));
 });
 
-chrome.storage.local.get(["aemServer", "aemKey", "aemTitle", "aemRecording", "aemCapturing", "aemCaptureKey"], (c) => {
+chrome.storage.local.get(["aemServer", "aemKey", "aemTitle", "aemRecording", "aemCapturing", "aemCaptureKey", "aemWatchOp", "aemWatchValue"], (c) => {
   $("server").value = c.aemServer || "";
   $("key").value = c.aemKey || "";
   $("title").value = c.aemTitle || "";
   setRecState(!!c.aemRecording);
   if (c.aemRecording) {
-    // Restore, do not re-save: fill the box from storage first, then draw.
+    // Restore, do not re-save: fill the boxes from storage first, then draw.
     $("capturekey").value = c.aemCaptureKey || "";
+    $("ruleop").value = c.aemWatchOp || "";
+    $("ruleval").value = c.aemWatchValue || "";
     renderCapture(!!c.aemCapturing);
   }
   if (c.aemRecording) status("Recording — do your task, then Stop & save.");

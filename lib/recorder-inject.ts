@@ -15,6 +15,9 @@ export function recorderInitScript() {
     __aemCapture?: boolean;
     /** Name to give the next capture, if the user typed one. */
     __aemCaptureKey?: string;
+    /** The watch rule set alongside the name, if any. */
+    __aemWatchOp?: string;
+    __aemWatchValue?: string;
     top: Window;
   };
   if (w.top !== window || w.__aemAttached || !w.__aemRecord) return;
@@ -204,6 +207,9 @@ export function recorderInitScript() {
           value: secret ? "" : readValue(el),
           ...(secret ? { sensitive: true } : {}),
           outputKey: w.__aemCaptureKey || undefined,
+          // The rule set at the moment of the click, same as the extension.
+          watchOp: w.__aemWatchOp || undefined,
+          watchValue: w.__aemWatchOp && w.__aemWatchValue ? w.__aemWatchValue : undefined,
           text: ((el as HTMLElement).innerText || "").trim().slice(0, 80),
         });
         return;

@@ -24,6 +24,8 @@
   let recording = false;
   let capturing = false;
   let captureKey = "";
+  let watchOp = "";
+  let watchValue = "";
   // Same default as the cloud runner's AEMULUS_LOOP_MAX. A page with thousands
   // of rows must not turn one step into an unbounded payload.
   const LOOP_MAX = 500;
@@ -180,6 +182,11 @@
         value: secret ? "" : readValue(el, CAPTURE_PREVIEW_MAX),
         ...(secret ? { sensitive: true } : {}),
         outputKey: captureKey || undefined,
+        // The rule set at the moment of the click. Undefined when the user left
+        // it on "tell me when it changes", which is the existing behaviour and
+        // needs no rule stored.
+        watchOp: watchOp || undefined,
+        watchValue: watchOp && watchValue ? watchValue : undefined,
         text: (el.innerText || "").trim().slice(0, 80),
       });
       return;
@@ -224,10 +231,15 @@
     if (!capturing && outline) outline.style.display = "none";
   }
   try {
-    chrome.storage.local.get(["aemRecording", "aemCapturing", "aemCaptureKey"], (r) => {
-      setRecording(r && r.aemRecording);
-      setCapturing(r && r.aemCapturing, r && r.aemCaptureKey);
-    });
+    chrome.storage.local.get(
+      ["aemRecording", "aemCapturing", "aemCaptureKey", "aemWatchOp", "aemWatchValue"],
+      (r) => {
+        setRecording(r && r.aemRecording);
+        setCapturing(r && r.aemCapturing, r && r.aemCaptureKey);
+        watchOp = String((r && r.aemWatchOp) || "");
+        watchValue = String((r && r.aemWatchValue) || "");
+      },
+    );
     chrome.storage.onChanged.addListener((ch, area) => {
       if (area !== "local") return;
       if (ch.aemRecording) setRecording(ch.aemRecording.newValue);
@@ -236,6 +248,10 @@
       // page you are already looking at.
       if (ch.aemCapturing) setCapturing(ch.aemCapturing.newValue);
       if (ch.aemCaptureKey) captureKey = String(ch.aemCaptureKey.newValue || "");
+      // Same reason as the key: a rule edited in the popup has to reach the page
+      // you are already standing on, not the next one.
+      if (ch.aemWatchOp) watchOp = String(ch.aemWatchOp.newValue || "");
+      if (ch.aemWatchValue) watchValue = String(ch.aemWatchValue.newValue || "");
     });
   } catch { /* not in extension context */ }
 

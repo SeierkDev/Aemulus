@@ -430,6 +430,9 @@ export async function executeRun(
             owner,
             parentInput: effInput,
             parentOutputs: outputs,
+            // effInput carries vault-filled and author-marked-secret values.
+            // Naming them is what keeps them out of the child — see childInput.
+            secretKeys: new Set([...vaultKeys, ...secretFieldKeys]),
           });
           await page.screenshot({ path: shotPath }).catch(() => {});
           const chainNote =

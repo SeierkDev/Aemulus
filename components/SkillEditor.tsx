@@ -6,6 +6,7 @@ import { Button, Card, Label, cx } from "@/components/ui";
 import { RunPanel } from "@/components/RunPanel";
 import { BulkRunPanel } from "@/components/BulkRunPanel";
 import { SchedulePanel } from "@/components/SchedulePanel";
+import { OPS_NEEDING_VALUE } from "@/lib/watches";
 import { TriggerPanel } from "@/components/TriggerPanel";
 import { PublishToggle } from "@/components/PublishToggle";
 import { VersionHistory } from "@/components/VersionHistory";
@@ -37,6 +38,7 @@ export function SkillEditor({
   versions,
   triggers,
   otherSkills,
+  triggerableSkills,
   myOrgs,
   isOwner,
 }: {
@@ -44,6 +46,8 @@ export function SkillEditor({
   versions: SkillVersionMeta[];
   triggers: TriggerMeta[];
   otherSkills: { id: string; name: string }[];
+  /** Narrower than otherSkills: what a watch may actually trigger. */
+  triggerableSkills: { id: string; name: string }[];
   myOrgs: { id: string; name: string }[];
   isOwner: boolean;
 }) {
@@ -296,6 +300,10 @@ export function SkillEditor({
           <SchedulePanel
             skillId={initial.id}
             fields={initial.inputSchema.fields}
+            /* The live steps, not initial.plan: a rule you just added to a
+               capture should be offered without saving and reloading first. */
+            plan={steps}
+            otherSkills={triggerableSkills}
           />
         </div>
 
@@ -495,10 +503,74 @@ export function SkillEditor({
                       type="checkbox"
                       checked={!!s.loop}
                       aria-label={`Step ${i + 1} capture all matches`}
-                      onChange={(e) => patchStep(i, { loop: e.target.checked })}
+                      onChange={(e) =>
+                        patchStep(i, {
+                          loop: e.target.checked,
+                          // Turning this on takes the numeric rules away below,
+                          // and one already chosen would have stayed on the
+                          // step: the select showed blank because no option
+                          // matched, while the step still carried "above 100"
+                          // and the watch screen refused it later, about a rule
+                          // this screen was no longer showing.
+                          ...(e.target.checked &&
+                          (s.watchOp === "above" || s.watchOp === "below")
+                            ? { watchOp: undefined, watchValue: undefined }
+                            : {}),
+                        })
+                      }
                     />
                     capture all matching elements (list)
                   </label>
+                  {/* The rule set while recording. Every other field on this
+                      step is editable here; leaving this one out meant a rule
+                      that prefills the watch screen could not be found, checked
+                      or corrected from the place you would look for it. */}
+                  <div className="grid grid-cols-[160px_1fr] items-center gap-3">
+                    <span className="text-xs text-ink-3">tell me when it</span>
+                    <div className="flex gap-2">
+                      <select
+                        className={input}
+                        value={s.watchOp ?? ""}
+                        aria-label={`Step ${i + 1} watch rule`}
+                        onChange={(e) =>
+                          patchStep(i, {
+                            watchOp: e.target.value || undefined,
+                            // An operand left behind by a previous op would be
+                            // stored against one that ignores it, and would come
+                            // back the next time that op was picked.
+                            ...((OPS_NEEDING_VALUE as string[]).includes(e.target.value)
+                              ? {}
+                              : { watchValue: undefined }),
+                          })
+                        }
+                      >
+                        <option value="">changes (default)</option>
+                        {/* Not offered for a list capture: the value is a JSON
+                            array and a numeric compare reads the first number
+                            in it, silently. */}
+                        {!s.loop && (
+                          <>
+                            <option value="below">goes below</option>
+                            <option value="above">goes above</option>
+                          </>
+                        )}
+                        <option value="equals">equals</option>
+                        <option value="contains">contains</option>
+                        <option value="not_contains">stops containing</option>
+                        <option value="appears">starts showing a value</option>
+                        <option value="disappears">stops showing a value</option>
+                      </select>
+                      {(OPS_NEEDING_VALUE as string[]).includes(s.watchOp ?? "") && (
+                        <input
+                          className={input}
+                          value={s.watchValue ?? ""}
+                          aria-label={`Step ${i + 1} watch value`}
+                          placeholder="value"
+                          onChange={(e) => patchStep(i, { watchValue: e.target.value })}
+                        />
+                      )}
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="mt-3 grid grid-cols-[160px_1fr] items-center gap-3 pl-11">

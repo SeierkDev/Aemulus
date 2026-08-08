@@ -91,7 +91,7 @@ const ROADMAP: { phase: string; title: string; body: Item[] }[] = [
         t: "Full zk-SNARK proofs of execution - today runs already carry private, selective-disclosure receipts (prove any field without revealing the rest); next, prove a whole run followed its skill with zero knowledge.",
       },
       {
-        t: "Longer, branching multi-step pipelines with waits and conditionals - single-level skill chaining that passes one skill's outputs into another's inputs already ships today.",
+        t: "Longer, branching multi-step pipelines with waits and conditionals. A watch can already ACT rather than only alert - when its rule fires it runs the next skill and hands it the value that fired it. Waits and multi-level branches are what remain.",
       },
     ],
   },

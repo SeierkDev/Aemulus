@@ -246,6 +246,11 @@ export function restoreCaptures(skill: GeneralizedSkill, demo: Demonstration): G
         inputKey: "",
         key: "",
         outputKey: key,
+        // The rule the user set while they were looking at the value. Carried
+        // verbatim like the key itself — it is the person's intent, not the
+        // model's, so it is spliced in rather than generated.
+        ...(a.watchOp ? { watchOp: a.watchOp } : {}),
+        ...(a.watchValue ? { watchValue: a.watchValue } : {}),
       } as GeneralizedSkill["steps"][number],
     });
   }

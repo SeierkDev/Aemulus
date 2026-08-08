@@ -9,6 +9,7 @@ import {
   listSchedules,
   setScheduleActive,
   setWatch,
+  setWatchNotify,
   getWatch,
   muteUntil,
   cadenceLabel,
@@ -20,6 +21,13 @@ import { computeTier, getAemulusBalance, watchLimitForLevel } from "./solana";
 import { publicBaseUrl } from "./public-url";
 import { ALERT_PRESETS } from "./alert-pack";
 import { mdEscape, ownerForChat } from "./telegram";
+import {
+  recordedRule,
+  ruleFitsCapture,
+  ruleIsUsable,
+  ruleSentence,
+  type WatchRule,
+} from "./watches";
 import type { Cadence, Skill } from "./types";
 
 /**
@@ -146,6 +154,13 @@ export async function cmdWatches(owner: string): Promise<Reply> {
     const w = await getWatch(s.id);
     if (w) watches.push({ s, w });
   }
+  // What each action RUNS, not just that it runs something. An action can only
+  // be disarmed, never edited, so a line that will not name the skill leaves
+  // nothing anywhere that says what you armed.
+  const actionNames = new Map<string, string>();
+  if (watches.some(({ w }) => w.action?.kind === "run_skill")) {
+    for (const sk of await listSkills(owner)) actionNames.set(sk.id, sk.name);
+  }
   if (watches.length === 0) {
     return {
       text: [
@@ -169,7 +184,19 @@ export async function cmdWatches(owner: string): Promise<Reply> {
         : "";
     return [
       `*${i + 1}.  ${mdEscape(s.skillName)}*${s.active ? "" : "   (paused)"}${muted}`,
-      `Watching *${mdEscape(w.rule.key)}*, checked ${cadenceLabel(s.cadence).toLowerCase()}.`,
+      // The RULE, not just the key. "below 5" and "whenever it changes" are very
+      // different watches, and showing only the field made a stricter one look
+      // like a broken one — it is quiet either way.
+      `Watching: ${mdEscape(ruleSentence(w.rule))}, checked ${cadenceLabel(s.cadence).toLowerCase()}.`,
+      // Something that starts a run on your behalf must be visible in the list
+      // you manage it from.
+      ...(w.action && w.action.kind === "run_skill"
+        ? [
+            actionNames.has(w.action.skillId)
+              ? `Then it runs *${mdEscape(actionNames.get(w.action.skillId)!)}* for you.`
+              : "Then it runs a skill you can no longer open.",
+          ]
+        : []),
       value,
       seen,
     ].join("\n");
@@ -355,7 +382,10 @@ export async function cmdHere(owner: string, arg: string, chatId: string): Promi
   // `redact`, so a watch deliberately set to hide its value would start
   // publishing it — at the exact moment it moves into a group, where more
   // people are watching.
-  await setWatch(w.id, owner, watch.rule, {
+  // setWatchNotify, not setWatch: this only moves where alerts go, and setWatch
+  // resets the baseline. Going through it meant a change that happened while
+  // the chat was being set up was swallowed and recorded as the new normal.
+  await setWatchNotify(w.id, owner, {
     ...(watch.notify ?? {}),
     channel: "telegram",
     chatId,
@@ -627,12 +657,28 @@ export async function handleCallback(
       level: tier.level,
       tier: tier.name,
     });
-    await setWatch(
-      scheduleId,
-      owner,
-      { key, op: "changed" },
-      { channel: "telegram", chatId },
-    );
+    // The rule the user set WHILE RECORDING, when it is for the key they just
+    // picked. Without this, the answer given at the only moment they were
+    // looking at the value is thrown away here — on the surface most watches
+    // are actually created from — and every watch silently becomes
+    // "tell me when it changes".
+    //
+    // Held to the same two tests the site and the API apply before they will
+    // attach a rule. This surface used to check only the first one, so a
+    // numeric rule recorded against a capture that collects a LIST was refused
+    // with a 400 on the site and accepted here — and it is here that most
+    // watches are made. The comparison would not fail; it would compare the
+    // first number in the list and answer confidently about the wrong thing.
+    // Falling back to "changed" keeps the watch, loses only the unusable rule.
+    const fromRecording = recordedRule(skill.plan, key);
+    const rule: WatchRule =
+      fromRecording &&
+      fromRecording.key === key &&
+      ruleIsUsable(fromRecording) &&
+      ruleFitsCapture(fromRecording, skill.plan)
+        ? fromRecording
+        : { key, op: "changed" };
+    await setWatch(scheduleId, owner, rule, { channel: "telegram", chatId });
     return {
       text: [
         "*Watch created*",
@@ -640,7 +686,9 @@ export async function handleCallback(
         `I'll run *${mdEscape(skill.name)}* ${cad.label.toLowerCase()} and look at *${mdEscape(key)}*.`,
         `That's about ${cad.perDay} ${cad.perDay === 1 ? "run" : "runs"} a day out of your quota.`,
         "",
-        "You'll hear from me only when that value is different from the time before. The very first check has nothing to compare against, so it just records what's there now and stays quiet.",
+        rule.op === "changed"
+          ? "You'll hear from me only when that value is different from the time before. The very first check has nothing to compare against, so it just records what's there now and stays quiet."
+          : `You'll hear from me ${ruleSentence(rule)} — the rule you set while recording.`,
         "",
         "Send /watches any time to see it.",
       ].join("\n"),

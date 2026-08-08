@@ -760,4 +760,11 @@ export const MIGRATIONS: Migration[] = [
     ],
   },
 
+  // 50 - a watch can do something, not only say something.
+  {
+    id: 50,
+    name: "watch_action",
+    addColumns: [{ table: "schedules", column: "watch_action", def: "TEXT" }],
+  },
+
 ];

@@ -44,6 +44,31 @@ new Aemulus({ apiKey, baseUrl? })
 | `listSkills({ limit?, cursor? })` | One page of the published skill catalog |
 | `allSkills(pageSize?)` | Walk every page of the catalog, auto-following cursors |
 | `verify(runId)` | Verify a run's sealed receipt. Public, no API key required |
+| `createWatch({ skillId, cadence, rule, action?, input?, notify? })` | Check a page on a cadence and be told when the rule fires |
+| `listWatches()` / `getWatch(id)` | Every watch, with its current value, failure streak and action |
+| `setWatchActive(id, active)` | Pause or resume. A paused watch keeps everything it has learned |
+| `clearWatchAction(id)` | Stop it running a skill, leaving the watch and its baseline intact |
+| `deleteWatch(id)` | Remove it for good |
+
+### Watches
+
+A watch is a schedule plus the rule that reads its output. The rule can be more
+than "did it change" — and when it fires, it can run another of your skills
+instead of only messaging you, handed the value that fired it.
+
+```ts
+const w = await aemulus.createWatch({
+  skillId: "skl_…",
+  cadence: "every30m",
+  rule: { key: "dev_holding", op: "below", value: "5" },
+  action: { kind: "run_skill", skillId: "skl_exit" },
+});
+```
+
+The triggered run is metered against your daily run quota like any other. It
+never fires for a failed check or a muted watch, and `clearWatchAction` disarms
+it without deleting the watch — deleting would take the baseline with it, so the
+replacement would stay quiet through the first real change.
 
 Pass an `idempotencyKey` so a retried request returns the original run instead of starting a second one.
 

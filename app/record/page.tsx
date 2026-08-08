@@ -6,6 +6,7 @@ import { Badge, Button, Card, Label, cx } from "@/components/ui";
 import { useUsageGate } from "@/components/use-usage-gate";
 import Image from "next/image";
 import { Trace } from "@/components/record/Trace";
+import { OPS_NEEDING_VALUE } from "@/lib/watches";
 import { LiveView } from "@/components/record/LiveView";
 import type { RecorderState } from "@/lib/types";
 
@@ -56,6 +57,8 @@ export default function RecordPage() {
   const [error, setError] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [captureKey, setCaptureKey] = useState("");
+  const [captureOp, setCaptureOp] = useState("");
+  const [captureOpValue, setCaptureOpValue] = useState("");
   /** True while a capture toggle is in flight, so the poll does not undo it. */
   const togglingRef = useRef(false);
   /**
@@ -198,6 +201,8 @@ export default function RecordPage() {
     // it — the one mistake that costs you the whole recording.
     setCapturing(false);
     setCaptureKey("");
+    setCaptureOp("");
+    setCaptureOpValue("");
     if (!startUrl.trim()) {
       setError("Enter a URL to start from.");
       return;
@@ -250,13 +255,18 @@ export default function RecordPage() {
       void fetch("/api/record/capture", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ on: true, key: captureKey.trim() }),
+        body: JSON.stringify({
+          on: true,
+          key: captureKey.trim(),
+          op: captureOp || undefined,
+          opValue: captureOpValue.trim() || undefined,
+        }),
       }).catch(() => {
         /* the name is a nicety; a failure here must not interrupt recording */
       });
     }, 350);
     return () => clearTimeout(t);
-  }, [captureKey, capturing]);
+  }, [captureKey, captureOp, captureOpValue, capturing]);
 
   async function toggleCapture() {
     const next = !capturing;
@@ -266,7 +276,12 @@ export default function RecordPage() {
       const r = await fetch("/api/record/capture", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ on: next, key: captureKey.trim() }),
+        body: JSON.stringify({
+          on: next,
+          key: captureKey.trim(),
+          op: captureOp || undefined,
+          opValue: captureOpValue.trim() || undefined,
+        }),
       });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Failed");
     } catch (e) {
@@ -455,14 +470,51 @@ export default function RecordPage() {
               </p>
 
               {capturing && (
-                <input
-                  value={captureKey}
-                  onChange={(e) => setCaptureKey(e.target.value)}
-                  maxLength={32}
-                  placeholder="Name it (optional) - price, status, balance"
-                  aria-label="Name for the captured value"
-                  className={input}
-                />
+                <>
+                  <input
+                    value={captureKey}
+                    onChange={(e) => setCaptureKey(e.target.value)}
+                    maxLength={32}
+                    placeholder="Name it (optional) - price, status, balance"
+                    aria-label="Name for the captured value"
+                    className={input}
+                  />
+                  {/* The same question the extension asks, at the same moment.
+                      Without it, which recorder you happened to use decided
+                      whether you could answer it at all. */}
+                  <div className="flex gap-2">
+                    <select
+                      value={captureOp}
+                      onChange={(e) => {
+                        setCaptureOp(e.target.value);
+                        if (!OPS_NEEDING_VALUE.includes(e.target.value as never)) {
+                          setCaptureOpValue("");
+                        }
+                      }}
+                      aria-label="Tell me when"
+                      className={input}
+                    >
+                      <option value="">Tell me when it changes</option>
+                      <option value="below">goes below</option>
+                      <option value="above">goes above</option>
+                      <option value="equals">equals</option>
+                      <option value="contains">contains</option>
+                      <option value="not_contains">stops containing</option>
+                      <option value="appears">starts showing a value</option>
+                      <option value="disappears">stops showing a value</option>
+                    </select>
+                    {OPS_NEEDING_VALUE.includes(captureOp as never) && (
+                      <input
+                        value={captureOpValue}
+                        onChange={(e) => setCaptureOpValue(e.target.value)}
+                        maxLength={120}
+                        placeholder="value"
+                        aria-label="Value to compare against"
+                        className={input}
+                      />
+                    )}
+                  </div>
+                </>
               )}
 
               <button

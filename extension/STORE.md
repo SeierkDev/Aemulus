@@ -19,8 +19,11 @@ other people can install it with one click instead of dev mode.
 > Aemulus replays it on new inputs, right in your own browser, so it's already
 > signed in and behaves like you. Want to be told when something changes? Turn
 > on Capture a value and click the number, price or status you care about — no
-> selectors, no config. Every run captures step-by-step proof and a
-> tamper-evident receipt.
+> selectors, no config. Then say when you actually care: below a number, above
+> one, when a word appears, or simply whenever it moves. Aemulus checks on a
+> schedule and tells you, and it can run another one of your skills at that
+> moment instead of only messaging you. Every run captures step-by-step proof
+> and a tamper-evident receipt.
 >
 > The extension connects to your own Aemulus account (you provide the URL + an
 > API key). Recordings and runs live on your Aemulus server, not with anyone

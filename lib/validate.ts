@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { WATCH_OPS } from "./watches";
 import { NextResponse } from "next/server";
 
 /**
@@ -67,6 +68,13 @@ const SkillStepSchema = z.object({
   inputKey: z.string().max(200),
   key: z.string().max(40),
   outputKey: z.string().max(200).optional(),
+  // The rule the capture was recorded with. Absent from this schema, zod's
+  // default strip silently DELETED it on every skill save — record a rule, edit
+  // anything about the skill, and the answer given while looking at the value
+  // was gone with nothing said. The op list mirrors the evaluator's, so a plan
+  // cannot smuggle in one nothing handles.
+  watchOp: z.enum(WATCH_OPS).optional(),
+  watchValue: z.string().max(2000).optional(),
   loop: z.boolean().optional(),
   subSkillId: z.string().max(200).optional(),
   interactive: z.boolean().optional(),
@@ -180,7 +188,15 @@ export const ResolveBody = z.object({
  * Whether the caller's tier can sustain the one they picked is decided in the
  * route, against their balance, not here.
  */
+/** What a watch does when it fires. Omitted or "alert" keeps the old behaviour. */
+export const WatchActionBody = z.object({
+  kind: z.enum(["alert", "run_skill"]),
+  skillId: z.string().min(1).max(64).optional(),
+  alsoAlert: z.boolean().optional(),
+});
+
 export const WatchCreateBody = z.object({
+  action: WatchActionBody.optional(),
   skillId: z.string().min(1).max(64),
   cadence: z.enum([
     "every10m",
@@ -196,16 +212,7 @@ export const WatchCreateBody = z.object({
   input: inputRecord.optional(),
   rule: z.object({
     key: z.string().min(1).max(120),
-    op: z.enum([
-      "changed",
-      "equals",
-      "contains",
-      "not_contains",
-      "appears",
-      "disappears",
-      "above",
-      "below",
-    ]),
+    op: z.enum(WATCH_OPS),
     value: z.string().max(2000).optional(),
     confirm: z.number().int().min(1).max(10).optional(),
     cooldownMs: z.number().int().min(0).max(7 * 24 * 60 * 60 * 1000).optional(),
@@ -220,8 +227,17 @@ export const WatchCreateBody = z.object({
     .optional(),
 });
 
+export const WatchRuleBody = z.object({
+  key: z.string().min(1).max(120),
+  op: z.enum(WATCH_OPS),
+  value: z.string().max(2000).optional(),
+});
+
 export const ScheduleCreateBody = z.object({
   skillId: z.string().min(1).max(64),
+  /** Turn this schedule into a watch: alert on this rule instead of just running. */
+  rule: WatchRuleBody.optional(),
+  action: WatchActionBody.optional(),
   cadence: z.enum([
     "hourly",
     "every6h",
@@ -234,6 +250,9 @@ export const ScheduleCreateBody = z.object({
 });
 
 export const ScheduleToggleBody = z.object({ active: z.boolean() });
+
+/** Disarm a watch's action without destroying the watch. */
+export const ScheduleActionBody = z.object({ action: z.literal("alert") });
 
 export const RateBody = z.object({
   stars: z.number().int().min(1).max(5),

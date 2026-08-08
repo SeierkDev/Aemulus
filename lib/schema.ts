@@ -174,7 +174,9 @@ CREATE TABLE IF NOT EXISTS schedules (
   watch_rule  TEXT,
   watch_state TEXT,
   notify      TEXT,
-  muted_until INTEGER
+  muted_until INTEGER,
+  -- JSON: what to DO when the rule fires, beyond messaging (lib/watch-action.ts)
+  watch_action TEXT
 );
 
 -- Teams/orgs: a group of wallets that share skills, with roles (admin|member).

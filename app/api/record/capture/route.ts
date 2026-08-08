@@ -4,6 +4,7 @@ import { getRecorder } from "@/lib/recorder";
 import { readJson } from "@/lib/validate";
 import { logError } from "@/lib/log";
 import { z } from "zod";
+import { WATCH_OPS } from "@/lib/watches";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +16,10 @@ const Body = z.object({
    *  Bounded by what the /watch wizard's callback data can carry — a longer name
    *  means the capture never shows up as something you can watch. */
   key: z.string().max(32).optional(),
+  /** The rule to record with this capture. Constrained to the operators the
+   *  evaluator knows, so a client cannot store one nothing can satisfy. */
+  op: z.enum(WATCH_OPS).optional(),
+  opValue: z.string().max(2000).optional(),
 });
 
 /**
@@ -37,7 +42,14 @@ export async function POST(req: Request) {
     if (!rec.isBusy()) {
       return NextResponse.json({ error: "Nothing is recording." }, { status: 409 });
     }
-    await rec.setCapture(parsed.data.on, parsed.data.key ?? "");
+    await rec.setCapture(
+      parsed.data.on,
+      parsed.data.key ?? "",
+      // "changed" is the default the evaluator already applies, so storing it
+      // explicitly would only add noise to the step.
+      parsed.data.op && parsed.data.op !== "changed" ? parsed.data.op : "",
+      parsed.data.opValue ?? "",
+    );
     return NextResponse.json({ capturing: parsed.data.on, key: parsed.data.key ?? "" });
   } catch (e) {
     logError("api/record/capture", e);

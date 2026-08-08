@@ -5,6 +5,8 @@ import { WalletGate } from "@/components/WalletGate";
 import { ScheduleControls } from "@/components/ScheduleControls";
 import { getSession } from "@/lib/auth";
 import { listSchedules, cadenceLabel } from "@/lib/schedules";
+import { listSkills } from "@/lib/skills";
+import { ruleSentence } from "@/lib/watches";
 import { when } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +15,18 @@ export const dynamic = "force-dynamic";
 export default async function SchedulesPage() {
   const session = await getSession();
   const schedules = session ? await listSchedules(session.pubkey) : [];
+  // What each watch's action actually RUNS.
+  //
+  // The list said "then runs a skill" and stopped there, and an action can only
+  // be disarmed, never edited — so nothing in the product would tell you what
+  // you had armed. Naming it is the difference between a line you can check and
+  // one you have to take on trust.
+  const names = new Map(
+    (session && schedules.some((s) => s.watch?.actionSkillId)
+      ? await listSkills(session.pubkey)
+      : []
+    ).map((s) => [s.id, s.name]),
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6">
@@ -63,6 +77,38 @@ export default async function SchedulesPage() {
                     </span>
                   )}
                 </div>
+                {s.watch && (
+                  // A schedule that is really a watch, and a watch that starts a
+                  // skill when it fires, both looked exactly like a plain
+                  // scheduled run here. Something that spends quota and acts on
+                  // your behalf has to be legible from the page you manage it on.
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-2">
+                    <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-3">
+                      watch
+                    </span>
+                    <span>{ruleSentence(s.watch)}</span>
+                    {s.watch.actionSkillId && (
+                      <>
+                        <span>·</span>
+                        <span>
+                          then runs{" "}
+                          {names.has(s.watch.actionSkillId) ? (
+                            <Link
+                              href={`/skills/${s.watch.actionSkillId}`}
+                              className="text-ink underline"
+                            >
+                              {names.get(s.watch.actionSkillId)}
+                            </Link>
+                          ) : (
+                            // Shared with you and since unshared, or otherwise
+                            // out of reach: say so rather than name nothing.
+                            "a skill you can no longer open"
+                          )}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                )}
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-3">
                   <span>next {when(s.nextRunAt)}</span>
                   <span>·</span>
@@ -80,7 +126,11 @@ export default async function SchedulesPage() {
                   )}
                 </div>
               </div>
-              <ScheduleControls scheduleId={s.id} active={s.active} />
+              <ScheduleControls
+                scheduleId={s.id}
+                active={s.active}
+                acts={!!s.watch?.actionSkillId}
+              />
             </Card>
               ))}
             </div>

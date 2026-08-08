@@ -31,7 +31,13 @@ _(For a one-click install for everyone, see `STORE.md`.)_
    number or status you want. The click reads that element instead of pressing
    it, and the extension shows you what it read. Without a capture a skill can
    only *do* things; a watch needs one that *reads* something.
-5. **Stop & save** → open **/skills** on the site → **Generalize** into a skill.
+5. While capture is on you can also set **when you care** — below a number,
+   above one, equals, contains, appears, disappears, or the default "tell me
+   when it changes". The rule travels with the capture, so a watch built from
+   this skill starts with it already filled in instead of asking again later,
+   out of context. Change it mid-capture and the next click picks up the new
+   rule.
+6. **Stop & save** → open **/skills** on the site → **Generalize** into a skill.
 
 ## Run a skill
 

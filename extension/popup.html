@@ -52,6 +52,23 @@
       <button id="stop" disabled>Stop &amp; save</button>
     </div>
     <input id="capturekey" maxlength="32" placeholder="Name it (optional) - price, status" style="margin-top:8px; display:none;" />
+    <div id="rulerow" style="margin-top:8px; display:none; gap:6px;">
+      <select id="ruleop" style="flex:1 1 auto;">
+        <!-- The same words every screen on the site uses. "disappears" in
+             particular is not a synonym for the element going away: that is the
+             watch reporting itself broken. It means the field is still there
+             and now says nothing, which is why it is spelled out. -->
+        <option value="">Tell me when it changes</option>
+        <option value="below">goes below</option>
+        <option value="above">goes above</option>
+        <option value="equals">equals</option>
+        <option value="contains">contains</option>
+        <option value="not_contains">stops containing</option>
+        <option value="appears">starts showing a value</option>
+        <option value="disappears">stops showing a value</option>
+      </select>
+      <input id="ruleval" maxlength="120" placeholder="value" style="flex:0 0 96px; display:none;" />
+    </div>
     <button id="capture" class="wide" disabled>Capture a value</button>
     <p id="capturehint" class="eyebrow" style="margin-top:6px; display:none;">
       Click the number or status you want watched. It reads it instead of clicking it.

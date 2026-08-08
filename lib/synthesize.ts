@@ -4,6 +4,8 @@ import {
   GeneralizedSchema,
   generalizeDemonstration,
   markSecretFields,
+  restoreCaptures,
+  dropDeadOpeningNavigation,
   scrubFence,
   traceForPrompt,
 } from "./generalize";
@@ -154,10 +156,28 @@ ${examples}
     throw new Error("Synthesizer did not return a skill.");
   }
   // Mark credential inputs secret from every demo's trace (fold — only ever adds).
-  return demos.reduce(
+  const marked = demos.reduce(
     (s, d) => markSecretFields(s, d),
     GeneralizedSchema.parse(block.input) as GeneralizedSkill,
   );
+
+  /**
+   * Splice the captures back, exactly as the single-demonstration path does.
+   *
+   * Without this a skill built from two or more recordings had NO extract steps
+   * at all — the model's schema cannot emit that action, and only
+   * restoreCaptures puts them back — so recording the same task twice to make it
+   * more reliable silently cost you the ability to watch it. The rule set while
+   * recording went with them.
+   *
+   * From ONE demo rather than a fold over all of them: every recording of the
+   * same task carries the same captures, so folding would splice each one in
+   * again per demo and produce duplicates. The first demo that actually has any
+   * is used, so a capture made only on the second take is not lost either.
+   */
+  const withCaptures = demos.find((d) => d.trace?.some((a) => a.type === "extract"));
+  const restored = withCaptures ? restoreCaptures(marked, withCaptures) : marked;
+  return dropDeadOpeningNavigation(restored);
 }
 
 export async function synthesizeSkill(

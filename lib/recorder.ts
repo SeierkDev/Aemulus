@@ -66,6 +66,8 @@ class RecorderSession {
   state: RecorderState | null = null;
   /** Name to attach to the next capture, if the user typed one. */
   private captureKey = "";
+  private watchOp = "";
+  private watchValue = "";
   private browser: Browser | null = null;
   private context: BrowserContext | null = null;
   private page: Page | null = null;
@@ -110,6 +112,8 @@ class RecorderSession {
     // the recording that set it. accepted was already reset here; the capture
     // name was not, and would have been inherited by the next recording.
     this.captureKey = "";
+    this.watchOp = "";
+    this.watchValue = "";
     this.state = {
       id: sid,
       owner,
@@ -351,10 +355,14 @@ class RecorderSession {
    * scripts run on every subsequent page load, each overwriting the last. The
    * final value happens to be right, which is what makes it easy to miss.
    */
-  async setCapture(on: boolean, key = ""): Promise<void> {
+  async setCapture(on: boolean, key = "", op = "", value = ""): Promise<void> {
     if (!this.state || this.state.status !== "recording") return;
     this.state.capturing = on;
     this.captureKey = key;
+    // Cleared with the toggle, like the key: the next capture must not silently
+    // inherit the last one's condition.
+    this.watchOp = on ? op : "";
+    this.watchValue = on ? value : "";
     await this.applyCapture();
   }
 
@@ -362,14 +370,23 @@ class RecorderSession {
   private async applyCapture(): Promise<void> {
     const on = this.state?.capturing === true;
     const key = this.captureKey;
+    const op = this.watchOp;
+    const opValue = this.watchValue;
     await this.page
       ?.evaluate(
-        ([v, k]) => {
-          const w = window as unknown as { __aemCapture?: boolean; __aemCaptureKey?: string };
+        ([v, k, o, ov]) => {
+          const w = window as unknown as {
+            __aemCapture?: boolean;
+            __aemCaptureKey?: string;
+            __aemWatchOp?: string;
+            __aemWatchValue?: string;
+          };
           w.__aemCapture = v as boolean;
           w.__aemCaptureKey = k as string;
+          w.__aemWatchOp = o as string;
+          w.__aemWatchValue = ov as string;
         },
-        [on, key] as [boolean, string],
+        [on, key, op, opValue] as [boolean, string, string, string],
       )
       .catch(() => {
         /* mid-navigation; framenavigated re-applies once the document exists */
