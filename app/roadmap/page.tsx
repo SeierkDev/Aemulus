@@ -82,7 +82,10 @@ const ROADMAP: { phase: string; title: string; body: Item[] }[] = [
     phase: "Phase 3",
     title: "Deeper intelligence",
     body: [
-      { t: "Vision-grounded synthesis - the model sees the page, not just the trace." },
+      {
+        t: "Vision-grounded synthesis - the generalizer sees the recording's screenshots alongside the trace, so it can tell near-identical elements apart and read what a value actually was, instead of inferring intent from element names alone.",
+        done: true,
+      },
       {
         t: "Full zk-SNARK proofs of execution - today runs already carry private, selective-disclosure receipts (prove any field without revealing the rest); next, prove a whole run followed its skill with zero knowledge.",
       },
