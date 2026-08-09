@@ -6,7 +6,7 @@ import { Button, Card, Label, cx } from "@/components/ui";
 import { RunPanel } from "@/components/RunPanel";
 import { BulkRunPanel } from "@/components/BulkRunPanel";
 import { SchedulePanel } from "@/components/SchedulePanel";
-import { OPS_NEEDING_VALUE } from "@/lib/watches";
+import { OPS_NEEDING_VALUE, branchSpan } from "@/lib/watches";
 import { TriggerPanel } from "@/components/TriggerPanel";
 import { PublishToggle } from "@/components/PublishToggle";
 import { VersionHistory } from "@/components/VersionHistory";
@@ -21,6 +21,16 @@ import type {
 
 const input =
   "w-full rounded-[var(--radius-base)] border border-border-strong bg-surface-2 px-3 py-2 text-sm outline-none placeholder:text-ink-3 focus:border-ink-3";
+
+/** How long a wait is, in words, for any stored value — not just offered ones. */
+function waitLabel(ms: number): string {
+  if (ms < 60_000) return `${Math.round(ms / 1000)} seconds`;
+  const m = ms / 60_000;
+  return `${Number.isInteger(m) ? m : m.toFixed(1)} minute${m === 1 ? "" : "s"}`;
+}
+
+/** Branch operators that compare against something the author types. */
+const COND_NEEDS_VALUE: string[] = ["equals", "contains", "not_contains", "above", "below"];
 
 /** Wait operators that compare against something the author types. */
 const WAIT_NEEDS_VALUE: string[] = ["equals", "contains", "not_contains", "above", "below"];
@@ -134,7 +144,22 @@ export function SkillEditor({
   }
   function removeStep(i: number) {
     setSteps((s) =>
-      s.filter((_, j) => j !== i).map((x, j) => ({ ...x, idx: j })),
+      s
+        // A branch covers a COUNT of steps, so removing one from inside a group
+        // leaves the count pointing one step further down the plan — quietly
+        // pulling in a step that was never meant to be conditional, which shows
+        // up weeks later as "why didn't it file the invoice". Shrink any branch
+        // whose group contained the step being removed. Removing the branch's
+        // own step takes the condition with it, which needs no fixing.
+        .map((x, j) => {
+          const span = branchSpan(x.condition);
+          const covers = j < i && i <= j + span - 1;
+          return covers
+            ? { ...x, condition: { ...x.condition!, span: Math.max(1, span - 1) } }
+            : x;
+        })
+        .filter((_, j) => j !== i)
+        .map((x, j) => ({ ...x, idx: j })),
     );
     setStepKeys((k) => k.filter((_, j) => j !== i));
     setSaved(false);
@@ -165,6 +190,19 @@ export function SkillEditor({
     } finally {
       setBusy(false);
     }
+  }
+
+  // Which steps a branch above them governs. Computed before the list rather
+  // than tracked through it: reassigning across a render is a real hazard, not
+  // a style rule.
+  const branchCover: boolean[] = [];
+  {
+    let through = -1;
+    steps.forEach((s, pos) => {
+      const covered = pos <= through;
+      branchCover.push(covered);
+      if (!covered && s.condition) through = pos + branchSpan(s.condition) - 1;
+    });
   }
 
   return (
@@ -403,11 +441,25 @@ export function SkillEditor({
         </div>
         <div className="mt-4 grid gap-2">
           {steps.map((s, i) => (
-            <Card key={stepKeys[i]} className="p-4">
+            <Card
+              key={stepKeys[i]}
+              className={
+                // A span is a number, so "this step and the next 3" told you how
+                // many without ever showing you WHICH. Choosing a branch you
+                // cannot see the extent of is how one ends up covering a step
+                // nobody meant it to.
+                branchCover[i] ? "ml-6 border-l-2 border-l-border-strong p-4" : "p-4"
+              }
+            >
               <div className="flex items-center gap-3">
                 <span className="mono w-8 shrink-0 text-ink-3">
                   {String(i).padStart(2, "0")}
                 </span>
+                {branchCover[i] && (
+                  <span className="shrink-0 text-[0.65rem] uppercase tracking-wide text-ink-3">
+                    in branch
+                  </span>
+                )}
                 <select
                   // Width BEFORE the shared input class, and the class stripped
                   // of its own w-full: the two collided, the select rendered
@@ -516,11 +568,20 @@ export function SkillEditor({
                         aria-label={`Step ${i + 1} wait timeout`}
                         onChange={(e) => patchStep(i, { waitMs: Number(e.target.value) })}
                       >
-                        <option value="10000">10 seconds</option>
-                        <option value="30000">30 seconds</option>
-                        <option value="60000">1 minute</option>
-                        <option value="120000">2 minutes</option>
-                        <option value="300000">5 minutes</option>
+                        {/* The stored value is always one of the options. The
+                            schema accepts any wait from a second to five
+                            minutes; offering five fixed ones meant a step set
+                            through the API to 45s drew "10 seconds" and waited
+                            45. */}
+                        {Array.from(
+                          new Set([10_000, 30_000, 60_000, 120_000, 300_000, s.waitMs ?? 30_000]),
+                        )
+                          .sort((a, b) => a - b)
+                          .map((ms) => (
+                            <option key={ms} value={ms}>
+                              {waitLabel(ms)}
+                            </option>
+                          ))}
                       </select>
                       <select
                         className={input}
@@ -708,6 +769,16 @@ export function SkillEditor({
                           {f.label || f.key}
                         </option>
                       ))}
+                      {/* Still bound to a field that has been deleted. Without
+                          this the select falls back to "- pick input -" while
+                          the step keeps typing into a key that no longer
+                          exists — which is precisely the state the publish
+                          guard refuses, shown here as if nothing were wrong. */}
+                      {s.inputKey && !fields.some((f) => f.key === s.inputKey) && (
+                        <option value={s.inputKey}>
+                          {s.inputKey} — no such input field
+                        </option>
+                      )}
                     </select>
                   ) : s.valueSource === "constant" ? (
                     <input
@@ -727,39 +798,113 @@ export function SkillEditor({
               )}
 
               {/* Branch condition (run only if…) */}
-              <div className="mt-3 grid grid-cols-[160px_1fr] items-center gap-3 pl-11">
+              <div className="mt-3 grid grid-cols-[160px_1fr] items-start gap-3 pl-11">
                 <select
                   className={input}
-                  value={s.condition?.kind ?? "none"}
+                  value={s.condition ? (s.condition.op ?? s.condition.kind) : "none"}
                   aria-label={`Step ${i + 1} run condition`}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "none") return patchStep(i, { condition: undefined });
+                    const presence = v === "exists" || v === "absent";
                     patchStep(i, {
-                      condition:
-                        e.target.value === "none"
-                          ? undefined
-                          : {
-                              kind: e.target.value as "exists" | "absent",
-                              selector: s.condition?.selector ?? "",
-                            },
-                    })
-                  }
+                      condition: {
+                        // kind stays on the object because it is what a stored
+                        // condition has always been judged by; op wins when set.
+                        kind: presence ? (v as "exists" | "absent") : "exists",
+                        selector: s.condition?.selector ?? "",
+                        ...(presence ? {} : { op: v }),
+                        ...(COND_NEEDS_VALUE.includes(v) ? { value: s.condition?.value ?? "" } : {}),
+                        ...(s.condition?.span && s.condition.span > 1 ? { span: s.condition.span } : {}),
+                      },
+                    });
+                  }}
                 >
                   <option value="none">always run</option>
                   <option value="exists">run if present</option>
                   <option value="absent">run if absent</option>
+                  <option value="appears">run if it shows a value</option>
+                  <option value="disappears">run if it shows nothing</option>
+                  <option value="equals">run if it equals</option>
+                  <option value="contains">run if it contains</option>
+                  <option value="not_contains">run if it does not contain</option>
+                  <option value="above">run if it is above</option>
+                  <option value="below">run if it is below</option>
                 </select>
                 {s.condition && (
-                  <input
-                    className={input}
-                    value={s.condition.selector}
-                    placeholder="CSS selector to check"
-                    aria-label={`Step ${i + 1} condition selector`}
-                    onChange={(e) =>
-                      patchStep(i, {
-                        condition: { kind: s.condition!.kind, selector: e.target.value },
-                      })
-                    }
-                  />
+                  <div className="flex flex-col gap-2">
+                    <div className="flex gap-2">
+                      <input
+                        className={input}
+                        value={s.condition.selector}
+                        placeholder="CSS selector to check"
+                        aria-label={`Step ${i + 1} condition selector`}
+                        onChange={(e) =>
+                          patchStep(i, {
+                            condition: { ...s.condition!, selector: e.target.value },
+                          })
+                        }
+                      />
+                      {COND_NEEDS_VALUE.includes(s.condition.op ?? "") && (
+                        <input
+                          className={input}
+                          value={s.condition.value ?? ""}
+                          placeholder="value"
+                          maxLength={200}
+                          aria-label={`Step ${i + 1} condition value`}
+                          onChange={(e) =>
+                            patchStep(i, {
+                              condition: { ...s.condition!, value: e.target.value },
+                            })
+                          }
+                        />
+                      )}
+                    </div>
+                    {/* What the branch covers. One decision in one place, instead
+                        of the same test copied onto four steps that then have to
+                        be kept in agreement by hand. */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-ink-3">and it covers</span>
+                      <select
+                        className={cx(input, "w-auto")}
+                        value={String(s.condition.span ?? 1)}
+                        aria-label={`Step ${i + 1} condition span`}
+                        onChange={(e) =>
+                          patchStep(i, {
+                            condition: { ...s.condition!, span: Number(e.target.value) },
+                          })
+                        }
+                      >
+                        {/* The stored value is always one of the options.
+                            Offering a fixed list meant a span set through the
+                            API — 7, say — matched nothing, so the select drew
+                            "this step only" while the list beside it marked
+                            seven steps as covered, and the two contradicted
+                            each other about the same branch. */}
+                        {Array.from(
+                          new Set([1, 2, 3, 4, 5, 6, 8, 10, 15, 20, branchSpan(s.condition)]),
+                        )
+                          .sort((a, b) => a - b)
+                          .map((n) => (
+                            <option key={n} value={n}>
+                              {n === 1 ? "this step only" : `this step and the next ${n - 1}`}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                    {!s.condition.selector.trim() && (
+                      <p className="text-xs text-ink-3">
+                        A branch needs something to check. Left empty, this step and everything it
+                        covers is skipped on every run.
+                      </p>
+                    )}
+                    {(s.condition.span ?? 1) > 1 && i + (s.condition.span ?? 1) > steps.length && (
+                      <p className="text-xs text-ink-3">
+                        This branch reaches past the end of the plan. It will cover every step
+                        from here on.
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
 

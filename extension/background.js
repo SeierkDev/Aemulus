@@ -89,6 +89,25 @@ function perform(tabId, step, value, forcedSelector) {
     } catch { resolve(null); }
   });
 }
+/** Mirrors branchSpan in lib/watches: how many steps a branch governs. */
+function branchSpan(cond) {
+  const n = Math.floor((cond && cond.span) || 1);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return Math.min(50, n);
+}
+
+function askCondition(tabId, condition) {
+  return new Promise((resolve) => {
+    try {
+      chrome.tabs.sendMessage(tabId, { __aem: "cond", condition }, (resp) => {
+        // No answer means we could not read the page. Treat that as "do not
+        // run": a branch that cannot be judged must not take the path that
+        // DOES something on the strength of not knowing.
+        resolve(chrome.runtime.lastError ? false : !!(resp && resp.met));
+      });
+    } catch { resolve(false); }
+  });
+}
 function getCandidates(tabId) {
   return new Promise((resolve) => {
     try {
@@ -192,10 +211,55 @@ async function runSkill(msg) {
   let error = null;
   let tokensIn = 0, tokensOut = 0;
 
+  // The last position covered by a branch whose condition did not hold.
+  let skipThrough = -1;
+
   for (let i = 0; i < plan.length; i++) {
     const step = plan[i];
     const isSecret = secret.has(step.inputKey);
     const value = resolveValue(step, input);
+
+    // Branching, which this driver did not do at all: a conditional step ran
+    // unconditionally here while the cloud skipped it, so the same skill did
+    // different work depending on where it ran.
+    //
+    // One place a step is skipped, for the same reason the runner has one: both
+    // ways in have to remember that a skipped step which is ITSELF a branch
+    // takes its group with it, or the steps it gates run with their gate never
+    // evaluated. Recorded rather than passed over, because a step missing from
+    // the record cannot be told apart from a step that never existed.
+    const skipStep = async (note) => {
+      if (step.condition) {
+        skipThrough = Math.max(skipThrough, i + branchSpan(step.condition) - 1);
+      }
+      results.push({ idx: step.idx, selectorUsed: "", value: "", confidence: 1, flagged: false, note, screenshot: await safeCapture(windowId) });
+    };
+
+    if (i <= skipThrough) {
+      await skipStep("Skipped: inside a branch that didn't run.");
+      continue;
+    }
+    if (step.condition) {
+      // A page that cannot be reached is not a condition that did not hold.
+      // Treated as "not met", a closed or crashed tab would skip this step and
+      // everything its branch covers — and then the next branch, and the next —
+      // so a run that did nothing could finish saying it was fine. The cloud
+      // runner fails the run here; so does this.
+      if (!(await ensureReady(tabId, 15000))) {
+        status = "needs_review";
+        error = "The page could not be reached to check a step's condition.";
+        results.push({ idx: step.idx, selectorUsed: "", value: "", confidence: 0, flagged: true, note: "Could not reach the page to check this step's condition.", screenshot: await safeCapture(windowId) });
+        break;
+      }
+      if (!(await askCondition(tabId, step.condition))) {
+        await skipStep("Skipped: its condition was not met.");
+        continue;
+      }
+    }
+
+    // Announced after the branching, not before it: the popup used to name a
+    // step as running and then skip it, which is the one place this driver
+    // tells a person what it is doing right now.
     await setStatus({ state: "running", step: i + 1, total: plan.length, intent: step.intent, runId, server });
 
     if (step.action === "navigate") {

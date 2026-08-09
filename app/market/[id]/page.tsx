@@ -5,6 +5,7 @@ import { Nav } from "@/components/Nav";
 import { RunPanel } from "@/components/RunPanel";
 import { BulkRunPanel } from "@/components/BulkRunPanel";
 import { Stars } from "@/components/Stars";
+import { branchSpan, conditionSentence } from "@/lib/watches";
 import { RatingWidget } from "@/components/RatingWidget";
 import { ReportButton } from "@/components/ReportButton";
 import {
@@ -71,6 +72,20 @@ export default async function MarketSkillPage({
         categorize(s.name, s.description) === category,
     )
     .slice(0, 4);
+
+  // Which steps only happen if a branch above them holds. Listing a plan flat
+  // says nine steps all happen; when four are behind a branch, that is not a
+  // description of the skill but an overstatement of it — on the page whose
+  // heading is what it does.
+  const branchCover: boolean[] = [];
+  {
+    let through = -1;
+    skill.plan.forEach((s, pos) => {
+      const covered = pos <= through;
+      branchCover.push(covered);
+      if (!covered && s.condition) through = pos + branchSpan(s.condition) - 1;
+    });
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6">
@@ -213,19 +228,39 @@ export default async function MarketSkillPage({
           What it does
         </h2>
         <div className="mt-4 grid gap-2">
-          {skill.plan.map((s) => (
-            <Card key={s.idx} className="flex items-center gap-3 p-3.5">
-              <span className="mono w-8 shrink-0 text-ink-3">
-                {String(s.idx).padStart(2, "0")}
-              </span>
-              <span className="rounded border border-border-strong bg-surface-2 px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wide text-ink-3">
-                {s.action}
-              </span>
-              <span className="flex-1 truncate text-sm text-ink-2">
-                {s.intent}
-              </span>
-            </Card>
-          ))}
+          {skill.plan.map((s, pos) => {
+            const covered = branchCover[pos];
+            const span = branchSpan(s.condition);
+            return (
+              <Card
+                key={s.idx}
+                className={`flex items-center gap-3 p-3.5${covered ? " ml-6 border-l-2 border-l-border-strong" : ""}`}
+              >
+                <span className="mono w-8 shrink-0 text-ink-3">
+                  {String(s.idx).padStart(2, "0")}
+                </span>
+                <span className="rounded border border-border-strong bg-surface-2 px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wide text-ink-3">
+                  {s.action}
+                </span>
+                <span className="flex-1 truncate text-sm text-ink-2">
+                  {s.intent}
+                </span>
+                {/* Shown even when this step is itself inside a branch: a
+                    nested condition is part of what the skill does, and marking
+                    it only as "in the branch above" hides the inner test
+                    entirely — on the page whose heading is what it does. */}
+                {s.condition && (
+                  <span className="shrink-0 truncate text-xs text-ink-3" title={conditionSentence(s.condition)}>
+                    {conditionSentence(s.condition)}
+                    {span > 1 ? ` · covers ${span} steps` : ""}
+                  </span>
+                )}
+                {covered && (
+                  <span className="shrink-0 text-xs text-ink-3">in the branch above</span>
+                )}
+              </Card>
+            );
+          })}
         </div>
 
         {skill.inputSchema.fields.length > 0 && (

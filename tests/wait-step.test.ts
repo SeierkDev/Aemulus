@@ -362,3 +362,30 @@ describe("what a timed-out wait leaves behind", () => {
     expect(block).toMatch(/!w\.met && \(await isCaptchaPresent\(page\)\)/);
   });
 });
+
+describe("the timeout control tells the truth about a stored value", () => {
+  const ed = readFileSync("components/SkillEditor.tsx", "utf8");
+
+  it("always offers the wait the step actually has", () => {
+    // The schema accepts any wait from a second to five minutes; the dropdown
+    // offered five. A step set through the API to 45s drew "10 seconds" and
+    // waited 45.
+    expect(ed).toMatch(
+      /new Set\(\[10_000, 30_000, 60_000, 120_000, 300_000, s\.waitMs \?\? 30_000\]\)/,
+    );
+  });
+
+  it("labels any value, not only the offered ones", () => {
+    const fn = ed.slice(ed.indexOf("function waitLabel(ms: number)"), ed.indexOf("/** Branch operators"));
+    expect(fn).toMatch(/ms < 60_000/);
+    expect(fn).toMatch(/minute\$\{m === 1 \? "" : "s"\}/);
+  });
+
+  it("a step bound to a deleted input field says so", () => {
+    // Pre-existing, and the same defect: the select fell back to "- pick input
+    // -" while the step kept typing into a key that no longer exists — the
+    // exact state the publish guard refuses.
+    expect(ed).toMatch(/s\.inputKey && !fields\.some\(\(f\) => f\.key === s\.inputKey\)/);
+    expect(ed).toMatch(/no such input field/);
+  });
+});

@@ -91,7 +91,8 @@ const ROADMAP: { phase: string; title: string; body: Item[] }[] = [
         t: "Full zk-SNARK proofs of execution - today runs already carry private, selective-disclosure receipts (prove any field without revealing the rest); next, prove a whole run followed its skill with zero knowledge.",
       },
       {
-        t: "Longer, branching multi-step pipelines with waits and conditionals. A watch can already ACT rather than only alert - when its rule fires it runs the next skill and hands it the value that fired it - and a step can now WAIT for the page to be ready, on the same terms a watch rule uses, instead of missing an element a recording never had to wait for. Multi-level branches are what remain.",
+        t: "Longer, branching multi-step pipelines with waits and conditionals. A watch can ACT rather than only alert - when its rule fires it runs the next skill and hands it the value that fired it. A step can WAIT for the page to be ready instead of missing an element a recording never had to wait for. And a branch can ask what an element SAYS, not only whether it is there, and govern a group of steps rather than one - so a skill takes a different path depending on what it finds.",
+        done: true,
       },
     ],
   },

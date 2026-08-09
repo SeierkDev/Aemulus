@@ -80,6 +80,65 @@ export type WaitOp = (typeof WAIT_OPS)[number];
  * longer is a schedule, not a wait.
  */
 export const MAX_WAIT_MS = 5 * 60 * 1000;
+
+/**
+ * The most steps one branch may govern.
+ *
+ * A bound rather than a preference: the span is stored data, and a plan that
+ * claimed a branch covered a few thousand steps would skip the rest of itself
+ * on one unlucky reading. Fifty is far past any plan anyone records by hand.
+ */
+export const MAX_BRANCH_SPAN = 50;
+
+/**
+ * How many steps a branch governs, counting its own.
+ *
+ * One clamp, because the number is stored data and three places read it: the
+ * runner, the extension's driver, and the editor. A span of 0 or a fraction is
+ * a plan that says nothing coherent, and the safe reading of "nothing coherent"
+ * is the behaviour a condition has always had — this step and no other.
+ */
+/**
+ * A branch condition in plain words.
+ *
+ * Shared with the marketplace page, which is where somebody decides whether to
+ * run a stranger's skill. A plan listed flat reads as nine steps that all
+ * happen; if four of them are behind a branch, saying so is the difference
+ * between describing the skill and overstating it.
+ */
+export function conditionSentence(c: {
+  kind?: string;
+  selector: string;
+  op?: string;
+  value?: string;
+}): string {
+  const el = `"${c.selector}"`;
+  const v = c.value ?? "";
+  switch (c.op) {
+    case "appears":
+      return `only if ${el} shows a value`;
+    case "disappears":
+      return `only if ${el} shows nothing`;
+    case "equals":
+      return `only if ${el} equals ${v}`;
+    case "contains":
+      return `only if ${el} contains ${v}`;
+    case "not_contains":
+      return `only if ${el} does not contain ${v}`;
+    case "above":
+      return `only if ${el} is above ${v}`;
+    case "below":
+      return `only if ${el} is below ${v}`;
+    default:
+      return c.kind === "absent" ? `only if ${el} is absent` : `only if ${el} is present`;
+  }
+}
+
+export function branchSpan(cond?: { span?: number } | null): number {
+  const n = Math.floor(cond?.span ?? 1);
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return Math.min(MAX_BRANCH_SPAN, n);
+}
 export const DEFAULT_WAIT_MS = 30_000;
 
 export type WatchRule = {

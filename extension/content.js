@@ -388,6 +388,30 @@
     });
   }
 
+  /**
+   * Does a step's branch condition hold right now?
+   *
+   * The extension had no answer to this at all: a conditional step ran
+   * unconditionally here while the cloud skipped it, so the same skill did
+   * different work depending on where it ran. Same reader and same vocabulary
+   * as the wait above, so both sides ask one question.
+   */
+  function conditionMet(cond) {
+    if (!cond) return true;
+    let el = null;
+    try {
+      const found = document.querySelector(cond.selector);
+      el = found && aemVisible(found) ? found : null;
+    } catch { el = null; }
+    if (cond.op) {
+      // Inconclusive is not a reason to run.
+      return aemHolds(cond.op, cond.value || "", el ? readValue(el, 20000) : null) === true;
+    }
+    let present = false;
+    try { present = !!document.querySelector(cond.selector); } catch { present = false; }
+    return cond.kind === "exists" ? present : !present;
+  }
+
   function performStep(step, value, forcedSelector) {
     const action = step.action;
     if (action === "navigate") return { ok: true, selectorUsed: "", confidence: 1 };
@@ -496,6 +520,7 @@
       Promise.resolve(performStep(msg.step, msg.value, msg.forcedSelector)).then(reply);
       return true;
     }
+    if (msg.__aem === "cond") { reply({ met: conditionMet(msg.condition) }); return true; }
     if (msg.__aem === "candidates") { reply({ candidates: collectCandidates() }); return true; }
   });
 

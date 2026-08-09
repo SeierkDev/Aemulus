@@ -45,8 +45,9 @@ import {
 import { runSlots } from "./semaphore";
 import { attachAgenc, attachReceipt } from "./receipt";
 import { runIsWatch } from "./runs";
-import { MAX_WAIT_MS } from "./watches";
+import { MAX_WAIT_MS, branchSpan, conditionSentence } from "./watches";
 import { captureValue } from "./page-read";
+import { conditionMet } from "./branch";
 import { waitForStep, waitLimit } from "./wait";
 import { learnSelectors } from "./skills";
 import { startChainedRun } from "./chain";
@@ -309,7 +310,12 @@ export async function executeRun(
      */
     const credentialed = vaultKeys.size > 0 || secretFieldKeys.size > 0;
 
-    for (const step of skill.plan) {
+    // The last position covered by a branch whose condition did not hold. A
+    // condition used to govern its own step and nothing else; a group is one
+    // decision in one place instead of the same test copied onto four steps
+    // that then have to be kept in agreement by hand.
+    let skipThrough = -1;
+    for (const [pos, step] of skill.plan.entries()) {
       if (Date.now() > deadline) {
         finalStatus = "failed";
         error = "Run exceeded the time limit.";
@@ -373,30 +379,55 @@ export async function executeRun(
         if (!sensitive) await page.screenshot({ path: shotPath }).catch(() => {});
       };
 
+      /**
+       * Do not run this step, and say why.
+       *
+       * The one place a step is skipped, because there are three ways to get
+       * here — the reviewer said so, an outer branch did not run, or this
+       * step's own condition did not hold — and every one of them has to
+       * remember the same thing: IF THIS STEP IS A BRANCH, its group goes with
+       * it. A gate that was skipped must not leave its gated work to run
+       * ungated, which is how an invoice that was already filed gets filed
+       * again. That invariant went in twice through two different doors before
+       * it lived here, so a fourth way in cannot get it wrong.
+       *
+       * Uses the redacted recVal/recShot + snap() like every other
+       * secret-typing path: a conditional SECRET input whose branch does not
+       * run must not persist the resolved credential into the step record,
+       * which is shown unmasked and folded into the receipt.
+       */
+      const skipStep = async (reason: string) => {
+        if (step.condition) {
+          skipThrough = Math.max(skipThrough, pos + branchSpan(step.condition) - 1);
+        }
+        await snap();
+        await recordStep(runId, step, "", recVal, recShot, 1, false, reason);
+      };
+
       try {
         // Reviewer chose to skip this step.
         if (override?.skip) {
-          await snap();
-          await recordStep(runId, step, "", recVal, recShot, 1, false, "Skipped by reviewer.");
+          await skipStep(
+            step.condition && branchSpan(step.condition) > 1
+              ? "Skipped by reviewer, and the steps this branch covers."
+              : "Skipped by reviewer.",
+          );
           continue;
         }
 
-        // Conditional step (branching): run only if the condition holds. Use the
-        // redacted recVal/recShot + snap() like every other secret-typing path — a
-        // conditional SECRET input whose condition is false must not persist the
-        // resolved credential into the step record (shown unmasked + folded into the
-        // receipt).
+        // Inside a branch that did not run. Recorded rather than passed over in
+        // silence: a step missing from the record is indistinguishable from a
+        // step that never existed, and the record is what the receipt covers.
+        if (pos <= skipThrough) {
+          await skipStep("Skipped: inside a branch that didn't run.");
+          continue;
+        }
+
+        // This step's own branch: run only if the condition holds.
         if (step.condition && !(await conditionMet(page, step.condition))) {
-          await snap();
-          await recordStep(
-            runId,
-            step,
-            "",
-            recVal,
-            recShot,
-            1,
-            false,
-            `Skipped: condition (${step.condition.kind} ${step.condition.selector}) not met.`,
+          const span = branchSpan(step.condition);
+          await skipStep(
+            `Skipped: ${conditionSentence(step.condition)} not met${span > 1 ? `, and the ${span - 1} step${span > 2 ? "s" : ""} it covers` : ""}.`,
           );
           continue;
         }
@@ -854,20 +885,6 @@ export async function executeRun(
     logError("runner.finalize", e);
   }
   return (await getRun(runId))!;
-}
-
-/** Evaluate a step's branch condition against the current page. */
-async function conditionMet(
-  page: Page,
-  cond: { kind: "exists" | "absent"; selector: string },
-): Promise<boolean> {
-  let present = false;
-  try {
-    present = (await page.locator(cond.selector).count()) > 0;
-  } catch {
-    present = false; // invalid selector → treat as not present
-  }
-  return cond.kind === "exists" ? present : !present;
 }
 
 /**

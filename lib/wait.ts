@@ -1,6 +1,6 @@
 import type { Page } from "playwright";
 import { holds, DEFAULT_WAIT_MS, MAX_WAIT_MS } from "./watches";
-import { captureValue } from "./page-read";
+import { captureValue, pageIsGone } from "./page-read";
 import type { SkillStep } from "./types";
 
 /**
@@ -101,7 +101,11 @@ export async function waitForStep(
         // otherwise stall this tick for the whole default step timeout.
         const there = (await loc.count()) > 0 && (await loc.isVisible());
         r = there ? await captureValue(loc, 2000) : null;
-      } catch {
+      } catch (e) {
+        // A dead browser is not a page that has not got there yet. Left as
+        // "nothing there", the note blames the selector for a crash — and with
+        // "carry on anyway" the run marches into a browser that is gone.
+        if (pageIsGone(page, e)) throw e;
         r = null; // invalid selector reads as "not on the page"
       }
       if (r !== null) {

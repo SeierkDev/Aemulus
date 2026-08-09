@@ -95,8 +95,28 @@ export interface SkillInputField {
  * cookie banner only if it appears, or run a login flow only if logged out).
  */
 export interface StepCondition {
+  /** Present or not on the page. Ignored when `op` is set. */
   kind: "exists" | "absent";
   selector: string;
+  /**
+   * What the element has to SAY, rather than merely be.
+   *
+   * The same vocabulary a wait and a watch rule use, so "if the total is above
+   * 100" is one question with one answer everywhere it is asked. Absent, the
+   * condition is the original presence check and behaves exactly as before.
+   */
+  op?: string;
+  value?: string;
+  /**
+   * How many steps this governs, counting this one. Default 1.
+   *
+   * A condition used to cover a single step, so "if it is already approved,
+   * skip the next four" had to be written onto four steps that then had to be
+   * kept in agreement by hand. A branch that governs a group is one decision in
+   * one place, and a step inside a governed group may carry its own condition —
+   * which is what makes it nest.
+   */
+  span?: number;
 }
 
 export interface SkillStep {

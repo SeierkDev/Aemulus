@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { WATCH_OPS, WAIT_OPS, MAX_WAIT_MS } from "./watches";
+import { WATCH_OPS, WAIT_OPS, MAX_WAIT_MS, MAX_BRANCH_SPAN } from "./watches";
 import { NextResponse } from "next/server";
 
 /**
@@ -88,7 +88,19 @@ const SkillStepSchema = z.object({
   condition: z
     .object({
       kind: z.enum(["exists", "absent"]),
-      selector: z.string().max(2000),
+      // Non-empty: an empty selector throws in both runners, which reads as
+      // "not met" — so the step and everything its branch covers is silently
+      // skipped on every run, forever. Refused where it is set, like an
+      // unsatisfiable watch rule and a wait with nothing to look at.
+      selector: z.string().min(1).max(2000),
+      // What the element has to say, rather than merely be. Same vocabulary as
+      // a wait and a watch rule.
+      op: z.enum(WAIT_OPS).optional(),
+      value: z.string().max(2000).optional(),
+      // How many steps the branch governs, counting its own. Bounded because a
+      // plan claiming a few thousand would skip the rest of itself on one
+      // unlucky reading.
+      span: z.number().int().min(1).max(MAX_BRANCH_SPAN).optional(),
     })
     .optional(),
 })

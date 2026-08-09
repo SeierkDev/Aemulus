@@ -1,4 +1,4 @@
-import type { Locator } from "playwright";
+import type { Locator, Page } from "playwright";
 
 /**
  * Reading a value off the page.
@@ -10,6 +10,22 @@ import type { Locator } from "playwright";
  */
 
 export const MAX_CAPTURE_CHARS = 20_000;
+
+/**
+ * Did this fail because the SELECTOR is unusable, or because the page is gone?
+ *
+ * "Not on the page" is the right answer for a selector that matches nothing or
+ * cannot be parsed. It is the wrong answer for a browser that has crashed or
+ * closed: a branch would answer false and skip its whole group, a wait would
+ * report that the page never got there, and a run that did nothing could finish
+ * saying so in terms that point at the selector. The step-level catch already
+ * fails a run properly — the error just has to reach it.
+ */
+export function pageIsGone(page: Page, e: unknown): boolean {
+  if (page.isClosed()) return true;
+  const m = e instanceof Error ? e.message : String(e);
+  return /closed|crashed|Target page, context or browser/i.test(m);
+}
 
 /**
  * Read a value off an element: form value for inputs, else visible text.
