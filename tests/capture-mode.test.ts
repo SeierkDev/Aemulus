@@ -319,12 +319,13 @@ describe("what you see is what gets captured", () => {
   const inject = readFileSync("lib/recorder-inject.ts", "utf8");
   const ext = readFileSync("extension/content.js", "utf8");
 
-  // captureValue in the runner: inputValue() for form controls, textContent()
-  // for everything else. innerText is NOT the same — it reflects what is
-  // rendered and collapses whitespace, while textContent includes hidden nodes
-  // and keeps it.
+  // captureValue in the runner: inputValue for form controls, textContent for
+  // everything else. innerText is NOT the same — it reflects what is rendered
+  // and collapses whitespace, while textContent includes hidden nodes and keeps
+  // it. (Both calls take an optional timeout now, because waits share this
+  // reader and poll with it.)
   it("reads the same property the runner reads", () => {
-    expect(runner).toMatch(/textContent\(\)/);
+    expect(readFileSync("lib/page-read.ts", "utf8")).toMatch(/textContent\(o\)/);
     for (const src of [inject, ext]) {
       // Scoped to readValue: accessibleName legitimately uses innerText, because
       // a label is what a human SEES, which is a different question from what a
@@ -336,7 +337,7 @@ describe("what you see is what gets captured", () => {
   });
 
   it("still uses the field's value for form controls, as the runner does", () => {
-    expect(runner).toMatch(/inputValue\(\)/);
+    expect(readFileSync("lib/page-read.ts", "utf8")).toMatch(/inputValue\(o\)/);
     for (const src of [inject, ext]) {
       expect(src).toMatch(/input\|textarea\|select/);
     }

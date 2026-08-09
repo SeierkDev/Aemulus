@@ -50,6 +50,38 @@ export const WATCH_OPS = [
 
 export type WatchOp = (typeof WATCH_OPS)[number];
 
+/**
+ * The operators that make sense for a WAIT, in the order a person picks them.
+ *
+ * "changed" is deliberately absent. A watch compares this check against the
+ * last one, so change is the thing it can see; a wait has no previous reading
+ * to compare against, only what the page says right now. Offering it would
+ * produce a step that either fires instantly or never, depending on nothing the
+ * author can see.
+ */
+export const WAIT_OPS = [
+  "appears",
+  "disappears",
+  "equals",
+  "contains",
+  "not_contains",
+  "above",
+  "below",
+] as const;
+
+export type WaitOp = (typeof WAIT_OPS)[number];
+
+/**
+ * The longest a single wait may hold.
+ *
+ * A waiting step keeps its browser and its run slot for the whole duration, so
+ * this is a cap on how long one skill can hold the pool open, not a preference.
+ * Five minutes covers a slow report or a settling balance; anything that takes
+ * longer is a schedule, not a wait.
+ */
+export const MAX_WAIT_MS = 5 * 60 * 1000;
+export const DEFAULT_WAIT_MS = 30_000;
+
 export type WatchRule = {
   /** Which of the run's output keys to watch. */
   key: string;
@@ -144,6 +176,48 @@ export function parseNumber(s: string): number | null {
   if (!m) return null;
   const n = Number(m[0].replace(/,/g, ""));
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Does ONE reading, on its own, satisfy an operator?
+ *
+ * The single-reading half of the evaluator, shared with waits. A watch asks
+ * whether something CHANGED and needs two readings for that; a wait only ever
+ * has the page as it is right now, and asks whether it is there yet.
+ *
+ * `reading` is null when the element could not be found at all, which is the
+ * distinction "" cannot carry: an empty field and a missing field are the same
+ * string and very different facts. Null satisfies "disappears" and nothing else.
+ *
+ * Returns null for inconclusive — a number was needed and the page gave
+ * something that is not one. A wait treats that as not-yet rather than as
+ * failure, because a page mid-render is the normal case for a step that exists
+ * to wait for the page to finish.
+ */
+export function holds(
+  op: WaitOp | string,
+  operand: string,
+  reading: string | null,
+): boolean | null {
+  const text = reading === null ? "" : normalize(reading);
+  switch (op) {
+    case "appears":
+      return reading !== null && text !== "";
+    case "disappears":
+      return reading === null || text === "";
+    case "equals":
+    case "contains":
+    case "not_contains":
+    case "above":
+    case "below":
+      // A missing element cannot satisfy a claim about its text. Without this,
+      // "not_contains" is true for an element that is not on the page at all,
+      // and a wait for it would pass before the page had rendered anything.
+      if (reading === null) return false;
+      return satisfies({ key: "", op, value: operand } as WatchRule, text);
+    default:
+      return null;
+  }
 }
 
 /** Does the value satisfy the rule, given what we saw last time? */

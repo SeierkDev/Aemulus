@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { WATCH_OPS } from "./watches";
+import { WATCH_OPS, WAIT_OPS, MAX_WAIT_MS } from "./watches";
 import { NextResponse } from "next/server";
 
 /**
@@ -8,7 +8,7 @@ import { NextResponse } from "next/server";
  * with a 400 before it reaches business logic.
  */
 
-const ACTIONS = ["navigate", "click", "input", "select", "key", "submit", "extract", "run_skill"] as const;
+const ACTIONS = ["navigate", "click", "input", "select", "key", "submit", "extract", "run_skill", "wait_for"] as const;
 
 // A skill's input map. Bounds key/value length AND the number of fields, so a
 // single request can't store an arbitrarily large object (memory/DB pressure).
@@ -75,6 +75,13 @@ const SkillStepSchema = z.object({
   // cannot smuggle in one nothing handles.
   watchOp: z.enum(WATCH_OPS).optional(),
   watchValue: z.string().max(2000).optional(),
+  // A wait, for a page that is not ready yet. Bounded here rather than trusted:
+  // the step holds a browser and a run slot for its whole duration, so an
+  // unbounded one is a way to hold the pool open.
+  waitOp: z.enum(WAIT_OPS).optional(),
+  waitValue: z.string().max(2000).optional(),
+  waitMs: z.number().int().min(1000).max(MAX_WAIT_MS).optional(),
+  waitOnTimeout: z.enum(["fail", "continue"]).optional(),
   loop: z.boolean().optional(),
   subSkillId: z.string().max(200).optional(),
   interactive: z.boolean().optional(),
@@ -84,7 +91,14 @@ const SkillStepSchema = z.object({
       selector: z.string().max(2000),
     })
     .optional(),
-});
+})
+  // A wait with nothing to look at can never be satisfied: it holds a browser
+  // for its whole timeout and then reports that the page never got there, every
+  // run, forever. Refused where it is set, like an unsatisfiable watch rule.
+  .refine((s) => s.action !== "wait_for" || s.selectors.length > 0, {
+    message: "A wait needs a selector — something on the page to wait for.",
+    path: ["selectors"],
+  });
 const InputFieldSchema = z.object({
   key: z.string().max(200),
   label: z.string().max(200),

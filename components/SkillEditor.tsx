@@ -22,6 +22,9 @@ import type {
 const input =
   "w-full rounded-[var(--radius-base)] border border-border-strong bg-surface-2 px-3 py-2 text-sm outline-none placeholder:text-ink-3 focus:border-ink-3";
 
+/** Wait operators that compare against something the author types. */
+const WAIT_NEEDS_VALUE: string[] = ["equals", "contains", "not_contains", "above", "below"];
+
 const STEP_ACTIONS: ActionType[] = [
   "navigate",
   "click",
@@ -31,6 +34,7 @@ const STEP_ACTIONS: ActionType[] = [
   "submit",
   "extract",
   "run_skill",
+  "wait_for",
 ];
 
 export function SkillEditor({
@@ -435,7 +439,108 @@ export function SkillEditor({
                   Remove
                 </button>
               </div>
-              {s.action === "run_skill" ? (
+              {s.action === "wait_for" ? (
+                <div className="mt-3 grid gap-2 pl-11">
+                  {/* The element to watch. Its own field here, because the only
+                      editable selector on this screen lived in the extract
+                      panel — so a wait had no way to be given one, and the save
+                      refused it for having none. */}
+                  <div className="grid grid-cols-[160px_1fr] items-center gap-3">
+                    <span className="text-xs text-ink-3">selector</span>
+                    <input
+                      className={input}
+                      value={s.selectors?.[0] ?? ""}
+                      placeholder="CSS selector of the element to wait for"
+                      aria-label={`Step ${i + 1} wait selector`}
+                      onChange={(e) =>
+                        patchStep(i, {
+                          selectors: [e.target.value, ...(s.selectors?.slice(1) ?? [])],
+                        })
+                      }
+                    />
+                  </div>
+                  {!(s.selectors?.[0] ?? "").trim() && (
+                    <div className="grid grid-cols-[160px_1fr] gap-3">
+                      <span />
+                      <p className="text-xs text-ink-3">
+                        A wait needs something to look at. Without a selector it would hold the
+                        browser for its whole timeout and then report that the page never got
+                        there, every run.
+                      </p>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-[160px_1fr] items-center gap-3">
+                    <span className="text-xs text-ink-3">wait until it</span>
+                    <div className="flex gap-2">
+                      <select
+                        className={input}
+                        value={s.waitOp ?? "appears"}
+                        aria-label={`Step ${i + 1} wait condition`}
+                        onChange={(e) =>
+                          patchStep(i, {
+                            waitOp: e.target.value,
+                            // An operand left behind by a previous op would be
+                            // stored against one that ignores it.
+                            ...(WAIT_NEEDS_VALUE.includes(e.target.value)
+                              ? {}
+                              : { waitValue: undefined }),
+                          })
+                        }
+                      >
+                        <option value="appears">starts showing a value</option>
+                        <option value="disappears">stops showing a value</option>
+                        <option value="equals">equals</option>
+                        <option value="contains">contains</option>
+                        <option value="not_contains">stops containing</option>
+                        <option value="above">goes above</option>
+                        <option value="below">goes below</option>
+                      </select>
+                      {WAIT_NEEDS_VALUE.includes(s.waitOp ?? "appears") && (
+                        <input
+                          className={input}
+                          value={s.waitValue ?? ""}
+                          aria-label={`Step ${i + 1} wait value`}
+                          placeholder="value"
+                          maxLength={200}
+                          onChange={(e) => patchStep(i, { waitValue: e.target.value })}
+                        />
+                      )}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-[160px_1fr] items-center gap-3">
+                    <span className="text-xs text-ink-3">give up after</span>
+                    <div className="flex items-center gap-2">
+                      <select
+                        className={input}
+                        value={String(s.waitMs ?? 30000)}
+                        aria-label={`Step ${i + 1} wait timeout`}
+                        onChange={(e) => patchStep(i, { waitMs: Number(e.target.value) })}
+                      >
+                        <option value="10000">10 seconds</option>
+                        <option value="30000">30 seconds</option>
+                        <option value="60000">1 minute</option>
+                        <option value="120000">2 minutes</option>
+                        <option value="300000">5 minutes</option>
+                      </select>
+                      <select
+                        className={input}
+                        value={s.waitOnTimeout ?? "fail"}
+                        aria-label={`Step ${i + 1} wait timeout behaviour`}
+                        onChange={(e) =>
+                          patchStep(i, { waitOnTimeout: e.target.value as "fail" | "continue" })
+                        }
+                      >
+                        <option value="fail">and stop the run</option>
+                        <option value="continue">and carry on anyway</option>
+                      </select>
+                    </div>
+                  </div>
+                  <p className="pl-0 text-xs text-ink-3">
+                    Uses this step&rsquo;s selectors. A recording is a straight line through a page
+                    that had already loaded; this is where a replay stops to let it.
+                  </p>
+                </div>
+              ) : s.action === "run_skill" ? (
                 <div className="mt-3 grid grid-cols-[160px_1fr] items-center gap-3 pl-11">
                   <span className="text-xs text-ink-3">run skill</span>
                   <select

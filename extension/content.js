@@ -275,9 +275,126 @@
     el.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
+  // ---------- WAITING ----------
+  // Mirrors lib/watches.ts. A content script cannot import from the server
+  // bundle, so this is a copy, and a copy that drifts is worse than no copy at
+  // all: the same skill would wait for different things depending on where it
+  // ran. tests/wait-step.test.ts pins the two against each other.
+  const AEM_ZERO_WIDTH = /[\u200B-\u200D\uFEFF]/g;
+  function aemNormalize(s) {
+    return String(s).replace(AEM_ZERO_WIDTH, "").replace(/\s+/g, " ").trim();
+  }
+  function aemNumber(s) {
+    const m = aemNormalize(s).replace(/[ \s]/g, "").match(/-?\d[\d,]*\.?\d*/);
+    if (!m) return null;
+    const n = Number(m[0].replace(/,/g, ""));
+    return Number.isFinite(n) ? n : null;
+  }
+  /** One reading, one answer. null reading = the element is not on the page. */
+  function aemHolds(op, operand, reading) {
+    const text = reading === null ? "" : aemNormalize(reading);
+    if (op === "appears") return reading !== null && text !== "";
+    if (op === "disappears") return reading === null || text === "";
+    // A missing element cannot satisfy a claim about its text. Without this,
+    // "not_contains" is true for an element that never rendered.
+    if (reading === null) return false;
+    const want = aemNormalize(operand);
+    if (op === "equals") return text === want;
+    if (op === "contains") return text.includes(want);
+    if (op === "not_contains") return !text.includes(want);
+    if (op === "above" || op === "below") {
+      const a = aemNumber(text), b = aemNumber(want);
+      if (a === null || b === null) return null;
+      return op === "above" ? a > b : a < b;
+    }
+    return null;
+  }
+
+  /**
+   * Playwright's definition, so both runners answer the same question: an
+   * element is visible when it has a non-empty box and is not visibility:hidden.
+   * display:none has no boxes, so it is covered.
+   */
+  function aemVisible(el) {
+    try {
+      if (!el.getClientRects || el.getClientRects().length === 0) return false;
+      return getComputedStyle(el).visibility !== "hidden";
+    } catch { return false; }
+  }
+
+  const WAIT_POLL_MS = 500;
+  const WAIT_MAX_MS = 5 * 60 * 1000;
+  const WAIT_DEFAULT_MS = 30000;
+
+  /** Hold here until the page says so, or until the step's time runs out. */
+  function waitForStep(step) {
+    const op = step.waitOp || "appears";
+    const operand = step.waitValue || "";
+    const limit = Math.min(Math.max(1000, step.waitMs || WAIT_DEFAULT_MS), WAIT_MAX_MS);
+    const until = Date.now() + limit;
+    const sels = step.selectors || [];
+    return new Promise((done) => {
+      let usedSel = "";
+      let lastPing = Date.now();
+      const tick = () => {
+        // The recorded selectors are ALTERNATIVE ways to find one element, so
+        // the first that finds it wins and its reading is the one judged.
+        // Asking whether ANY of them satisfied meant "stops showing a value"
+        // was satisfied by the first spare selector that no longer matched,
+        // while the element was still there under the one that did.
+        let reading = null;
+        let usedNow = "";
+        for (const sel of sels) {
+          let r = null;
+          try {
+            // Visible, like the cloud runner resolves a selector: an overlay
+            // hidden with CSS still has its text, and a not-yet-shown element
+            // would satisfy "starts showing a value" before it was there.
+            const found = document.querySelector(sel);
+            const e = found && aemVisible(found) ? found : null;
+            // Same ceiling the cloud reads to. At the capture default a long
+            // element is cut at 4,000 characters here and 20,000 there, so a
+            // "contains" whose match sits past the cut would never be satisfied
+            // locally and would be satisfied in the cloud.
+            r = e ? readValue(e, 20000) : null;
+          } catch { r = null; }
+          if (r !== null) { reading = r; usedNow = sel; break; }
+        }
+        if (reading !== null) usedSel = usedNow;
+        if (aemHolds(op, operand, reading) === true) {
+          done({ ok: true, selectorUsed: usedNow || usedSel, confidence: 1 });
+          return;
+        }
+        // Keep the service worker alive across a long wait (see background.js).
+        if (Date.now() - lastPing >= 20000) {
+          lastPing = Date.now();
+          try { chrome.runtime.sendMessage({ __aem: "waiting" }, () => void chrome.runtime.lastError); } catch { /* the worker will be woken by the reply anyway */ }
+        }
+        if (Date.now() >= until) {
+          // "continue" is the author saying the rest of the skill works without
+          // it. Reporting failure then would stop a run they said to carry on.
+          // timedOut either way, so the driver can record what happened rather
+          // than filing a carried-on wait as a clean success.
+          done(
+            (step.waitOnTimeout || "fail") === "continue"
+              ? { ok: true, selectorUsed: usedSel, confidence: 1, timedOut: true }
+              : { ok: false, reason: "wait-timeout", timedOut: true },
+          );
+          return;
+        }
+        setTimeout(tick, WAIT_POLL_MS);
+      };
+      tick();
+    });
+  }
+
   function performStep(step, value, forcedSelector) {
     const action = step.action;
     if (action === "navigate") return { ok: true, selectorUsed: "", confidence: 1 };
+    // Before the resolve below, deliberately: a wait exists precisely because
+    // the element is not there yet, and the shared "element-not-found" exit
+    // would refuse every wait that had anything to wait for.
+    if (action === "wait_for") return waitForStep(step);
 
     let el = null, used = "";
     if (forcedSelector) {
@@ -373,7 +490,12 @@
   chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
     if (!msg || !msg.__aem) return;
     if (msg.__aem === "ping") { reply({ ready: true, url: location.href }); return true; }
-    if (msg.__aem === "perform") { reply(performStep(msg.step, msg.value, msg.forcedSelector)); return true; }
+    if (msg.__aem === "perform") {
+      // A wait_for step answers later. Promise.resolve keeps every other step
+      // on exactly the path it had.
+      Promise.resolve(performStep(msg.step, msg.value, msg.forcedSelector)).then(reply);
+      return true;
+    }
     if (msg.__aem === "candidates") { reply({ candidates: collectCandidates() }); return true; }
   });
 

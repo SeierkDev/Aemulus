@@ -9,7 +9,8 @@ export type ActionType =
   | "key"
   | "submit"
   | "extract"
-  | "run_skill";
+  | "run_skill"
+  | "wait_for";
 
 export interface RecordedAction {
   idx: number;
@@ -123,6 +124,21 @@ export interface SkillStep {
    */
   watchOp?: string;
   watchValue?: string;
+  /**
+   * For "wait_for" steps: hold here until the page says so.
+   *
+   * A recorded task is a straight line through a page that was already ready.
+   * Replayed, the same line hits a table still loading, an approval that lands a
+   * few seconds later, a balance that settles. Until now the only answer was a
+   * step that failed and a run that stopped, so the pipeline was only as long as
+   * the slowest thing in it happened to be fast.
+   */
+  waitOp?: string;
+  waitValue?: string;
+  /** How long to keep looking, in ms. */
+  waitMs?: number;
+  /** What a timeout means: stop the run, or carry on without it. */
+  waitOnTimeout?: "fail" | "continue";
   /** For "run_skill" steps: the skill to invoke as a child run (composition). */
   subSkillId?: string;
   /** Human checkpoint: pause for a live takeover (e.g. a 2FA prompt). */

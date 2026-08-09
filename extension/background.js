@@ -8,6 +8,13 @@
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (!msg || !msg.__aem) return;
 
+  // A wait_for step can hold the page for minutes while this worker has nothing
+  // to do, and an idle MV3 service worker is terminated — taking the pending
+  // step response with it, so the run would die partway through for no reason
+  // the person could see. The content script pings while it waits; receiving
+  // the message is the point, and answering it keeps the channel honest.
+  if (msg.__aem === "waiting") { sendResponse({ ok: true }); return true; }
+
   if (msg.__aem === "action") {
     chrome.storage.local.get({ aemTrace: [] }, (r) => {
       const trace = Array.isArray(r.aemTrace) ? r.aemTrace : [];
@@ -205,10 +212,35 @@ async function runSkill(msg) {
     let flagged = false;
     let note = "";
 
+    // A wait that ran out never reaches the vision fallback.
+    //
+    // A missed selector means the element moved and vision can find it again. A
+    // wait running out means the thing the author said to wait for did not
+    // happen, which is not a locating problem: the fallback would spend tokens
+    // hunting an element that is not there and, worse, "recover" the step by
+    // pointing at something else — so a run told to stop would carry on as if
+    // the approval had landed. It is also the one place the two runners could
+    // disagree about the same skill, since the cloud has no fallback here.
+    if (step.action === "wait_for") {
+      if (res && res.ok) {
+        flagged = !!res.timedOut;
+        note = res.timedOut
+          ? "Waited and it never arrived; carried on, as the step says to."
+          : "Waited and it was there.";
+      } else {
+        flagged = true;
+        note = "Waited and it never arrived.";
+        status = "needs_review";
+        error = "A step waited for the page and it never got there.";
+        results.push({ idx: step.idx, selectorUsed, value: "", confidence: 0, flagged, note, screenshot: await safeCapture(windowId) });
+        break;
+      }
+    }
+
     // Deterministic selector missed → vision fallback (the operator picks the
     // element from the live page's candidates). Added in Phase 3.
     let extracted;
-    if (!res || !res.ok) {
+    if (step.action !== "wait_for" && (!res || !res.ok)) {
       const rescue = await visionRescue(server, key, runId, tabId, step, value);
       tokensIn += rescue.tokensIn; tokensOut += rescue.tokensOut;
       if (rescue.ok) {

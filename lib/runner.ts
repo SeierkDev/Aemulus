@@ -45,6 +45,9 @@ import {
 import { runSlots } from "./semaphore";
 import { attachAgenc, attachReceipt } from "./receipt";
 import { runIsWatch } from "./runs";
+import { MAX_WAIT_MS } from "./watches";
+import { captureValue } from "./page-read";
+import { waitForStep, waitLimit } from "./wait";
 import { learnSelectors } from "./skills";
 import { startChainedRun } from "./chain";
 import { agenticStep, agentFallbackEnabled } from "./agent";
@@ -232,6 +235,15 @@ export async function executeRun(
     });
     page.setDefaultTimeout(STEP_TIMEOUT_MS); // per-action cap (no hanging steps)
     let deadline = Date.now() + RUN_TIMEOUT_MS; // hard wall-clock cap (extended over human pauses)
+    // What the run may spend WAITING, on top of that cap.
+    //
+    // The run clock is shorter than the longest wait the editor offers, so
+    // without this a deliberate five-minute wait was quietly cut to whatever
+    // was left of the run and reported as the page never getting there. Time
+    // spent waiting is not the run being slow, the same reason a human pause is
+    // not billed to it. Capped for the whole run rather than per step, or a
+    // plan full of waits would have no wall clock at all.
+    let waitBudget = MAX_WAIT_MS;
     let captchaPauses = 0; // how many times we've paused for a human to clear a captcha
 
     // Credential vault: auto-fill the runner's stored secrets into matching input
@@ -419,6 +431,50 @@ export async function executeRun(
           }
           await setRunStatus(runId, "running");
           await recordStep(runId, step, "", recVal, recShot, 1, false, "Human completed an interactive checkpoint.");
+          continue;
+        }
+
+        // Wait for the page to be ready before going on.
+        //
+        // A recording is a straight line through a page that had already
+        // finished loading, because the person only clicked once they could see
+        // the thing. Replayed at machine speed the same line arrives early: the
+        // table is still spinning, the approval has not landed, the balance has
+        // not settled. Until now the answer was a step that missed its element
+        // and a run that stopped there, which made a pipeline only as long as
+        // the slowest thing in it happened to be fast.
+        if (step.action === "wait_for") {
+          // Granted before the wait, because the deadline is what bounds it,
+          // and the unused part handed straight back — a wait that returns in
+          // two seconds must not spend five minutes of the run's budget.
+          const grant = Math.min(waitLimit(step), waitBudget);
+          deadline += grant;
+          waitBudget -= grant;
+          const w = await waitForStep(page, step, deadline);
+          const unused = Math.max(0, grant - w.elapsed);
+          deadline -= unused;
+          waitBudget += unused;
+          await snap();
+          // A wall is a different problem from a slow page, and "last saw
+          // nothing there" sends you looking at your selector for something
+          // that was never going to arrive behind a bot challenge.
+          const note =
+            !w.met && (await isCaptchaPresent(page))
+              ? `${w.note} The page is showing a bot challenge.`
+              : w.note;
+          // Confidence is what the step is worth as evidence. A wait that ran
+          // out did not do what it says, so it is not worth 1.00 next to a note
+          // explaining that it failed.
+          const conf = w.met ? DETERMINISTIC_CONFIDENCE : 0;
+          if (!w.met && (step.waitOnTimeout ?? "fail") === "fail") {
+            // Recorded before the break, so the timeout is visible as the step
+            // that ended the run rather than as a bare run-level error.
+            await recordStep(runId, step, w.selectorUsed, "", recShot, conf, true, note);
+            finalStatus = "needs_review";
+            error = note;
+            break;
+          }
+          await recordStep(runId, step, w.selectorUsed, "", recShot, conf, !w.met, note);
           continue;
         }
 
@@ -881,23 +937,6 @@ function hostMatches(url: string, host: string): boolean {
 
 // Cap a single captured value so a hostile page with a multi-megabyte text node
 // can't bloat the (encrypted) run output / commitment / memory.
-const MAX_CAPTURE_CHARS = 20_000;
-
-/** Read a value off an element: form value for inputs, else visible text. */
-async function captureValue(loc: Locator): Promise<string> {
-  let raw = "";
-  try {
-    const tag = await loc.evaluate((el) => el.tagName.toLowerCase());
-    if (tag === "input" || tag === "textarea" || tag === "select") {
-      raw = (await loc.inputValue()).trim();
-    } else {
-      raw = ((await loc.textContent()) ?? "").trim();
-    }
-  } catch {
-    raw = ((await loc.textContent()) ?? "").trim();
-  }
-  return raw.slice(0, MAX_CAPTURE_CHARS);
-}
 
 /**
  * How long to keep trying a click we already know is covered.
