@@ -53,6 +53,22 @@ screenshot is captured; and the run settles on the site with a receipt (and pays
 the creator on external runs — same rules as a cloud run). If a step can't be
 resolved, the run parks in **needs review** for you to fix and retry.
 
+A replay here does the same things a cloud run does, so a skill behaves the same
+wherever you run it:
+
+- **Waits.** A `wait_for` step holds until the page is ready — a value starts
+  showing, a spinner stops, a number crosses — instead of missing an element
+  that was simply late. It gives up after the time the step sets, and the step
+  says whether that stops the run or it carries on.
+- **Branches.** A step with a condition runs only if the page says so, and one
+  condition can cover a group of steps — so a skill takes a different path
+  depending on what it finds, and the steps it skips are recorded as skipped
+  rather than left out.
+
+Both judge the page with the same operators, and the same code, that watch rules
+use on the site. A wait that times out is never sent to the vision fallback: the
+thing did not happen, which is not a selector that moved.
+
 ## Notes
 
 - **Secrets** (passwords, OTPs, card numbers…) are never captured or stored —

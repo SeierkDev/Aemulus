@@ -22,8 +22,11 @@ other people can install it with one click instead of dev mode.
 > selectors, no config. Then say when you actually care: below a number, above
 > one, when a word appears, or simply whenever it moves. Aemulus checks on a
 > schedule and tells you, and it can run another one of your skills at that
-> moment instead of only messaging you. Every run captures step-by-step proof
-> and a tamper-evident receipt.
+> moment instead of only messaging you. Replays wait for a page that is not
+> ready yet rather than missing something that was merely late, and take a
+> different path depending on what they find, so a skill that is nearly right
+> for your site can be made to fit. Every run captures step-by-step proof and a
+> tamper-evident receipt.
 >
 > The extension connects to your own Aemulus account (you provide the URL + an
 > API key). Recordings and runs live on your Aemulus server, not with anyone
