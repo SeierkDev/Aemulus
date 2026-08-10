@@ -39,6 +39,14 @@ export default async function SkillPage({
   const triggerableSkills = others
     .filter((s) => !templateTool(s) && !planHasChaining(s.plan))
     .map((s) => ({ id: s.id, name: s.name }));
+  // Where this one started, when it started as someone else's. Named only if it
+  // is still published — a private skill's title is not a stranger's to learn.
+  const parentRaw = skill.forkedFrom ? await getSkill(skill.forkedFrom) : null;
+  const forkedFrom =
+    parentRaw && (parentRaw.published || parentRaw.owner === session.pubkey)
+      ? { id: parentRaw.id, name: parentRaw.name, published: parentRaw.published }
+      : null;
+
   return (
     <SkillEditor
       initial={skill}
@@ -46,6 +54,7 @@ export default async function SkillPage({
       triggers={triggers}
       otherSkills={otherSkills}
       triggerableSkills={triggerableSkills}
+      forkedFrom={forkedFrom}
       myOrgs={myOrgs}
       isOwner={skill.owner === session.pubkey}
     />

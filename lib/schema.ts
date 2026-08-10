@@ -42,6 +42,10 @@ CREATE TABLE IF NOT EXISTS skills (
   allowed_hosts  TEXT NOT NULL DEFAULT '[]',
   -- org this skill is shared with (null = personal)
   org_id         TEXT,
+  -- the published skill this one was forked from, if any. Provenance, not a
+  -- dependency: a fork is a full copy and keeps working if the original changes,
+  -- is unpublished, or is edited beyond recognition.
+  forked_from    TEXT REFERENCES skills(id),
   created_at     INTEGER NOT NULL,
   updated_at     INTEGER NOT NULL
 );

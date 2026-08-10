@@ -767,4 +767,11 @@ export const MIGRATIONS: Migration[] = [
     addColumns: [{ table: "schedules", column: "watch_action", def: "TEXT" }],
   },
 
+  // 51 - where a skill came from, when it came from someone else's.
+  {
+    id: 51,
+    name: "skill_forked_from",
+    addColumns: [{ table: "skills", column: "forked_from", def: "TEXT" }],
+  },
+
 ];

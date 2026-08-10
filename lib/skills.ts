@@ -494,6 +494,102 @@ export async function skillAccess(
   };
 }
 
+/**
+ * Take someone else's published skill and make it yours to change.
+ *
+ * A COPY, not a reference. The marketplace was read-only in practice: run what
+ * is there, or record your own from nothing. A skill that is nearly right for
+ * your supplier portal was a dead end, so the half-right ones died instead of
+ * becoming five better ones.
+ *
+ * The copy is deliberately complete and deliberately detached — plan, inputs
+ * and allowed hosts come across, and nothing links back at run time. The
+ * original's author can edit, unpublish or abandon their skill and every fork
+ * keeps working. What survives is provenance: which skill this came from, so
+ * the listing can say where it started and the original can show what it
+ * spawned.
+ *
+ * What does NOT come across: the publish flag (a fork starts private, because
+ * publishing someone else's work under your name should be a decision, not a
+ * default), the run count and rating (they were earned by the original), the
+ * org share, and the source recording (it is the original author's, and it can
+ * hold what their browser saw).
+ */
+export async function forkSkill(
+  skillId: string,
+  owner: string,
+): Promise<{ id: string } | { refused: string }> {
+  await ready();
+  const src = await getSkill(skillId);
+  if (!src) return { refused: "That skill no longer exists." };
+  // A template is placeholder steps for a tool, not something that runs. The
+  // whole point of one is that you record your own version, so a copy of the
+  // placeholders is a skill that can never do anything — offering it would be
+  // offering a dead end dressed as a shortcut.
+  if (templateTool(src)) {
+    return { refused: "That's a starter template — record your own version instead of forking it." };
+  }
+  // The cap every other creation path enforces. Forking bypassed it by writing
+  // the row directly, and it is the CHEAPEST way to make a skill — no
+  // recording, no model call — so it was the easiest way to walk past the bound
+  // that exists to keep this table from growing without one.
+  if ((await countSkillsByOwner(owner)) >= MAX_SKILLS_PER_OWNER) {
+    return { refused: `You already have ${MAX_SKILLS_PER_OWNER} skills, which is the limit.` };
+  }
+  // Forkable = runnable by you. Published, or shared with an org you are in, or
+  // already yours — the same authority every other path asks.
+  if (!(await skillAccess(src, owner)).run) {
+    return { refused: "That skill isn't yours to fork." };
+  }
+  const now = Date.now();
+  const forkId = id("skl");
+  await db.execute({
+    sql: `INSERT INTO skills (id, owner, name, description, plan, input_schema, allowed_hosts, source_demo_id, published, published_at, run_count, version, forked_from, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 0, NULL, 0, 1, ?, ?, ?)`,
+    args: [
+      forkId,
+      owner,
+      // Named for what it is. Left identical, a marketplace of forks is a list
+      // of the same title over and over and nobody can tell them apart.
+      `${src.name} (fork)`.slice(0, 200),
+      src.description,
+      JSON.stringify(src.plan),
+      JSON.stringify(src.inputSchema),
+      JSON.stringify(src.allowedHosts),
+      src.id,
+      now,
+      now,
+    ],
+  });
+  // Snapshot v1, exactly as creating a skill does.
+  //
+  // Without it the fork had no history at all: the editor's version panel was
+  // empty, and updateSkill derives the next version from the highest SNAPSHOT —
+  // so the first edit wrote another v1, holding the edited state. The plan you
+  // forked was then unrecoverable, which is the one version a fork most needs,
+  // since the reason to fork is that you are about to change it.
+  await snapshotVersion({
+    id: forkId,
+    version: 1,
+    name: `${src.name} (fork)`.slice(0, 200),
+    description: src.description,
+    plan: src.plan,
+    inputSchema: src.inputSchema,
+    allowedHosts: src.allowedHosts,
+  });
+  return { id: forkId };
+}
+
+/** How many skills were forked from this one. */
+export async function forkCount(skillId: string): Promise<number> {
+  await ready();
+  const r = await db.execute({
+    sql: `SELECT COUNT(*) AS n FROM skills WHERE forked_from = ?`,
+    args: [skillId],
+  });
+  return Number(r.rows[0]?.n ?? 0);
+}
+
 /** Share a skill with an org (or unshare with null). Owner only. */
 export async function setSkillOrg(
   skillId: string,
@@ -518,6 +614,7 @@ function rowToSkill(row: Record<string, unknown>): Skill {
     inputSchema: parseJson<{ fields: SkillInputField[] }>(row.input_schema, { fields: [] }),
     allowedHosts: parseJson<string[]>(row.allowed_hosts, []),
     orgId: row.org_id == null ? null : String(row.org_id),
+    forkedFrom: row.forked_from == null ? null : String(row.forked_from),
     sourceDemoId: row.source_demo_id == null ? null : String(row.source_demo_id),
     published: Number(row.published) === 1,
     publishedAt: row.published_at == null ? null : Number(row.published_at),

@@ -5,10 +5,12 @@ import { Nav } from "@/components/Nav";
 import { RunPanel } from "@/components/RunPanel";
 import { BulkRunPanel } from "@/components/BulkRunPanel";
 import { Stars } from "@/components/Stars";
+import { ForkButton } from "@/components/ForkButton";
 import { branchSpan, conditionSentence } from "@/lib/watches";
 import { RatingWidget } from "@/components/RatingWidget";
 import { ReportButton } from "@/components/ReportButton";
 import {
+  forkCount,
   getSkill,
   skillTargets,
   categorize,
@@ -77,6 +79,15 @@ export default async function MarketSkillPage({
   // says nine steps all happen; when four are behind a branch, that is not a
   // description of the skill but an overstatement of it — on the page whose
   // heading is what it does.
+  // Provenance and what it spawned. The parent is only named when it is still
+  // published: a private skill's existence and title are not a stranger's to
+  // learn from a page about someone else's fork.
+  const [forks, parentRaw] = await Promise.all([
+    forkCount(skill.id),
+    skill.forkedFrom ? getSkill(skill.forkedFrom) : Promise.resolve(null),
+  ]);
+  const parent = parentRaw && parentRaw.published ? parentRaw : null;
+
   const branchCover: boolean[] = [];
   {
     let through = -1;
@@ -115,6 +126,28 @@ export default async function MarketSkillPage({
               )}
               <span>·</span>
               <span>{skill.plan.length} steps</span>
+              {forks > 0 && (
+                <>
+                  <span>·</span>
+                  <span>
+                    {forks} {forks === 1 ? "fork" : "forks"}
+                  </span>
+                </>
+              )}
+              {/* Where it started. Only when the original is still published:
+                  naming a private skill to a stranger would leak both that it
+                  exists and what it is called. */}
+              {parent && (
+                <>
+                  <span>·</span>
+                  <span>
+                    forked from{" "}
+                    <Link href={`/market/${parent.id}`} className="text-ink underline">
+                      {parent.name}
+                    </Link>
+                  </span>
+                </>
+              )}
               <span>·</span>
               <span className="mono">v{skill.version}</span>
               <span>· updated {ago(skill.updatedAt)}</span>
@@ -140,6 +173,13 @@ export default async function MarketSkillPage({
           <div className="flex shrink-0 items-center gap-2">
             {isVerified(skill.owner) && <Badge>✓ Verified</Badge>}
             <Badge>{tmpl ? "Template" : "Published"}</Badge>
+            {/* Not on your own skill (forking it would make a second copy of
+                something you can already edit), and not on a template, whose
+                steps are placeholders — a copy of those can never run, and this
+                page already tells you to record your own instead. */}
+            {!tmpl && skill.owner !== session?.pubkey && (
+              <ForkButton skillId={skill.id} signedIn={!!session} />
+            )}
           </div>
         </div>
 

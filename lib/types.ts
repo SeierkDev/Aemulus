@@ -181,6 +181,13 @@ export interface Skill {
   allowedHosts: string[];
   /** Org this skill is shared with (null = personal). */
   orgId: string | null;
+  /**
+   * The skill this one was forked from, if any.
+   *
+   * Provenance, not a dependency: a fork is a complete copy and keeps working
+   * whatever happens to the original.
+   */
+  forkedFrom?: string | null;
   sourceDemoId: string | null;
   published: boolean;
   publishedAt: number | null;

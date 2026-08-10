@@ -53,6 +53,7 @@ export function SkillEditor({
   triggers,
   otherSkills,
   triggerableSkills,
+  forkedFrom,
   myOrgs,
   isOwner,
 }: {
@@ -62,6 +63,8 @@ export function SkillEditor({
   otherSkills: { id: string; name: string }[];
   /** Narrower than otherSkills: what a watch may actually trigger. */
   triggerableSkills: { id: string; name: string }[];
+  /** Where this skill came from, when it came from someone else's. */
+  forkedFrom: { id: string; name: string; published: boolean } | null;
   myOrgs: { id: string; name: string }[];
   isOwner: boolean;
 }) {
@@ -234,6 +237,22 @@ export function SkillEditor({
       </header>
 
       <h1 className="sr-only">Edit skill: {name || initial.name}</h1>
+
+      {/* A fork is a complete copy: it keeps working whatever happens to the
+          original. Saying where it started is provenance, not a dependency. */}
+      {forkedFrom && (
+        <p className="text-xs text-ink-3">
+          Forked from{" "}
+          {forkedFrom.published ? (
+            <Link href={`/market/${forkedFrom.id}`} className="underline hover:text-ink">
+              {forkedFrom.name}
+            </Link>
+          ) : (
+            <span>{forkedFrom.name}</span>
+          )}
+          . This is your own copy — editing it changes nothing for anyone else.
+        </p>
+      )}
 
       <div className="border-t border-border pt-8">
         {/* Identity */}
